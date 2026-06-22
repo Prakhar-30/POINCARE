@@ -2,8 +2,6 @@
 
 ### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them — protecting liquidity providers from the losses that trends cause, without an oracle.
 
-> *Working codename — rename freely.*
-
 ---
 
 ## TL;DR
