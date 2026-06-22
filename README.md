@@ -1,244 +1,214 @@
 # POINCARÉ
 
-**An adaptive-curvature AMM hook for Uniswap v4 that minimizes directional Loss-Versus-Rebalancing by reshaping its own bonding curve in response to how *trending* the price is — not how volatile.**
+### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them — protecting liquidity providers from the losses that trends cause, without an oracle.
+
+> *Working codename — rename freely.*
 
 ---
 
 ## TL;DR
 
-A constant-product pool is a **fixed rectangular hyperbola** (`x · y = k`). Its curvature never changes, so it is locked into one trade-off forever: flat enough for low slippage *or* sharp enough to resist arbitrage — never both, never the right one for the moment.
+A normal AMM is a frozen curve: it quotes the same way whether the market is drifting hard in one direction (when liquidity providers bleed value to arbitrageurs) or just chopping around harmlessly. Poincaré watches its own price, runs a **CUSUM quickest-change detector** to decide — with mathematically optimal speed — whether a *genuine* directional trend has begun, and when one has, it **bends its bonding curve asymmetrically**: it hardens the side the trend is pushing (where LPs lose money) and stays deep and cheap on the stabilising side (rewarding the flow that helps).
 
-Poincaré makes the hyperbola's **curvature a live function of the price path's directional persistence** — how much the price is *trending* versus *chopping*. The key refinement over every prior "volatility" hook: **LVR is caused by directional moves, not symmetric noise.** A choppy, mean-reverting market is benign for LPs (they earn fees on round-trips); a *trending* market is where they bleed. So the curve sharpens when the price trends and flattens when it chops — placing the pool on the LVR-optimal point of the slippage/loss frontier each block, with **no oracle, no auction, no keeper, no external network.**
+The detector fires at a **data-dependent moment**, not after a fixed number of blocks, so there is no countdown for an attacker to game. And because the only way to fool the detector is to *genuinely move the market* — spending real money and feeding arbitrageurs — manipulation is bounded by design, not wished away.
 
-For calm or pegged pairs it collapses to a tight, stableswap-like curve automatically. For volatile, trending pairs it becomes a self-defending market maker. One invariant, two regimes, chosen by the market itself.
+**What it uses:** the *Milionis LVR identity* (why curvature is the lever), an *asymmetric hyperbolic bonding curve* (the actuator), a *directional-efficiency signal*, and *CUSUM / Quickest Change Detection* with *Lorden minimax optimality* and *robust-QCD* hardening (the engine).
 
 ---
 
 ## 1. The problem
 
-An LP earns fees but loses value to better-informed flow every time the price moves. The formal name is **Loss-Versus-Rebalancing (LVR)** — the largest, most permanent cost in automated market making. The Milionis–Moallemi–Roughgarden–Zhang result gives it in closed form:
+Liquidity providers lose value to better-informed flow whenever the price moves — a cost with a precise name, **Loss-Versus-Rebalancing (LVR)**. The Milionis–Moallemi–Roughgarden–Zhang identity pins it down:
 
-> **LVR rate ≈ ½ · σ² · (marginal liquidity at the current price).**
+$$\text{LVR rate} \;\approx\; \tfrac{1}{2}\,\sigma^2 \cdot \big(\text{marginal liquidity}\big)$$
 
-Two facts fall straight out:
+Two truths fall out of that one line:
 
-1. **Curvature is the LVR lever, not the fee.** Marginal liquidity is a property of the *curve's shape*. A flat curve bleeds more LVR; a sharp curve bleeds less. The fee only taxes the trade — it does not change how far the price moves, so it does not govern LVR.
-2. **The optimal curvature is conditional on price dynamics.** Because the loss scales with the *square of directional movement*, the curvature that best balances "earn fees from benign flow" against "don't get run over" depends on how the price is actually moving right now.
+- **Curvature is the lever.** "Marginal liquidity" is a property of the curve's *shape*. A flat curve bleeds more LVR; a sharp curve bleeds less. The *fee* is not in this equation — so fee-tweaking, which most hooks do, is pulling the wrong lever.
+- **The damage is directional.** LVR is driven by *sustained, one-directional* price moves, not by symmetric noise. A market that thrashes around but goes nowhere barely hurts LPs; a market that *trends* is what drains them.
 
-And the refinement that defines this project: σ² in that identity is realized over a path. A pair can be highly volatile yet mean-reverting — lots of motion, little net displacement, little LVR. The damage comes from **persistent, one-directional drift**. So the correct control signal is not volatility magnitude but **directional persistence**.
-
-What exists today does none of this:
-
-- **Constant-product** picks one curvature forever. Wrong almost always.
-- **Concentrated-liquidity ranges** are a static, manual guess; the LP carries all rebalancing.
-- **Dynamic-fee hooks** move the *fee* on volatility — the wrong lever, on the wrong signal.
-
-Nobody moves the lever the identity points at — **curvature — driven by the signal that actually causes the loss — directional persistence.** That is the gap Poincaré fills.
+So the right response is: **reshape the curve's curvature, asymmetrically, but only when a real trend is actually happening.** That last clause is the hard part — and the whole project.
 
 ---
 
-## 2. The core idea
+## 2. The design in one picture
 
-### 2.1 Generalize the hyperbola
-
-We use a **one-parameter family of hyperbolae** whose curvature is set by a coefficient `κ`, expressed through virtual offsets:
-
-```
-(x + a) · (y + b) = K        where a, b grow as κ shrinks
-```
-
-- **Low κ (large offsets):** nearly a straight line near the center — flat, deep, minimal slippage, stableswap-like. The benign regime.
-- **High κ (offsets → 0):** approaches and exceeds pure `x·y=k` — sharp, high marginal impact, strong adverse-selection resistance. The protective regime.
-
-The family is continuous and all trade math stays closed-form and gas-bounded — no transcendental solves.
-
-### 2.2 Drive curvature with directional persistence
-
-The signal is a **directional-efficiency** measure of the recent price path:
-
-```
-persistence  =  | net price displacement |  /  total path length     over a window
-```
-
-- Near **1** → the price marched one way → *trending* → LVR danger.
-- Near **0** → lots of motion, little net move → *choppy / mean-reverting* → benign.
-
-This is a cheap, incremental proxy for the Hurst exponent (trend vs. mean-reversion), computable per-swap on-chain. The controller maps it to the LVR-optimal curvature:
-
-```
-κ*(persistence) = clamp( f(persistence) , κ_min , κ_max )
-```
-
-`f` is monotone increasing: more persistence → more curvature → less directional LVR. `clamp` prevents degenerating into a constant-sum line (infinite LVR risk) or a dead, over-sharp curve.
-
-### 2.3 The stable-graceful property (free, not bolted on)
-
-A calm or pegged pair sits near `persistence ≈ 0` → `κ → κ_min` → the flattest, deepest curve → it behaves like a tight stableswap with low slippage. **It does not get worse for stable pairs; it converges to the right curve for them.** And if a "stable" pair depegs, the move becomes persistent, `κ` rises, and the curve sharpens to protect through the event, then re-flattens when calm returns.
-
----
-
-## 3. Architecture
-
-### 3.1 Concept map — how the signal becomes a curve
+Poincaré has two parts: a **detector** (the brain) that decides *when* there is a real trend, and an **actuator** (the curve) that *acts* on that decision.
 
 ```mermaid
 flowchart LR
-    P["Price path over a window"] --> DE["Directional Efficiency<br/>net displacement / path length"]
-    DE --> T{"Trending or choppy?"}
-    T -->|"High persistence<br/>one-directional drift"| SHARP["Sharpen curvature<br/>protect LPs from directional LVR"]
-    T -->|"Low persistence<br/>mean-reverting round-trips"| FLAT["Flatten curvature<br/>deep, cheap, router-friendly"]
-    SHARP --> OUT["LVR-optimal curve this block"]
-    FLAT --> OUT
+    PRICE["Pool's own price<br/>(sqrtPriceX96)"] --> SIG["Directional-efficiency signal<br/>trend vs chop"]
+    SIG --> CUSUM["CUSUM detector<br/>accumulate evidence<br/>fire at threshold h"]
+    CUSUM --> LAW["Control law<br/>evidence to bounded curvature"]
+    LAW --> CURVE["Asymmetric bonding curve<br/>hardens trend side,<br/>softens stabilising side"]
+    CURVE --> PRICE
 ```
 
-### 3.2 System architecture — components and data flow
+The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses change-point detection. The asymmetric curve is just where its decision lands.
+
+---
+
+## 3. The mathematics we use
+
+### 3.1 The actuator — an asymmetric hyperbolic curve
+
+A constant-product pool is the hyperbola `x·y = k`. We generalise it with virtual offsets and, crucially, make those offsets **direction-dependent**:
+
+$$\big(x + a_{\pm}\big)\big(y + b_{\pm}\big) = K$$
+
+The offsets used for a swap pushing *with* the trend (`+`) differ from those used for a swap pushing *against* it (`−`). The trend-following side gets small offsets (a **steep, shallow** curve — heavy price impact, protecting LPs). The stabilising side keeps large offsets (a **flat, deep** curve — cheap execution, rewarding the helpful flow). The two branches meet at the current price, creating an **endogenous bid–ask spread written into the geometry itself** — exactly what a professional market maker maintains, and what no AMM has natively.
+
+![The asymmetric bonding curve](asset/fig1_asymmetric_curve.png)
+
+*Fig 1 — In calm markets the curve is symmetric and deep (grey). When a real up-trend is detected, the curve hardens on the trend-following side (red) and stays flat on the counter-trend side (green). The kink at the operating point is a real, dynamic bid–ask spread.*
+
+### 3.2 The signal — directional efficiency
+
+We measure how *trending* the recent path is with a directional-efficiency ratio (a cheap, on-chain proxy for the Hurst exponent):
+
+$$D \;=\; \frac{\big|\,P_{\text{now}} - P_{\text{window start}}\,\big|}{\sum_i \big|\,P_i - P_{i-1}\,\big|} \;\in\; [0,1]$$
+
+Near **1** the price marched one way (trend); near **0** it moved a lot but went nowhere (chop). This feeds the detector.
+
+### 3.3 The engine — CUSUM / Quickest Change Detection
+
+This is the heart. The question "has a *real* regime change (a trend) started, and how fast can I be sure without crying wolf on noise?" is the mathematics of **Quickest Change Detection**, and its optimal workhorse is the **CUSUM** statistic (Page, 1954). It recursively accumulates the evidence and fires when it crosses a threshold:
+
+$$S_t \;=\; \max\!\big(0,\; S_{t-1} + (\ell_t - k)\big), \qquad \text{alarm when } S_t \ge h$$
+
+where `ℓ_t` is the log-likelihood-ratio increment of "trend" vs "no-trend," `k` is a slack constant, and `h` is the only real knob — and it is set by the tolerable **false-alarm rate**, *not* by a hard-coded number of blocks.
+
+Why this is the right tool, and not a heuristic:
+
+- **The firing moment is a *stopping time* — data-dependent and unpredictable.** A strong, real trend crosses `h` fast; weak noise never does. There is no fixed "after N blocks" for an attacker to exploit.
+- **It is provably optimal.** CUSUM is asymptotically optimal under **Lorden's minimax criterion**: it minimises the worst-case delay to detect a true change for any given false-alarm rate. That is the best-possible resolution of the "react fast vs don't get fooled" tension.
+
+### 3.4 The hardening — robust / minimax QCD
+
+The attacker who tries to fool the detector is itself a studied problem. **Minimax-robust QCD** designs the test against worst-case (least-favourable) distributions, and the **covert-adversary-vs-CUSUM** and game-theoretic-attack results let us *quantify* how costly it is to delay or trigger the detector. That body of work becomes Poincaré's manipulation-resistance proof — see §4.2.
+
+### 3.5 The control law — evidence to bounded curvature
+
+The detector's accumulated evidence sets the curve's asymmetry, **bounded** so it can never swing far enough to be worth gaming:
+
+$$\kappa \;=\; \text{clamp}\big(f(S_t),\; \kappa_{\min},\; \kappa_{\max}\big)$$
+
+![The control law](asset/fig4_control_law.png)
+
+*Fig 4 — Below the detection threshold the curve stays symmetric and deep. Past it, asymmetry ramps up but is hard-capped, so the most an attacker could ever gain on the soft side is smaller than the cost of triggering the detector.*
+
+---
+
+## 4. How it works — the full lifecycle
+
+### 4.1 Architecture
 
 ```mermaid
 flowchart TD
     SWAP["Incoming swap"] --> BS["beforeSwap"]
     subgraph HOOK["Poincare Hook"]
-        BS --> EST["Persistence Estimator<br/>directional efficiency from sqrtPriceX96<br/>incremental, windowed"]
-        EST --> CTRL["Curvature Controller<br/>kappa = clamp f persistence<br/>bounds + hysteresis"]
-        CTRL --> INV["Hyperbolic Invariant Engine<br/>x+a y+b = K<br/>closed-form output"]
-        INV --> DELTA["Return custom BeforeSwapDelta<br/>overrides default constant product"]
+        BS --> EST["Signal estimator<br/>directional efficiency from price"]
+        EST --> DET["CUSUM detector<br/>S_t update, compare to h"]
+        DET --> LAW["Control law<br/>bounded asymmetric kappa"]
+        LAW --> INV["Asymmetric invariant engine<br/>direction-dependent offsets<br/>closed-form output"]
+        INV --> DELTA["Return custom BeforeSwapDelta"]
     end
-    DELTA --> SETTLE["PoolManager settles net deltas"]
+    DELTA --> SETTLE["PoolManager settles via 6909 claims"]
     SETTLE --> AS["afterSwap"]
-    AS --> ACCT["Record sample, LVR accounting,<br/>optional value capture to LPs"]
-    subgraph SAFETY["Safety Layer"]
-        CB["Stale / extreme signal -> fallback to constant product"]
+    AS --> ACCT["Update price sample, CUSUM state, reserves"]
+    subgraph SAFETY["Safety layer"]
         BND["kappa bounds + max move per block"]
-        TW["Multi-block sampling -> manipulation resistance"]
+        ROB["robust/time-weighted signal -> manipulation resistance"]
+        CB["stale/extreme -> fallback to constant product"]
     end
-    EST -.-> TW
-    CTRL -.-> BND
+    EST -.-> ROB
+    LAW -.-> BND
     INV -.-> CB
-    subgraph ROUTE["Routing Layer"]
-        LENS["Quoter / Lens<br/>exposes price, depth, active kappa<br/>so aggregators can route"]
-    end
-    INV --> LENS
+    INV --> LENS["Quoter / Lens for routers"]
 ```
 
-### 3.3 Components
-
-- **Invariant Engine** — the custom curve. Implemented with `beforeSwapReturnDelta`, so the hook takes over swap accounting and prices on `(x+a)(y+b)=K` at the current curvature instead of the PoolManager's default `x·y=k`. Liquidity is accounted via singleton / ERC-6909 claims; positions are effectively full-range because the curve itself does the concentration.
-- **Persistence Estimator (oracle-free)** — the heart and the hardest part. Maintains a windowed **directional-efficiency** statistic from the pool's own `sqrtPriceX96` series. Needs: a noise floor (so calm pairs rest at `κ_min`), smoothing/hysteresis (no per-block flapping), and **multi-block sampling so no single block can fake a trend** (the primary attack surface).
-- **Curvature Controller** — maps `persistence → κ*` via the Milionis-grounded law; applies bounds, a max per-block move, and hysteresis. This is where "principled, not heuristic" lives: we compute the LVR-optimal curvature; we don't guess it.
-- **Safety Layer** — fallback to `x·y=k` on stale/absurd signal; hard `κ` bounds; circuit breaker that pins a conservative sharp curve on extreme moves.
-- **Routing / Lens** — a Quoter/Lens contract exposing effective price, depth, and active `κ` so aggregators (1inch, Matcha, CoW, UniswapX fillers) can integrate and route a custom-curve pool.
-
-### 3.4 Lifecycle — sequence of a single swap
+### 4.2 A swap, step by step
 
 ```mermaid
 sequenceDiagram
     participant T as Trader
     participant PM as PoolManager
     participant H as Poincare Hook
-    participant E as Persistence Estimator
-    participant C as Curvature Controller
-    participant I as Invariant Engine
+    participant E as Signal + CUSUM
+    participant I as Asymmetric Curve
 
-    T->>PM: swap request
+    T->>PM: swap request (with or against current drift)
     PM->>H: beforeSwap
-    H->>E: update from latest price sample
-    E-->>H: directional efficiency / persistence
-    H->>C: map persistence to kappa
-    C-->>H: bounded, smoothed kappa
-    H->>I: price swap on hyperbola at kappa
+    H->>E: update directional-efficiency + CUSUM S_t
+    E-->>H: trend state (none / up / down) and strength
+    H->>I: price swap on direction-dependent offsets
     I-->>H: output amount + custom delta
     H-->>PM: BeforeSwapDelta overrides constant product
     PM->>PM: settle net deltas
     PM->>H: afterSwap
-    H->>E: store sample, update window
-    H->>H: LVR accounting / optional value capture
+    H->>E: store price sample, persist CUSUM state
     PM-->>T: swap settled
 ```
 
----
+### 4.3 Lifecycle on a *real* trend
 
-## 4. Mathematical foundation
+A pool is deployed with the hook. Swaps begin. While the market only chops, the directional-efficiency signal stays low, the CUSUM statistic hovers near zero, and **the curve stays symmetric and deep — best-in-class execution for everyone.** Then a genuine trend begins. The CUSUM statistic starts climbing as evidence accumulates; it does *not* fire on the first few trades (that would be crying wolf). Only when the evidence crosses the threshold — a moment that depends on how strong the trend is, not on a fixed clock — does the regime flip and the curve begin to lean against the trend.
 
-| Object | Role |
-|---|---|
-| **Milionis LVR identity** (`LVR ≈ ½σ²·marginal liquidity`) | Establishes curvature as the LVR lever and that the optimum is dynamics-dependent. Why this is principled, not heuristic. |
-| **Directional-efficiency / persistence statistic** | The control signal — a cheap on-chain proxy for the Hurst exponent (trend vs. mean-reversion). The signal that actually causes LVR. |
-| **One-parameter hyperbolic family** `(x+a)(y+b)=K` | The adjustable curve; generalizes `x·y=k`; offsets keep it closed-form. |
-| **Curvature law** `κ*(persistence)=clamp(f(·),κ_min,κ_max)` | The control policy placing the pool on the LVR/slippage frontier each block. |
+![Lifecycle on a real trend](asset/fig2_lifecycle_real.png)
 
-The functional form of `f`, the offset↔κ parameterization, the window length, and the bounds are calibrated during the build — derived from the LVR identity and back-tested on historical paths for the target pair. The README fixes the structure; the constants are tuned empirically.
+*Fig 2 — Top: the pool price, calm then trending. Middle: the CUSUM statistic accumulating evidence and crossing the threshold at a data-dependent moment. Bottom: the curve's asymmetry, flat until detection, then ramping up to lean against the trend. Notice the detector ignores the early noise and only commits when the evidence is real.*
 
----
+### 4.4 What happens when someone fakes a trend
 
-## 5. Scope and honest restrictions
+This is the crux, and the figure makes it concrete. To push the CUSUM statistic to its threshold, an attacker cannot simply *signal* a trend — they must **actually move the price**, with real buys and real money. But moving the price away from fair value opens an arbitrage gap, and arbitrageurs immediately trade against them, capping the move and snapping it back the moment the attacker stops. So the attacker's cost climbs the whole time, and the unwind hands their losses straight to the arbitrageurs.
 
-- **Two-asset pairs.** A pair primitive — not a multi-asset basket tool, no N≥3 isolation.
-- **Best on volatile, trending-prone pairs** (ETH/USDC, ETH/BTC, volatile alts) where directional LVR dominates — squarely the UHI10 theme.
-- **Calm/pegged pairs handled gracefully** (flat regime), competitive for 2-asset stable pairs, but a dedicated multi-asset stableswap still wins on large pegged baskets.
-- **Liquidity/flow sensitive.** Deployable on long-tail, safest where depth and a clean price series exist for the estimator.
+![A faked trend](asset/fig3_fake_trend.png)
+
+*Fig 3 — Top: the attacker genuinely pumps the price (real money), and arbitrageurs snap it back when they stop. Middle: the CUSUM does cross — but only because the price truly moved, which the attacker paid for. Bottom: the attacker's mounting cost. The "fake" trend was never fake; it was a real, expensive market move. Combined with the bounded asymmetry (Fig 4), the soft-side advantage they could capture is held below this cost — so the attack does not pay.*
+
+The defence is therefore three layers working together: the **data-dependent CUSUM** removes the predictable countdown, the **bounded asymmetry** caps the prize, and **natural arbitrage** punishes anyone who tries to manufacture the move.
 
 ---
 
-## 6. Comparison against the existing hook landscape — and why it is not a copy
+## 5. Why it benefits everyone
 
-Three axes separate Poincaré from everything below: **(L)** lever = the *curvature of the invariant*, not a fee/spread/auction; **(S)** signal = *directional persistence*, not volatility magnitude or flow direction; **(O)** objective = *prevent directional LVR at the source*, not recapture/insure/target-IV after the fact. No existing hook shares all three; most share none.
+- **Liquidity providers** keep the value that normally leaks to arbitrageurs during trends, *and* — unlike a symmetric defence — keep their fee volume, because only the toxic side is hardened while the benign side stays open.
+- **Traders** stabilising the pool (trading against the drift) get the deepest, cheapest prices in the market; ordinary traders in calm markets see a tight, deep curve.
+- **Routers / aggregators** prefer it for exactly that reason — better execution on the flow it welcomes — and a first-class Quoter/Lens makes the custom curve easy to integrate.
 
-### 7.1 vs. the two closest priors — **IV-Targeting AMM (IVTAMM, UHI4)** and **LP Hub (UHI5 / UHI8)**
-Both are dynamic-**fee** hooks. IVTAMM moves the fee to hold *implied volatility* constant; LP Hub moves the fee off TradFi toxicity metrics (VPIN, Illiq, inventory) and adds a self-arb module. Poincaré differs on all three axes: it moves **curvature** (not the fee), off **directional persistence** (not volatility/toxicity), to **minimize LVR** (not target constant IV or price toxicity). Different lever, different signal, different objective.
+It does not make liquidity provision risk-free — the LP still holds the assets and feels genuine market moves. It removes the *avoidable* arbitrageur tax (the LVR), not the underlying exposure.
 
-### 7.2 vs. volatility-based dynamic-fee hooks
-*(Atrium Dynamic Fee, Volatility Oracle Hook, Dynamic AMM Fees, AutomataHook)* — these change the **fee** on **volatility**. Poincaré changes **curvature** on **persistence**. The fee does not govern LVR; volatility magnitude is not the LVR-causing signal.
+---
 
-### 7.3 vs. directional-fee / imbalance hooks
-*(Nezlobin directional-fee implementations, DepegShield / Stable Protection, Aegis Prime's divergence tax, EvenFlow)* — these reprice via **fees** on **instantaneous flow direction / imbalance**. Poincaré reshapes the **curve** based on the **path's persistence over a window** — a different signal (sustained drift vs. single-trade direction) and a different mechanism.
+## 6. Scope and honest restrictions
 
-### 7.4 vs. LVR-recapture mechanisms
-*(am-AMM, EigenLVR, EigenAuction, Aegis Prime, Argos)* — these let LVR happen and **recapture** it via auctions, AVS, taxes, or Reactive monitoring. Poincaré **prevents** it by curve-shaping, with no auctioneer, AVS, keeper, or external network.
+- **Two-asset pairs**, and it is built for **volatile, free-floating pairs** (ETH/USDC, ETH/BTC, volatile majors) where directional LVR dominates.
+- **Calm and pegged pairs are handled gracefully** — low signal keeps the curve flat and deep, behaving like a tight stableswap; a sudden depeg is just a detected trend the curve leans into.
+- **Liquidity- and flow-sensitive.** Deployable on long-tail pools, safest where there is real depth and a clean price series for the detector.
+- The detector raises and *bounds* the cost of manipulation; it does not claim to make it impossible. The manipulation-cost analysis is a first-class deliverable, not a footnote.
 
-### 7.5 vs. static geometric / multi-asset stableswap curves
-*(recent spherical / N-dimensional / "orbital-tick" stableswap geometries, CSMM concentric-orbit designs)* — **static, positive-curvature** geometries for **pegged multi-asset baskets**, solving IL-on-depeg by isolation. Poincaré is the opposite corner: a **dynamic, hyperbolic (negative-curvature)** curve for **volatile two-asset pairs**, solving LVR. Different curvature sign, static vs. moving, basket vs. pair, IL-on-depeg vs. LVR. A counterpart, not a variant.
+---
 
-### 7.6 vs. proprietary-AMM ports — *HyFi (UHI9)*
-HyFi brings closed proprietary-MM pricing to EVM. Poincaré is a **transparent, permissionless, LP-owned invariant** fully specified by a published LVR identity, not a private quoting strategy.
+## 7. Why this is not a copy
 
-### 7.7 vs. oracle-deviation fees — *Devia (UHI9)*
-Devia raises **fees** under **oracle uncertainty/staleness** — oracle-dependent. Poincaré is **oracle-free** (signal from the pool's own price) and **curvature-based**.
+The asymmetric-curve idea alone would resemble the directional-fee family (Nezlobin and its descendants). What makes Poincaré a different object is the **engine**: a **Quickest-Change-Detection trend detector** governs *when* it acts. A scan of the entire 562-hook UHI directory and the UHI9 winners returns **zero** uses of CUSUM, change-point detection, SPRT, or quickest detection — the signals in use are simple EWMAs, TWAPs, and imbalance thresholds with fixed cut-offs (which are precisely what an attacker can game). Poincaré is, to our knowledge, the **first AMM whose regime-switching is governed by a provably-optimal, adversarially-robust sequential change detector, firing at a data-dependent moment no attacker can precompute.** The curve is the actuator; the detector is the contribution.
 
-### 7.8 vs. IL/LVR hedging, insurance, tranching — *schizō, BackStop, Indemnifi, CrossHedge, Lambda, ybAMM, Mochi Yield (UHI9)*
-This family **manages the loss after it exists** — tranching, insuring, hedging on a perp/peer, or splitting principal/yield. Poincaré **shrinks the loss before it happens** at the curve level. Fully complementary — a Poincaré pool would hand these products a smaller loss to manage.
-
-### 7.9 vs. order-book-style "professional MM logic" hooks
-*(the spread-widening / MM-style risk-pricing entries, incl. LP Hub's framing)* — these overlay an order-book **spread/quote** on top of `x·y=k`. Poincaré changes the **invariant itself**, grounded in a specific LVR identity, not a spread heuristic.
-
-### 7.10 vs. automated liquidity managers / JIT
-*(Bunni/Arrakis/Gamma-style range management, JIT-liquidity hooks)* — these **recenter or resize discrete ranges** heuristically, or inject liquidity just-in-time. Poincaré changes the **continuous curvature** of the invariant via a principled persistence→curvature law.
-
-### 7.11 vs. MEV / sandwich-protection hooks
-*(EigenShield Flow Sentinel, sealed-bid FHE auction hooks, non-toxic-executor gasless hooks)* — these act at the **mempool/sequencing** layer. Poincaré acts at the **curve** layer and addresses LVR-type leakage structurally; it is not a sandwich detector and could sit alongside one.
-
-### 7.12 vs. prediction-market / scoring-rule AMMs
-*(LMSR sports-betting and binary-outcome hooks)* — a different market entirely (bounded-outcome information markets). No overlap.
-
-### Summary
-
-| Axis | Everyone else | **Poincaré** |
+| Axis | Existing hooks | **Poincaré** |
 |---|---|---|
-| Lever | fee, spread, auction, or static curve | **curvature of the invariant** |
-| Signal | volatility magnitude, flow direction, oracle | **directional persistence (trend vs. chop)** |
-| LVR strategy | recapture / hedge / insure / target-IV | **prevent at the source** |
-| External deps | oracle, AVS, keeper, Reactive Network | **none — self-contained** |
-| Stable pairs | separate stableswap needed | **flat regime, automatic** |
-| Grounding | heuristic | **published LVR identity** |
-
-No prior hook occupies this cell. The differentiation is structural, not cosmetic.
+| Lever | fee / spread / static curve | **curvature, asymmetric** |
+| Trigger | fixed window / threshold / oracle | **CUSUM stopping time (data-dependent)** |
+| Optimality | heuristic | **Lorden minimax-optimal detection** |
+| Manipulation | hopes the signal is hard to fake | **bounded prize + robust-QCD + arbitrage punishment** |
+| External deps | oracle / AVS / keeper | **none — self-contained** |
 
 ---
 
-## 7. Build roadmap
+## 8. Roadmap
 
-1. **Lock the reference pair** (volatile, deep — the estimator is designed around it).
-2. Implement the **hyperbolic invariant engine** + `beforeSwapReturnDelta` accounting.
-3. Implement and **stress-test the persistence estimator** (the make-or-break module).
-4. Implement the **curvature controller** + safety layer.
-5. **Back-test** `f(persistence)` on historical paths; quantify LVR reduction vs. constant-product *and* vs. a vol-fee baseline; include a manipulation-cost analysis.
-6. Ship the **Quoter/Lens**; pursue one router integration.
-7. Foundry suite: fuzz/invariant tests, manipulation simulations, gas profiling.
+1. Lock the reference pair (volatile, deep) — the detector is calibrated around it.
+2. Build the asymmetric invariant engine (direction-dependent offsets) + `beforeSwapReturnDelta` accounting.
+3. Build the directional-efficiency signal and the CUSUM detector (`S_t`, threshold `h` from a target false-alarm rate); add the robust/heavy-tailed variant.
+4. Wire the bounded control law + safety layer.
+5. **Back-test** on historical paths: quantify LVR reduction vs. constant-product and vs. a vol-fee baseline, and run the manipulation-cost analysis against a modelled adversary.
+6. Ship the Quoter/Lens; pursue a router integration.
+7. Foundry suite: fuzz, invariant, and adversarial-CUSUM manipulation simulations; gas profiling.
