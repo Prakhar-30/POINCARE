@@ -58,7 +58,7 @@ $$\big(x + a_{\pm}\big)\big(y + b_{\pm}\big) = K$$
 
 The offsets used for a swap pushing *with* the trend (`+`) differ from those used for a swap pushing *against* it (`−`). The trend-following side gets small offsets (a **steep, shallow** curve — heavy price impact, protecting LPs). The stabilising side keeps large offsets (a **flat, deep** curve — cheap execution, rewarding the helpful flow). The two branches meet at the current price, creating an **endogenous bid–ask spread written into the geometry itself** — exactly what a professional market maker maintains, and what no AMM has natively.
 
-![The asymmetric bonding curve](asset/fig1_asymmetric_curve.png)
+![The asymmetric bonding curve](fig1_asymmetric_curve.png)
 
 *Fig 1 — In calm markets the curve is symmetric and deep (grey). When a real up-trend is detected, the curve hardens on the trend-following side (red) and stays flat on the counter-trend side (green). The kink at the operating point is a real, dynamic bid–ask spread.*
 
@@ -93,7 +93,7 @@ The detector's accumulated evidence sets the curve's asymmetry, **bounded** so i
 
 $$\kappa \;=\; \text{clamp}\big(f(S_t),\; \kappa_{\min},\; \kappa_{\max}\big)$$
 
-![The control law](asset/fig4_control_law.png)
+![The control law](fig4_control_law.png)
 
 *Fig 4 — Below the detection threshold the curve stays symmetric and deep. Past it, asymmetry ramps up but is hard-capped, so the most an attacker could ever gain on the soft side is smaller than the cost of triggering the detector.*
 
@@ -154,7 +154,7 @@ sequenceDiagram
 
 A pool is deployed with the hook. Swaps begin. While the market only chops, the directional-efficiency signal stays low, the CUSUM statistic hovers near zero, and **the curve stays symmetric and deep — best-in-class execution for everyone.** Then a genuine trend begins. The CUSUM statistic starts climbing as evidence accumulates; it does *not* fire on the first few trades (that would be crying wolf). Only when the evidence crosses the threshold — a moment that depends on how strong the trend is, not on a fixed clock — does the regime flip and the curve begin to lean against the trend.
 
-![Lifecycle on a real trend](asset/fig2_lifecycle_real.png)
+![Lifecycle on a real trend](fig2_lifecycle_real.png)
 
 *Fig 2 — Top: the pool price, calm then trending. Middle: the CUSUM statistic accumulating evidence and crossing the threshold at a data-dependent moment. Bottom: the curve's asymmetry, flat until detection, then ramping up to lean against the trend. Notice the detector ignores the early noise and only commits when the evidence is real.*
 
@@ -162,7 +162,7 @@ A pool is deployed with the hook. Swaps begin. While the market only chops, the 
 
 This is the crux, and the figure makes it concrete. To push the CUSUM statistic to its threshold, an attacker cannot simply *signal* a trend — they must **actually move the price**, with real buys and real money. But moving the price away from fair value opens an arbitrage gap, and arbitrageurs immediately trade against them, capping the move and snapping it back the moment the attacker stops. So the attacker's cost climbs the whole time, and the unwind hands their losses straight to the arbitrageurs.
 
-![A faked trend](asset/fig3_fake_trend.png)
+![A faked trend](fig3_fake_trend.png)
 
 *Fig 3 — Top: the attacker genuinely pumps the price (real money), and arbitrageurs snap it back when they stop. Middle: the CUSUM does cross — but only because the price truly moved, which the attacker paid for. Bottom: the attacker's mounting cost. The "fake" trend was never fake; it was a real, expensive market move. Combined with the bounded asymmetry (Fig 4), the soft-side advantage they could capture is held below this cost — so the attack does not pay.*
 
