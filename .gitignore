@@ -16,3 +16,6 @@ docs/
 
 # Node modules
 node_modules/
+
+# Local build brief — kept local, never tracked
+CLAUDE.md

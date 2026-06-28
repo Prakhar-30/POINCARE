@@ -2,12 +2,25 @@
 bytecode_hash = "none"
 evm_version = "cancun"
 ffi = true
-fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}]
+fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}, {access = "read-write", path = "./analysis/simulation/"}]
 libs = ["lib"]
 out = "out"
 solc_version = "0.8.30"
 src = "src"
 via_ir = false
+# The Sepolia-fork simulation lives in test/sim and needs the IR pipeline (the large simulation
+# contract is stack-too-deep without it) + a fork RPC. Keep it OUT of the default build/test so
+# `forge test` stays fast and via-ir-free; run it under the `sim` profile (below).
+skip = ["test/sim/**"]
+
+# Isolated profile for the heavy fork simulation: enables IR and re-includes test/sim.
+# Inherits everything else from [profile.default]. Run: FOUNDRY_PROFILE=sim forge test --match-path test/sim/...
+[profile.sim]
+via_ir = true
+skip = []
+
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC}"
 
 [lint]
 exclude_lints = ["screaming-snake-case-immutable", "screaming-snake-case-const"]

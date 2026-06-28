@@ -9,5 +9,6 @@ v4-periphery/=lib/uniswap-hooks/lib/v4-periphery/
 @openzeppelin/contracts/=lib/uniswap-hooks/lib/v4-core/lib/openzeppelin-contracts/contracts/
 
 hookmate/=lib/hookmate/src/
+solady/=lib/solady/src/
 permit2/=lib/uniswap-hooks/lib/v4-periphery/lib/permit2/
 solmate/=lib/uniswap-hooks/lib/v4-core/lib/solmate/
