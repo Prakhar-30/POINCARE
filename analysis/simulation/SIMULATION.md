@@ -1,4 +1,4 @@
-# Poincaré — comparative simulation on a Sepolia Uniswap v4 fork
+# Poincaré: comparative simulation on a Sepolia Uniswap v4 fork
 
 A WETH/USDC stress test run against the **real Uniswap v4 `PoolManager` deployed on Sepolia**
 (forked locally with Anvil), comparing two otherwise-identical pools and producing the graphs in
@@ -29,7 +29,7 @@ differ in exactly one parameter:
 Setting `κ_max = 0` turns the same contract into a plain `x·y=k` AMM, so the control is a true
 apples-to-apples baseline: **any difference in LP value is attributable solely to the Poincaré
 asymmetry**, not to a different curve model, liquidity layout, or settlement path. (A vanilla
-hookless v4 pool would be *concentrated* liquidity — a different curve — and would confound the
+hookless v4 pool would be *concentrated* liquidity (a different curve) and would confound the
 comparison.)
 
 Each block: the external fair price advances per a regime schedule; an **arbitrageur** drags each
@@ -58,7 +58,7 @@ the result; it only keeps the arbitrage math clean.
 ![LP value retained](../../public/sim/sim_lpvalue.png)
 
 The LP-value advantage is the cleanest, most robust read: it is **flat during `calm`** (nothing to
-protect — the detector correctly does not engage), **grows through the trends**, and **jumps during
+protect, since the detector correctly does not engage), **grows through the trends**, and **jumps during
 the `flash_crash` + `whipsaw`** high-volatility regimes, settling at a **$502k** advantage. The
 detector's κ engages only on confirmed trends and returns to zero in calm.
 
@@ -66,7 +66,7 @@ detector's κ engages only on confirmed trends and returns to zero in calm.
 
 | scenario | LVR reduction |
 |---|---|
-| calm | 0% (no lean — correct) |
+| calm | 0% (no lean, correct) |
 | strong_up | **54%** |
 | flash_crash | **83%** |
 | uptrend_pullbacks | 10% |
@@ -84,18 +84,18 @@ Graphs: `sim_lpvalue.png` (headline), `sim_lvr.png`, `sim_price.png`, `sim_kappa
 ## Honest caveats
 
 - **Synthetic regime path**, not real WETH/USDC tick history. It is a controlled stress
-  environment (calm + trend bursts + a flash crash + whipsaw), reproducible from one seed — not a
+  environment (calm + trend bursts + a flash crash + whipsaw), reproducible from one seed, not a
   claim about a specific historical window. The economics (real v4 settlement, real swaps) are
   authentic; the *price path* is generated.
 - **Stylised flow**: one profit-seeking arb + one uninformed noise order per block.
 - **Per-scenario LVR is noisy.** Because the live pool runs a no-arb band (it skips arbs inside the
   spread) and is left slightly mispriced between arbs, the *per-scenario* arb-extraction figure
   wobbles (in `mild_up` it is even marginally higher than the control). The **aggregate LVR** and
-  the **LP-value** curve — which is monotonically ≥ the control throughout — are the robust
+  the **LP-value** curve (which is monotonically ≥ the control throughout) are the robust
   metrics; LP value is the ground truth and Poincaré never trails it.
 - **The benign-flow trade-off is real and shown**: with-trend noise orders pay the spread on the
   live pool (a cost to those traders, revenue to LPs); against-trend and calm flow are untaxed.
-- **18-decimal mock USDC** (not the real 6-decimal token) — immaterial to the detector/curve.
+- **18-decimal mock USDC** (not the real 6-decimal token), immaterial to the detector/curve.
 - **Single seed / single path** for the headline; a production report should average many seeds.
 - This complements, not replaces, the in-repo proofs: the in-memory back-test
   (`analysis/backtest/`), the 384k-op invariant suite, and the end-to-end manipulation sims
@@ -103,7 +103,7 @@ Graphs: `sim_lpvalue.png` (headline), `sim_lvr.png`, `sim_price.png`, `sim_kappa
 
 ---
 
-## Real-data run — 6 months of actual ETH/USDC
+## Real-data run: 6 months of actual ETH/USDC
 
 The same comparative engine, but `fair` is driven by **real Binance ETHUSDC 4h closes** instead of
 a synthetic path. Test: `test/sim/ForkRealData.t.sol`. Reproduce:
@@ -115,7 +115,7 @@ python analysis/simulation/plot_realdata.py          # -> public/sim/real/
 ```
 
 **Window:** 2025-12-30 → 2026-06-28, 1,080 candles. ETH fell **$2,987 → $1,568** (≈ −47%, with a
-$3,367 high) — a genuine multi-leg bear market with rallies.
+$3,367 high), a genuine multi-leg bear market with rallies.
 
 | metric | POINCARÉ | CONTROL | result |
 |---|---:|---:|---|
@@ -126,10 +126,10 @@ $3,367 high) — a genuine multi-leg bear market with rallies.
 ![Real ETH/USDC LP value](../../public/sim/real/real_lpvalue.png)
 
 **The honest read:** the advantage is **flat through the choppy January**, **jumps at the February
-crash**, holds through the chop, and **jumps again at the June leg-down** — the detector engaged on
+crash**, holds through the chop, and **jumps again at the June leg-down**, as the detector engaged on
 the two real sustained downtrends and stayed neutral in chop, ending **+$15k** for Poincaré LPs on
 a ~$6M pool. The reduction (8.8%) is smaller than on the synthetic stress path (29.7%) precisely
-because real markets are noisier with fewer clean trends — the conservative detector engages less,
+because real markets are noisier with fewer clean trends, so the conservative detector engages less,
 so it helps less, **but it never hurts** (LVR ≤ control held the whole way; assertion enforced).
 This is the expected, defensible behaviour: protection concentrated on the real directional moves
 that actually drain LPs, nothing during chop. Graphs in `public/sim/real/`: `real_lpvalue.png`,
