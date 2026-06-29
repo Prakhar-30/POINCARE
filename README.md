@@ -34,12 +34,23 @@ So the right response is: **reshape the curve's curvature, asymmetrically, but o
 Poincaré has two parts: a **detector** (the brain) that decides *when* there is a real trend, and an **actuator** (the curve) that *acts* on that decision.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace','primaryColor':'transparent','primaryTextColor':'#388bfd','primaryBorderColor':'#8b949e','lineColor':'#8b949e','tertiaryColor':'transparent','clusterBkg':'transparent','clusterBorder':'#8b949e'}}}%%
 flowchart LR
-    PRICE["Pool's own price<br/>(reserve-implied, r1/r0)"] --> SIG["Directional-efficiency signal<br/>trend vs chop"]
-    SIG --> CUSUM["CUSUM detector<br/>accumulate evidence<br/>fire at threshold h"]
-    CUSUM --> LAW["Control law<br/>evidence to bounded curvature"]
-    LAW --> CURVE["Asymmetric bonding curve<br/>hardens trend side,<br/>softens stabilising side"]
+    PRICE("Pool's own price<br/>(reserve-implied, r1/r0)") --> SIG("Directional-efficiency signal<br/>trend vs chop")
+    SIG --> CUSUM("CUSUM detector<br/>accumulate evidence<br/>fire at threshold h")
+    CUSUM --> LAW("Control law<br/>evidence to bounded curvature")
+    LAW --> CURVE("Asymmetric bonding curve<br/>hardens trend side,<br/>softens stabilising side")
     CURVE --> PRICE
+    classDef io stroke:#8b949e,color:#8b949e,stroke-width:2px;
+    classDef sig stroke:#3fb950,color:#3fb950,stroke-width:2px;
+    classDef engine stroke:#f85149,color:#f85149,stroke-width:3px;
+    classDef law stroke:#a371f7,color:#a371f7,stroke-width:2px;
+    classDef curve stroke:#388bfd,color:#388bfd,stroke-width:2px;
+    class PRICE io;
+    class SIG sig;
+    class CUSUM engine;
+    class LAW law;
+    class CURVE curve;
 ```
 
 The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses change-point detection. The asymmetric curve is just where its decision lands.
@@ -109,31 +120,45 @@ $$\kappa \;=\; \text{clamp}\big(f(S_t),\; \kappa_{\min},\; \kappa_{\max}\big)$$
 ### 4.1 Architecture
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace','primaryColor':'transparent','primaryTextColor':'#388bfd','primaryBorderColor':'#8b949e','lineColor':'#8b949e','tertiaryColor':'transparent','clusterBkg':'transparent','clusterBorder':'#8b949e'}}}%%
 flowchart TD
-    SWAP["Incoming swap"] --> BS["beforeSwap (all logic lives here)"]
+    SWAP("Incoming swap") --> BS("beforeSwap (all logic lives here)")
     subgraph HOOK["Poincare Hook"]
-        BS --> EST["Sample price once per block<br/>(reserve-implied r1/r0, pre-swap)<br/>-> directional-efficiency D"]
-        EST --> DET["CUSUM detector<br/>S_t update, compare to h"]
-        DET --> LAW["Control law<br/>bounded, rate-limited kappa"]
-        LAW --> INV["Curve engine<br/>directional spread on a symmetric<br/>constant-product base, closed-form"]
-        INV --> PERSIST["Persist CUSUM state, kappa, price sample"]
-        PERSIST --> DELTA["Return custom BeforeSwapDelta"]
+        BS --> EST("Sample price once per block<br/>(reserve-implied r1/r0, pre-swap)<br/>-> directional-efficiency D")
+        EST --> DET("CUSUM detector<br/>S_t update, compare to h")
+        DET --> LAW("Control law<br/>bounded, rate-limited kappa")
+        LAW --> INV("Curve engine<br/>directional spread on a symmetric<br/>constant-product base, closed-form")
+        INV --> PERSIST("Persist CUSUM state, kappa, price sample")
+        PERSIST --> DELTA("Return custom BeforeSwapDelta")
     end
-    DELTA --> SETTLE["PoolManager settles via ERC-6909 claims"]
+    DELTA --> SETTLE("PoolManager settles via ERC-6909 claims")
     subgraph SAFETY["Safety layer"]
-        BND["kappa bounds + max move per block (bid-ask seam)"]
-        ROB["once-per-block sampling -> flash-manipulation resistance"]
-        CB["never reverts, calm -> plain constant product"]
+        BND("kappa bounds + max move per block (bid-ask seam)")
+        ROB("once-per-block sampling -> flash-manipulation resistance")
+        CB("never reverts, calm -> plain constant product")
     end
     EST -.-> ROB
     LAW -.-> BND
     INV -.-> CB
-    INV --> LENS["Quoter / Lens for routers"]
+    INV --> LENS("Quoter / Lens for routers")
+    classDef io stroke:#8b949e,color:#8b949e,stroke-width:2px;
+    classDef sig stroke:#3fb950,color:#3fb950,stroke-width:2px;
+    classDef engine stroke:#f85149,color:#f85149,stroke-width:3px;
+    classDef law stroke:#a371f7,color:#a371f7,stroke-width:2px;
+    classDef curve stroke:#388bfd,color:#388bfd,stroke-width:2px;
+    classDef safety stroke:#d29922,color:#d29922,stroke-width:2px;
+    class SWAP,BS,PERSIST,DELTA,SETTLE,LENS io;
+    class EST sig;
+    class DET engine;
+    class LAW law;
+    class INV curve;
+    class BND,ROB,CB safety;
 ```
 
 ### 4.2 A swap, step by step
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace','actorBkg':'transparent','actorBorder':'#388bfd','actorTextColor':'#388bfd','actorLineColor':'#8b949e','signalColor':'#8b949e','signalTextColor':'#8b949e','noteBkgColor':'transparent','noteBorderColor':'#d29922','noteTextColor':'#d29922','activationBkgColor':'transparent','activationBorderColor':'#8b949e','sequenceNumberColor':'#0d1117'}}}%%
 sequenceDiagram
     participant T as Trader
     participant PM as PoolManager
@@ -176,6 +201,7 @@ The defence is therefore three layers working together: the **data-dependent CUS
 This is the heart of the novelty in one picture: one pool walked through an entire regime cycle (calm, a real trend, detection, the lean, and the return to calm), showing exactly *when* and *why* the curve changes.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace','actorBkg':'transparent','actorBorder':'#388bfd','actorTextColor':'#388bfd','actorLineColor':'#8b949e','signalColor':'#8b949e','signalTextColor':'#8b949e','noteBkgColor':'transparent','noteBorderColor':'#d29922','noteTextColor':'#d29922','activationBkgColor':'transparent','activationBorderColor':'#8b949e','sequenceNumberColor':'#0d1117'}}}%%
 sequenceDiagram
     autonumber
     participant M as Market (fair price)
@@ -215,19 +241,24 @@ sequenceDiagram
 **Side by side, on the very same trend**, against a normal constant-product pool:
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace','primaryColor':'transparent','primaryTextColor':'#388bfd','primaryBorderColor':'#8b949e','lineColor':'#8b949e','tertiaryColor':'transparent','clusterBkg':'transparent','clusterBorder':'#8b949e'}}}%%
 flowchart TB
     subgraph NORMAL["A normal constant-product pool"]
         direction TB
-        N1["Trend pushes the price"] --> N2["Curve is frozen and symmetric"]
-        N2 --> N3["Arbitrageurs rebalance it every step"]
-        N3 --> N4["LPs bleed the FULL LVR<br/>toxic flow extracts the maximum"]
+        N1("Trend pushes the price") --> N2("Curve is frozen and symmetric")
+        N2 --> N3("Arbitrageurs rebalance it every step")
+        N3 --> N4("LPs bleed the FULL LVR<br/>toxic flow extracts the maximum")
     end
     subgraph POIN["The Poincare pool"]
         direction TB
-        Q1["Trend pushes the price"] --> Q2["CUSUM detects the regime change<br/>at a data-dependent moment"]
-        Q2 --> Q3["Curve hardens ONLY the with-trend side"]
-        Q3 --> Q4["Toxic arb pays a spread the LPs keep<br/>~14% less LVR (back-test)<br/>benign & against-trend flow untaxed"]
+        Q1("Trend pushes the price") --> Q2("CUSUM detects the regime change<br/>at a data-dependent moment")
+        Q2 --> Q3("Curve hardens ONLY the with-trend side")
+        Q3 --> Q4("Toxic arb pays a spread the LPs keep<br/>~14% less LVR (back-test)<br/>benign & against-trend flow untaxed")
     end
+    classDef bad stroke:#f85149,color:#f85149,stroke-width:2px;
+    classDef good stroke:#3fb950,color:#3fb950,stroke-width:2px;
+    class N1,N2,N3,N4 bad;
+    class Q1,Q2,Q3,Q4 good;
 ```
 
 A normal pool cannot tell a trend from chop, so it offers the same terms to toxic and benign flow alike and pays the full LVR. Poincaré spends a small, bounded spread *only* on the flow that is actually hurting LPs, *only* while a real trend is confirmed, and routes it back to the LPs.
