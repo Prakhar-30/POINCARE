@@ -2,7 +2,7 @@
 bytecode_hash = "none"
 evm_version = "cancun"
 ffi = true
-fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}, {access = "read-write", path = "./analysis/simulation/"}]
+fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}, {access = "read-write", path = "./analysis/simulation/"}, {access = "read-write", path = "./deployments/"}]
 libs = ["lib"]
 out = "out"
 solc_version = "0.8.30"
@@ -19,8 +19,17 @@ skip = ["test/sim/**"]
 via_ir = true
 skip = []
 
+# Profile for live deployment. The PoincareHook is 28KB unoptimized (over the 24.5KB EIP-170
+# limit — tests never hit this because deployCodeTo bypasses it). Optimizer + IR shrinks it to
+# ~13KB. Run: FOUNDRY_PROFILE=deploy forge script script/DeployPoincareUnichain.s.sol ...
+[profile.deploy]
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC}"
+unichain_sepolia = "https://sepolia.unichain.org"
 
 [lint]
 exclude_lints = ["screaming-snake-case-immutable", "screaming-snake-case-const"]

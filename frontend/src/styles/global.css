@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Map design tokens to Tailwind v4 theme so utilities (bg-surface, text-text-2,
+   rounded-card, font-display …) stay theme-reactive: each maps to a runtime var. */
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Quicksand", "Nunito", ui-sans-serif, sans-serif;
+
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+  --color-divider-2: var(--divider-2);
+
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-up: var(--up);
+  --color-up-deep: var(--up-deep);
+  --color-down: var(--down);
+  --color-down-deep: var(--down-deep);
+  --color-lav: var(--lav);
+  --color-lav-deep: var(--lav-deep);
+  --color-lav-soft: var(--lav-soft);
+  --color-honey: var(--honey);
+  --color-eth: var(--eth);
+  --color-usdc: var(--usdc);
+  --color-green-label: var(--green-label);
+  --color-green-sub: var(--green-sub);
+  --color-warn-label: var(--warn-label);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-card: var(--r-card);
+  --radius-xl: var(--r-xl);
+
+  --shadow-soft-sm: var(--shadow-sm);
+  --shadow-soft: var(--shadow-card);
+  --shadow-soft-lg: var(--shadow-lg);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+    background: var(--app-bg);
+    background-attachment: fixed;
+    transition: background 0.35s ease, color 0.35s ease;
+  }
+  ::selection {
+    background: rgba(142, 136, 216, 0.22);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--track);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  input {
+    font-family: inherit;
+  }
+}
+
+/* Crafted helpers --------------------------------------------------------- */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* card: the single recurring surface primitive */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+.card-quiet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sm);
+}
+
+/* subtle paper grain to kill the flat "AI gradient" feel */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* motion */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.anim-pulse-dot { animation: pulseDot 1.8s infinite; }
+.anim-floaty { animation: floaty 5s ease-in-out infinite; }
+.anim-blink { animation: blink 1.6s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
