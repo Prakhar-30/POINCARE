@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Landing } from "@/pages/Landing";
 import { AppShell } from "@/app/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -14,6 +15,8 @@ export function App() {
           <Route path="/app" element={<AppShell />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        {/* Vercel Web Analytics — collects anonymous page views across all routes. */}
+        <Analytics />
       </HashRouter>
     </ErrorBoundary>
   );
