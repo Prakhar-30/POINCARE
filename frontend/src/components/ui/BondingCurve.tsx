@@ -87,7 +87,7 @@ export function BondingCurve({
         <circle cx={px} cy={py} r={4.5} fill={accent} />
       </svg>
 
-      <div className="absolute left-3 top-2.5" style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>x · y = k · WETH ↔ USDC</div>
+      <div className="absolute left-3 top-2.5 hidden sm:block" style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>x · y = k · WETH ↔ USDC</div>
       <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 10, fontWeight: 700 }}>
         <span style={{ color: "var(--up)" }}>● buy slope</span>
         <span style={{ color: "var(--down)" }}>● sell slope</span>

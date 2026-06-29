@@ -47,9 +47,9 @@ export function Trade() {
   return (
     <>
     <TxSteps stepper={stepper} title="Swapping" />
-    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
       {/* ---- swap form ---- */}
-      <div className="card p-6">
+      <div className="card p-5 sm:p-6 min-w-0">
         <div className="flex justify-between items-center mb-4">
           <span className="font-display" style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Swap</span>
           <span className="flex items-center gap-1.5" style={{ fontSize: 11, fontWeight: 700, color: "var(--lav)" }}>
@@ -112,7 +112,7 @@ export function Trade() {
       </div>
 
       {/* ---- middle: explainer ---- */}
-      <div className="card-quiet p-6">
+      <div className="card-quiet p-5 sm:p-6 min-w-0">
         <div className="flex items-center gap-2.5 mb-4">
           <span style={{ color: "var(--lav)" }}><Icon name="shield" size={18} /></span>
           <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>How this trade compares to a normal pool</span>
@@ -128,14 +128,14 @@ export function Trade() {
             <>You're trading in <span style={{ color: "var(--up-deep)", fontWeight: 700 }}>{s.trend === "none" ? "a calm market" : "the stabilising direction"}</span>, so Poincaré charges <span style={{ fontWeight: 700, color: "var(--text)" }}>zero spread</span>, so you keep <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(Math.max(0, q.savedVsFee))}</span> that a 0.3% fee pool would have taken. Protection without taxing honest flow.</>
           )}
         </p>
-        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
           <MiniStat label="Detector regime" value={s.trend === "none" ? "Calm" : s.trend === "up" ? "Up-trend" : "Down-trend"} color={s.trend === "up" ? "var(--up)" : s.trend === "down" ? "var(--down)" : "var(--lav)"} />
           <MiniStat label="This trade → LPs" value={fmtUsd(q.lvrToLps)} color="var(--green-label)" />
         </div>
       </div>
 
       {/* ---- tape ---- */}
-      <Tape rows={tape} />
+      <div className="min-w-0"><Tape rows={tape} /></div>
     </div>
     </>
   );

@@ -28,9 +28,9 @@ export function Pool() {
   return (
     <>
     <TxSteps stepper={lp.stepper} title={mode === "add" ? "Adding liquidity" : "Removing liquidity"} />
-    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
       {/* ---- left: add / remove ---- */}
-      <div className="card p-6">
+      <div className="card p-5 sm:p-6 min-w-0">
         {/* mode toggle */}
         <div className="flex gap-1 mb-5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 4 }}>
           {(["add", "remove"] as const).map((m) => (
@@ -56,17 +56,17 @@ export function Pool() {
       </div>
 
       {/* ---- right: curve + position ---- */}
-      <div className="flex flex-col gap-4.5" style={{ gap: 18 }}>
+      <div className="flex flex-col gap-4.5 min-w-0" style={{ gap: 18 }}>
         {/* bonding curve */}
         <div className="card grain overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
+          <div className="flex items-center justify-between gap-2 flex-wrap px-5 sm:px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
             <div className="flex items-center gap-2.5">
               <span style={{ color: "var(--lav)" }}><Icon name="curve" size={18} /></span>
               <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Live bonding curve</span>
             </div>
             <span style={{ fontSize: 12, fontWeight: 700, color: "var(--faint)" }}>{fmtUsd(price)} / WETH</span>
           </div>
-          <div className="p-6 pt-5">
+          <div className="p-5 sm:p-6 pt-5">
             <BondingCurve r0={pos.r0} r1={pos.r1} spreadZeroForOne={s.spreadZeroForOne} spreadOneForZero={s.spreadOneForZero} trend={s.trend} />
             <p className="mt-4" style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-3)" }}>
               Liquidity sits on the constant-product invariant. When the CUSUM detector flags a trend, the with-trend
@@ -77,7 +77,7 @@ export function Pool() {
         </div>
 
         {/* position + LP LVR */}
-        <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 18 }}>
+        <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
           <div className="card-quiet p-5">
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".3px", color: "var(--text-3)", marginBottom: 14 }}>Your position</div>
             {pos.shares > 0 ? (

@@ -8,7 +8,7 @@ const ThemeContext = createContext<Ctx | null>(null);
 function initial(): Theme {
   const saved = localStorage.getItem("poincare-theme");
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light"; // light is the default; the user can switch to dark and it's remembered
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

@@ -12,6 +12,10 @@ const fade = (delay = 0) => ({
   transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const, delay },
 });
 
+// In-page smooth scroll (HashRouter owns the URL hash, so we can't use href="#id").
+const scrollToId = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
 function LaunchButton({ size = "md" }: { size?: "md" | "lg" }) {
   const lg = size === "lg";
   return (
@@ -38,14 +42,14 @@ export function Landing() {
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
       {/* ---- nav ---- */}
       <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
-        <a href="#" className="flex items-center gap-2.5 shrink-0">
+        <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
           <Mark size={34} />
           <span className="font-display hidden sm:block" style={{ fontWeight: 700, fontSize: 19, color: "var(--text)", letterSpacing: ".5px" }}>Poincaré</span>
           <span className="hidden sm:inline text-lav" style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".5px", background: "var(--lav-soft)", borderRadius: 20, padding: "3px 9px" }}>v4</span>
-        </a>
+        </button>
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <a href="#how" className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)" }}>How it works</a>
-          <a href="#moat" className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)" }}>The moat</a>
+          <button onClick={scrollToId("how")} className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>How it works</button>
+          <button onClick={scrollToId("moat")} className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>The moat</button>
           <ThemeToggle />
           <LaunchButton />
         </div>
@@ -72,9 +76,9 @@ export function Landing() {
 
             <motion.div {...fade(0.18)} className="mt-8 flex items-center gap-4 flex-wrap">
               <LaunchButton size="lg" />
-              <a href="#how" className="inline-flex items-center gap-2 font-bold" style={{ color: "var(--text-2)", fontSize: 15 }}>
+              <button onClick={scrollToId("how")} className="inline-flex items-center gap-2 font-bold" style={{ color: "var(--text-2)", fontSize: 15, cursor: "pointer" }}>
                 See how it works <Icon name="arrowRight" size={16} />
-              </a>
+              </button>
             </motion.div>
 
             <motion.div {...fade(0.24)} className="mt-9 flex items-center gap-5 flex-wrap" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-3)" }}>
