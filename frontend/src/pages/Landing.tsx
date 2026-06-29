@@ -56,14 +56,14 @@ export function Landing() {
             </motion.div>
 
             <motion.h1 {...fade(0.06)} className="font-display" style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 700, lineHeight: 1.06, color: "var(--text)", letterSpacing: "-.5px" }}>
-              An AMM that feels the trend —
+              An AMM that feels the trend
               <span style={{ color: "var(--lav-deep)" }}> and leans into it.</span>
             </motion.h1>
 
             <motion.p {...fade(0.12)} className="mt-5 max-w-xl" style={{ fontSize: 17, lineHeight: 1.65, color: "var(--text-2)" }}>
               Poincaré is a Uniswap v4 hook with a tiny <span style={{ fontWeight: 700, color: "var(--text)" }}>change-point detector</span> for a brain.
               When it spots a <em>real</em> directional trend, it gently widens the spread on the side that bleeds
-              liquidity providers — and stays cheap and open everywhere else. No oracle. No keeper. Just the pool's own price.
+              liquidity providers, while staying cheap and open everywhere else. No oracle. No keeper. Just the pool's own price.
             </motion.p>
 
             <motion.div {...fade(0.18)} className="mt-8 flex items-center gap-4 flex-wrap">
@@ -102,11 +102,11 @@ export function Landing() {
           <SectionTitle eyebrow="What it is" title="Two parts, kept honest" />
           <div className="grid gap-5 mt-9" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             <Feature icon="brain" color="var(--lav)" title="The detector"
-              body="A two-sided CUSUM quickest-change detector runs on every swap. It fires at a data-dependent moment — not a fixed block count — so there's no countdown to game. Provably optimal for the speed-vs-false-alarm trade-off." />
+              body="A two-sided CUSUM quickest-change detector runs on every swap. It fires at a data-dependent moment rather than a fixed block count, so there's no countdown to game. Provably optimal for the speed-vs-false-alarm trade-off." />
             <Feature icon="wave" color="var(--honey)" title="The curve"
               body="An asymmetric bonding curve. When a trend is confirmed, the with-trend (toxic) side is charged a small directional spread the LPs keep. The stabilising side stays at the base price. A real bid-ask, written into the geometry." />
             <Feature icon="shield" color="var(--up)" title="The moat"
-              body="To fool the detector you must genuinely move the price — spending real money and feeding arbitrageurs. Faking a trend is negative-EV. The protection is bounded by math, not wished away." />
+              body="To fool the detector you must genuinely move the price, which means spending real money and feeding arbitrageurs. Faking a trend is negative-EV. The protection is bounded by math, not wished away." />
           </div>
         </div>
       </section>
@@ -117,7 +117,7 @@ export function Landing() {
           <SectionTitle eyebrow="How it works" title="Watch · detect · lean" />
           <div className="grid gap-5 mt-9" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             <Step n="01" title="Watch its own price" body="Each swap, the hook samples the pool's reserve-implied price once per block and feeds the signed log-return to the detector. No oracle is consulted." />
-            <Step n="02" title="Accumulate evidence" body="Two CUSUM statistics build evidence for an up- or down-trend. Noise never crosses the threshold; a real, sustained move does — quickly when the drift is strong." />
+            <Step n="02" title="Accumulate evidence" body="Two CUSUM statistics build evidence for an up- or down-trend. Noise never crosses the threshold; a real, sustained move does, and quickly when the drift is strong." />
             <Step n="03" title="Lean the curve" body="On firing, the control law ramps a bounded, rate-limited spread onto the with-trend side and routes it back to LPs. When the trend fades, the curve returns to symmetric." />
           </div>
         </div>
@@ -130,12 +130,12 @@ export function Landing() {
             <SectionTitle eyebrow="Why you can't game it" title="The manipulator pays their own toll" align="left" />
             <p className="mt-4" style={{ fontSize: 15.5, lineHeight: 1.7, color: "var(--text-2)" }}>
               To push the detector past its threshold, an attacker has to trade the price in one direction, repeatedly,
-              with real capital. Every one of those trades pays price impact — and the moment detection fires, the
-              with-trend spread they just triggered. Arbitrageurs snap the price back the instant they stop.
+              with real capital. Every one of those trades pays price impact, and the moment detection fires they also pay
+              the with-trend spread they just triggered. Arbitrageurs snap the price back the instant they stop.
             </p>
             <div className="mt-6 flex flex-col gap-2.5">
               <MoatRow label="Cost to fake a trend" value="impact + κ·notional" tone="down" />
-              <MoatRow label="Payoff if it works" value="marginal — LPs keep the spread" tone="muted" />
+              <MoatRow label="Payoff if it works" value="marginal, LPs keep the spread" tone="muted" />
               <MoatRow label="Net for the attacker" value="negative-EV" tone="up" />
             </div>
           </motion.div>

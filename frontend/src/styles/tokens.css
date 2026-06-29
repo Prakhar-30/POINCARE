@@ -66,6 +66,7 @@
   --shadow-card: 0 4px 20px rgba(123, 113, 158, 0.08);
   --shadow-lg: 0 18px 50px rgba(123, 113, 158, 0.16);
   --shadow-glow-up: 0 10px 30px rgba(107, 184, 154, 0.22);
+  --scrim: rgba(60, 54, 88, 0.32);
 
   /* radii */
   --r-sm: 12px;
@@ -134,6 +135,7 @@
   --shadow-card: 0 6px 24px rgba(0, 0, 0, 0.34);
   --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.46);
   --shadow-glow-up: 0 10px 30px rgba(116, 198, 164, 0.18);
+  --scrim: rgba(0, 0, 0, 0.55);
 
   --app-bg: radial-gradient(900px 500px at 85% -10%, rgba(142, 136, 216, 0.18), transparent 60%),
     radial-gradient(720px 460px at 4% 6%, rgba(107, 184, 154, 0.12), transparent 55%), #16131f;

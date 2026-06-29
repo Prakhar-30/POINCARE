@@ -1,6 +1,9 @@
 import { usePoolState } from "@/hooks/usePoolState";
 import { usePoolTotals, useTape } from "@/hooks/useBackend";
-import { fmtUsd, fmtNum, fmtPct } from "@/lib/format";
+import { useDetectorConfig } from "@/hooks/useDetectorConfig";
+import { useSignalSeries } from "@/hooks/useSignalSeries";
+import { fmtUsd, fmtNum, fmtPct, shorten } from "@/lib/format";
+import { CONTRACTS } from "@/config/contracts";
 import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
 import { Tape } from "@/components/ui/Tape";
@@ -35,10 +38,13 @@ function Stat({ label, value, accent, tinted }: { label: string; value: string; 
 
 export function Dashboard() {
   const s = usePoolState();
+  const cfg = useDetectorConfig();
   const totals = usePoolTotals().data;
   const tape = useTape(10).data ?? [];
+  const real = useSignalSeries();
   const regime = regimeOf(s.trend);
   const tvl = (Number(s.r0) / 1e18) * 2; // balanced pool, both legs ≈ r0 in USDC terms
+  const kappaMax = cfg.kappaMax || 0.1;
 
   return (
     <div className="px-6 pb-8">
@@ -78,7 +84,7 @@ export function Dashboard() {
                 </span>
               </div>
               <div className="mt-3.5">
-                <Oscilloscope trend={s.trend} intensity={Math.max(s.kappa / 0.1, s.directionalEfficiency)} />
+                <Oscilloscope trend={s.trend} intensity={Math.max(s.kappa / kappaMax, s.directionalEfficiency)} real={real} />
               </div>
               <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
@@ -87,7 +93,7 @@ export function Dashboard() {
             </div>
 
             <div className="flex flex-col items-center justify-center gap-5">
-              <Gauge value={s.kappa} max={0.1} label="κ · lean" color="var(--honey)" suffix="%" scale={100} />
+              <Gauge value={s.kappa} max={kappaMax} label="κ · lean" color="var(--honey)" suffix="%" scale={100} />
               <Gauge value={s.directionalEfficiency} max={1} label="D · efficiency" color="var(--lav)" suffix="%" scale={100} />
             </div>
           </div>
@@ -110,7 +116,7 @@ export function Dashboard() {
               {totals?.swap_count ?? 0} swaps tracked · retained for LPs
             </div>
             <div style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--green-border)", fontSize: 11, color: "var(--green-sub)", lineHeight: 1.6 }}>
-              The directional spread Poincaré charged with-trend flow — value a constant-product (x·y=k) pool would
+              The directional spread Poincaré charged with-trend flow, the value a constant-product (x·y=k) pool would
               have leaked to arbitrageurs. Accrues as trades are recorded. Not guaranteed.
             </div>
           </div>
@@ -120,7 +126,7 @@ export function Dashboard() {
             <Row label="WETH (currency1)" value={`${fmtNum(Number(s.r1) / 1e18, 2)} WETH`} />
             <Row label="USDC (currency0)" value={`${fmtNum(Number(s.r0) / 1e18, 0)} USDC`} />
             <Row label="implied price" value={`${fmtUsd(s.price)} / WETH`} />
-            <Row label="hook" value="0x8dBc…aA88" mono />
+            <Row label="hook" value={shorten(CONTRACTS.hook)} mono />
           </div>
 
           <Tape rows={tape} />

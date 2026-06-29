@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { maxUint256, parseUnits } from "viem";
-import { CONTRACTS, ERC20_ABI, POOL_KEY, ROUTER_ABI } from "@/config/contracts";
+import { parseUnits } from "viem";
+import { CONTRACTS, ERC20_ABI, EXPLORER, POOL_KEY, ROUTER_ABI } from "@/config/contracts";
 import { recordSwap } from "@/lib/db";
+import { resolveGas, GAS } from "@/lib/gas";
+import { humanizeError } from "@/lib/errors";
+import { useStepper } from "@/hooks/useStepper";
+import { useToast } from "@/components/ui/Toast";
+import { fmtNum } from "@/lib/format";
 import type { Quote } from "@/lib/curve";
 
-export type SwapStatus = "idle" | "approving" | "swapping" | "success" | "error";
+export type SwapStatus = "idle" | "busy" | "success" | "error";
 
 const erc20 = (address: `0x${string}`) => ({ address, abi: ERC20_ABI } as const);
 
@@ -13,44 +18,59 @@ export function useSwap() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const stepper = useStepper();
+  const toast = useToast();
   const [status, setStatus] = useState<SwapStatus>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
 
   async function swap(params: { amountIn: string; zeroForOne: boolean; minOut: number; quote: Quote }) {
     if (!address || !walletClient || !publicClient) return;
-    setError(null);
-    setTxHash(null);
-    try {
-      const { amountIn, zeroForOne, minOut, quote } = params;
-      const tokenIn = (zeroForOne ? CONTRACTS.usdc : CONTRACTS.weth) as `0x${string}`;
-      const tokenOut = (zeroForOne ? CONTRACTS.weth : CONTRACTS.usdc) as `0x${string}`;
-      const router = CONTRACTS.router as `0x${string}`;
-      const amountInWei = parseUnits(amountIn, 18);
-      const minOutWei = parseUnits(minOut.toFixed(18), 18);
+    const { amountIn, zeroForOne, minOut, quote } = params;
+    const sellSym = zeroForOne ? "USDC" : "WETH";
+    const buySym = zeroForOne ? "WETH" : "USDC";
+    const tokenIn = (zeroForOne ? CONTRACTS.usdc : CONTRACTS.weth) as `0x${string}`;
+    const tokenOut = (zeroForOne ? CONTRACTS.weth : CONTRACTS.usdc) as `0x${string}`;
+    const router = CONTRACTS.router as `0x${string}`;
+    const amountInWei = parseUnits(amountIn, 18);
+    const minOutWei = parseUnits(minOut.toFixed(18), 18);
 
-      // 1. approve the router to pull the input token, if needed
+    let current = "swap";
+    try {
+      // does the router already have enough allowance?
       const allowance = (await publicClient.readContract({ ...erc20(tokenIn), functionName: "allowance", args: [address, router] })) as bigint;
-      if (allowance < amountInWei) {
-        setStatus("approving");
-        const aHash = await walletClient.writeContract({ ...erc20(tokenIn), functionName: "approve", args: [router, maxUint256] });
+      const needApprove = allowance < amountInWei;
+
+      stepper.begin([
+        ...(needApprove ? [{ key: "approve", label: `Approve ${sellSym}` }] : []),
+        { key: "swap", label: `Swap ${sellSym} for ${buySym}` },
+      ]);
+      setStatus("busy");
+
+      // 1. approve the EXACT amount the router needs (no infinite approvals)
+      if (needApprove) {
+        current = "approve";
+        stepper.activate("approve");
+        const gas = await resolveGas(publicClient, { ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], account: address }, GAS.approve);
+        const aHash = await walletClient.writeContract({ ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], gas });
         await publicClient.waitForTransactionReceipt({ hash: aHash });
+        stepper.complete("approve");
       }
 
-      // measure actual output via balance delta (exact, vs the estimated quote)
       const balBefore = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
 
       // 2. swap through the v4 router (the hook prices it with the live directional spread)
-      setStatus("swapping");
+      current = "swap";
+      stepper.activate("swap");
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
-      const hash = await walletClient.writeContract({
-        address: router,
-        abi: ROUTER_ABI,
-        functionName: "swapExactTokensForTokens",
-        args: [amountInWei, minOutWei, zeroForOne, POOL_KEY, "0x", address, deadline],
-      });
-      setTxHash(hash);
+      const swapArgs = [amountInWei, minOutWei, zeroForOne, POOL_KEY, "0x", address, deadline] as const;
+      const gas = await resolveGas(
+        publicClient,
+        { address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, account: address },
+        GAS.swap,
+      );
+      const hash = await walletClient.writeContract({ address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, gas });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      stepper.complete("swap");
+      stepper.finish(`${EXPLORER}/tx/${hash}`);
 
       const balAfter = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
       const actualOut = Number(balAfter - balBefore) / 1e18;
@@ -67,7 +87,7 @@ export function useSwap() {
         amount_out: actualOut > 0 ? actualOut : quote.out,
         price: quote.execPrice,
         notional_usdc: quote.notionalUsdc,
-        kappa: quote.spread, // spread applied on this direction
+        kappa: quote.spread,
         trend: quote.withTrend ? (zeroForOne ? "down" : "up") : "none",
         spread_frac: quote.spread,
         with_trend: quote.withTrend,
@@ -75,15 +95,18 @@ export function useSwap() {
       });
 
       setStatus("success");
+      const outShown = actualOut > 0 ? actualOut : quote.out;
+      toast.success("Swap confirmed", `${fmtNum(amtIn, 2)} ${sellSym} for ${fmtNum(outShown, buySym === "WETH" ? 5 : 2)} ${buySym}`, `${EXPLORER}/tx/${hash}`);
       return hash;
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "swap failed";
-      setError(msg.length > 120 ? msg.slice(0, 120) + "…" : msg);
+    } catch (e) {
+      const msg = humanizeError(e);
+      stepper.fail(current, msg);
+      toast.error("Swap failed", msg);
       setStatus("error");
     }
   }
 
-  return { swap, status, error, txHash, reset: () => { setStatus("idle"); setError(null); setTxHash(null); } };
+  return { swap, status, stepper, reset: () => setStatus("idle") };
 }
 
 /** Free-mint the demo tokens so a fresh wallet can trade. */
@@ -91,15 +114,23 @@ export function useFaucet() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const toast = useToast();
   const [minting, setMinting] = useState(false);
 
   async function mint() {
     if (!address || !walletClient || !publicClient) return;
     setMinting(true);
     try {
-      const h1 = await walletClient.writeContract({ ...erc20(CONTRACTS.usdc as `0x${string}`), functionName: "mint", args: [address, parseUnits("50000", 18)] });
-      const h2 = await walletClient.writeContract({ ...erc20(CONTRACTS.weth as `0x${string}`), functionName: "mint", args: [address, parseUnits("20", 18)] });
+      const usdc = erc20(CONTRACTS.usdc as `0x${string}`);
+      const weth = erc20(CONTRACTS.weth as `0x${string}`);
+      const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, parseUnits("50000", 18)], account: address }, GAS.mint);
+      const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, parseUnits("50000", 18)], gas: g1 });
+      const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, parseUnits("20", 18)], account: address }, GAS.mint);
+      const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, parseUnits("20", 18)], gas: g2 });
       await Promise.all([publicClient.waitForTransactionReceipt({ hash: h1 }), publicClient.waitForTransactionReceipt({ hash: h2 })]);
+      toast.success("Test tokens minted", "50,000 USDC and 20 WETH added to your wallet");
+    } catch (e) {
+      toast.error("Mint failed", humanizeError(e));
     } finally {
       setMinting(false);
     }

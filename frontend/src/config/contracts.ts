@@ -89,6 +89,58 @@ export const HOOK_ABI = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
 ] as const;
 
+/**
+ * Hook-owned liquidity (BaseCustomAccounting). LP shares are the hook's own ERC20.
+ * Liquidity tokens settle via transferFrom(sender -> PoolManager), so the user
+ * approves USDC and WETH to the PoolManager (not the hook) before addLiquidity.
+ * tickLower/tickUpper/userInputSalt are unused by the custom curve -> pass 0.
+ */
+export const HOOK_LP_ABI = [
+  {
+    type: "function",
+    name: "addLiquidity",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "amount0Desired", type: "uint256" },
+          { name: "amount1Desired", type: "uint256" },
+          { name: "amount0Min", type: "uint256" },
+          { name: "amount1Min", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "tickLower", type: "int24" },
+          { name: "tickUpper", type: "int24" },
+          { name: "userInputSalt", type: "bytes32" },
+        ],
+      },
+    ],
+    outputs: [{ name: "delta", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "removeLiquidity",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "liquidity", type: "uint256" },
+          { name: "amount0Min", type: "uint256" },
+          { name: "amount1Min", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "tickLower", type: "int24" },
+          { name: "tickUpper", type: "int24" },
+          { name: "userInputSalt", type: "bytes32" },
+        ],
+      },
+    ],
+    outputs: [{ name: "delta", type: "int256" }],
+  },
+] as const;
+
 /** ERC20 (incl. free mint on the demo tokens). */
 export const ERC20_ABI = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },

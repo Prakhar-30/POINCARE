@@ -7,13 +7,14 @@ import { quote } from "@/lib/curve";
 import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tape } from "@/components/ui/Tape";
+import { TxSteps } from "@/components/ui/TxSteps";
 
 const SLIP = 0.5; // %
 
 export function Trade() {
   const s = usePoolState();
   const bal = useBalances();
-  const { swap, status, error, reset } = useSwap();
+  const { swap, status, stepper, reset } = useSwap();
   const faucet = useFaucet();
   const tape = useTape(16).data ?? [];
 
@@ -32,7 +33,7 @@ export function Trade() {
   const sellBal = sellUSDC ? bal.usdc : bal.weth;
   const insufficient = Number(amt) > sellBal + 1e-9;
 
-  const busy = status === "approving" || status === "swapping";
+  const busy = status === "busy";
   const disabled = busy || !amt || Number(amt) <= 0 || q.out <= 0 || insufficient;
 
   async function onSwap() {
@@ -42,6 +43,8 @@ export function Trade() {
   }
 
   return (
+    <>
+    <TxSteps stepper={stepper} title="Swapping" />
     <div className="grid gap-4.5 px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
       {/* ---- swap form ---- */}
       <div className="card p-6">
@@ -95,10 +98,8 @@ export function Trade() {
             transition: "background .2s",
           }}
         >
-          {status === "approving" ? "Approving…" : status === "swapping" ? "Swapping…" : status === "success" ? "Swapped ✓" : insufficient ? `Insufficient ${sellSym}` : `Swap ${sellSym} → ${buySym}`}
+          {busy ? "Confirming…" : status === "success" ? "Swapped ✓" : insufficient ? `Insufficient ${sellSym}` : `Swap ${sellSym} → ${buySym}`}
         </button>
-
-        {error && <div className="mt-3 text-center" style={{ fontSize: 11.5, color: "var(--down-deep)" }}>{error}</div>}
 
         {/* faucet */}
         {sellBal < 1 && (
@@ -119,10 +120,10 @@ export function Trade() {
         <CompareBar label="Normal pool · 0.3% fee" value={q.feeOut} max={q.baseOut} sym={buySym} color="var(--faint)" />
         <p className="mt-5" style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-3)" }}>
           {q.withTrend ? (
-            <>You're trading <span style={{ color: "var(--honey-deep)", fontWeight: 700 }}>with the detected trend</span>, so a small spread of {fmtPct(spread)} applies — and that{" "}
+            <>You're trading <span style={{ color: "var(--honey-deep)", fontWeight: 700 }}>with the detected trend</span>, so a small spread of {fmtPct(spread)} applies, and that{" "}
             <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(q.lvrToLps)}</span> goes straight to LPs. A normal pool would have leaked it to arbitrageurs. That's the LVR being reduced, in real time.</>
           ) : (
-            <>You're trading in <span style={{ color: "var(--up-deep)", fontWeight: 700 }}>{s.trend === "none" ? "a calm market" : "the stabilising direction"}</span>, so Poincaré charges <span style={{ fontWeight: 700, color: "var(--text)" }}>zero spread</span> — you keep <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(Math.max(0, q.savedVsFee))}</span> a 0.3% fee pool would have taken. Protection without taxing honest flow.</>
+            <>You're trading in <span style={{ color: "var(--up-deep)", fontWeight: 700 }}>{s.trend === "none" ? "a calm market" : "the stabilising direction"}</span>, so Poincaré charges <span style={{ fontWeight: 700, color: "var(--text)" }}>zero spread</span>, so you keep <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(Math.max(0, q.savedVsFee))}</span> that a 0.3% fee pool would have taken. Protection without taxing honest flow.</>
           )}
         </p>
         <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -134,6 +135,7 @@ export function Trade() {
       {/* ---- tape ---- */}
       <Tape rows={tape} />
     </div>
+    </>
   );
 }
 

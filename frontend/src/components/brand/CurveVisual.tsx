@@ -1,35 +1,42 @@
 import { motion } from "framer-motion";
 
 // Signature illustration: a constant-product hyperbola (calm, grey) and the same curve
-// "leaning" on the with-trend side (honey) — the directional spread, drawn as the kink at
+// "leaning" on the with-trend side (honey), the directional spread drawn as the kink at
 // the operating point. This is the whole product in one picture.
 const W = 460;
 const H = 340;
 const P = 34;
 
+// chart domain. YMIN sits below the leaning curve's lowest point so it never clips the frame.
+const XMIN = 0.2;
+const XMAX = 1.0;
+const YMIN = 0.1;
+const YMAX = 1.0;
+const LEAN = 0.34;
+
+const sx = (x: number) => P + ((x - XMIN) / (XMAX - XMIN)) * (W - 2 * P);
+const sy = (y: number) => H - P - ((y - YMIN) / (YMAX - YMIN)) * (H - 2 * P);
+
 function hyperbola(k: number, lean = 0) {
   const pts: string[] = [];
-  const xmin = 0.2;
-  const xmax = 1.0;
   for (let i = 0; i <= 60; i++) {
-    const x = xmin + (i / 60) * (xmax - xmin);
+    const x = XMIN + (i / 60) * (XMAX - XMIN);
     // lean steepens the right (buy) side: y reduced as x grows past the midpoint
     const t = Math.max(0, (x - 0.55) / 0.45);
     const y = (k / x) * (1 - lean * t);
-    const sx = P + ((x - xmin) / (xmax - xmin)) * (W - 2 * P);
-    const sy = H - P - ((y - 0.2) / (1.0 - 0.2)) * (H - 2 * P);
-    pts.push(`${sx.toFixed(1)},${sy.toFixed(1)}`);
+    pts.push(`${sx(x).toFixed(1)},${sy(y).toFixed(1)}`);
   }
   return pts.join(" ");
 }
 
 export function CurveVisual() {
-  const calm = hyperbola(0.2, 0);
-  const lean = hyperbola(0.2, 0.34);
+  const k = 0.2;
+  const calm = hyperbola(k, 0);
+  const lean = hyperbola(k, LEAN);
 
-  // operating point ~ middle
-  const ox = P + ((0.55 - 0.2) / 0.8) * (W - 2 * P);
-  const oy = H - P - ((0.2 / 0.55 - 0.2) / 0.8) * (H - 2 * P);
+  // operating point ~ middle (on the calm curve)
+  const ox = sx(0.55);
+  const oy = sy(k / 0.55);
 
   return (
     <div className="relative grain rounded-xl overflow-hidden" style={{ background: "var(--scope-bg)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}>
@@ -58,6 +65,7 @@ export function CurveVisual() {
           stroke="var(--honey)"
           strokeWidth="3.5"
           strokeLinecap="round"
+          strokeLinejoin="round"
           initial={{ pathLength: 0, opacity: 0 }}
           animate={{ pathLength: 1, opacity: 1 }}
           transition={{ duration: 1.3, ease: "easeInOut", delay: 0.3 }}

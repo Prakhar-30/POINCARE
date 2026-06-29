@@ -29,7 +29,7 @@ export function Tape({ rows }: { rows: SwapRow[] }) {
       <div style={{ maxHeight: 250, overflowY: "auto" }}>
         {rows.length === 0 && (
           <div className="px-5 py-6 text-center" style={{ fontSize: 12, color: "var(--faint)" }}>
-            No trades yet — be the first to swap.
+            No trades yet. Be the first to swap.
           </div>
         )}
         <AnimatePresence initial={false}>

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, lightTheme, darkTheme } from "@rainbow-me/rainbowkit";
 import { wagmiConfig } from "@/config/wagmi";
 import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 5_000 } },
@@ -32,11 +33,13 @@ function RainbowKitThemed({ children }: { children: ReactNode }) {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <RainbowKitThemed>{children}</RainbowKitThemed>
-        </QueryClientProvider>
-      </WagmiProvider>
+      <ToastProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClient}>
+            <RainbowKitThemed>{children}</RainbowKitThemed>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

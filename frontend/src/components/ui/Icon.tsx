@@ -104,6 +104,19 @@ const paths: Record<string, ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+  curve: (
+    <>
+      <path d="M4 20V4" />
+      <path d="M4 20h16" />
+      <path d="M5 18C9 18 9 7 19 6" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  spinner: (
+    <>
+      <path d="M12 3a9 9 0 1 0 9 9" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;

@@ -78,14 +78,21 @@ export async function fetchLpEvents(address: string): Promise<LpEvent[]> {
   return (data as LpEvent[]) ?? [];
 }
 
-/** Live tape: invoke cb whenever a new swap is inserted. Returns an unsubscribe fn. */
+/** Live tape: invoke cb whenever a new swap is inserted. Returns an unsubscribe fn.
+ *  Uses a unique channel name per call so React 18 StrictMode's double-mount can't
+ *  reuse an already-subscribed channel (which makes `.on()` throw). */
 export function subscribeSwaps(cb: (row: SwapRow) => void): () => void {
   if (!supabaseReady) return () => {};
-  const channel = supabase
-    .channel("swaps-tape")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "swaps" }, (payload) => cb(payload.new as SwapRow))
-    .subscribe();
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+  try {
+    const channel = supabase
+      .channel(`swaps-tape-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "swaps" }, (payload) => cb(payload.new as SwapRow))
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  } catch (e) {
+    console.warn("subscribeSwaps", e); // realtime is a nice-to-have; polling still refreshes the tape
+    return () => {};
+  }
 }
