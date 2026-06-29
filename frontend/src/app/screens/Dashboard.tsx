@@ -4,6 +4,7 @@ import { useDetectorConfig } from "@/hooks/useDetectorConfig";
 import { useSignalSeries } from "@/hooks/useSignalSeries";
 import { fmtUsd, fmtNum, fmtPct, shorten } from "@/lib/format";
 import { CONTRACTS } from "@/config/contracts";
+import { useIsNarrow, useIsMobile } from "@/hooks/useMediaQuery";
 import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
 import { Tape } from "@/components/ui/Tape";
@@ -43,13 +44,15 @@ export function Dashboard() {
   const tape = useTape(10).data ?? [];
   const real = useSignalSeries();
   const regime = regimeOf(s.trend);
+  const narrow = useIsNarrow();
+  const mobile = useIsMobile();
   const tvl = (Number(s.r0) / 1e18) * 2; // balanced pool, both legs ≈ r0 in USDC terms
   const kappaMax = cfg.kappaMax || 0.1;
 
   return (
     <div className="px-6 pb-8">
       {/* stat bar */}
-      <div className="grid gap-3.5 pt-5" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+      <div className="grid gap-3.5 pt-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
         <Stat label="Total value locked" value={s.loading ? "—" : fmtUsd(tvl, { compact: true })} />
         <Stat label="Mid · WETH/USDC" value={s.loading ? "—" : fmtUsd(s.price)} />
         <Stat label="Detector regime" value={regime.label} accent={regime.color} />
@@ -58,14 +61,14 @@ export function Dashboard() {
       </div>
 
       {/* brain + side */}
-      <div className="grid gap-4.5 mt-4" style={{ gridTemplateColumns: "1fr 340px", gap: 18 }}>
+      <div className="grid gap-4.5 mt-4" style={{ gridTemplateColumns: narrow ? "1fr" : "1fr 340px", gap: 18 }}>
         {/* The Brain */}
         <div className="card grain relative overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
+          <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
             <div className="flex items-center gap-2.5">
               <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
               <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>The Brain</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· CUSUM drift detector</span>
+              <span className="hidden sm:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· CUSUM drift detector</span>
             </div>
             <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ fontSize: 12, fontWeight: 700, color: regime.color, background: regime.ring }}>
               <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: regime.color }} />
@@ -73,7 +76,7 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className="grid gap-5 p-6" style={{ gridTemplateColumns: "1.45fr 1fr" }}>
+          <div className="grid gap-5 p-6" style={{ gridTemplateColumns: mobile ? "1fr" : "1.45fr 1fr" }}>
             <div>
               <div className="flex items-baseline gap-3">
                 <div className="font-display" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, color: regime.color }}>

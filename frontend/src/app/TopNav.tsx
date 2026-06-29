@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
     <div
-      className="sticky top-0 z-50 flex items-center gap-6 px-6"
+      className="sticky top-0 z-50 flex items-center gap-2.5 sm:gap-6 px-3 sm:px-6"
       style={{
         height: 64,
         borderBottom: "1px solid var(--nav-border)",
@@ -33,7 +33,7 @@ export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
         </div>
       </a>
 
-      <div className="flex gap-1 rounded-2xl p-1" style={{ background: "var(--nav-pill)" }}>
+      <div className="flex gap-1 rounded-2xl p-1 shrink-0" style={{ background: "var(--nav-pill)" }}>
         {TABS.map((t) => {
           const active = t.id === tab;
           return (
@@ -60,16 +60,16 @@ export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
         })}
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
         <div
-          className="hidden sm:flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+          className="hidden lg:flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
           style={{ color: "var(--text-3)", background: "var(--surface)", border: "1px solid var(--nav-border)" }}
         >
           <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
           Unichain Sepolia
         </div>
         <ThemeToggle />
-        <ConnectButton showBalance={false} accountStatus="address" chainStatus="none" />
+        <ConnectButton showBalance={false} accountStatus="avatar" chainStatus="none" />
       </div>
     </div>
   );
