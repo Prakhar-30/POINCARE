@@ -37,9 +37,13 @@ export function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
       {/* ---- nav ---- */}
-      <nav className="sticky top-0 z-50 flex items-center px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
-        <Wordmark size={34} tag="v4" />
-        <div className="ml-auto flex items-center gap-3">
+      <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
+        <a href="#" className="flex items-center gap-2.5 shrink-0">
+          <Mark size={34} />
+          <span className="font-display hidden sm:block" style={{ fontWeight: 700, fontSize: 19, color: "var(--text)", letterSpacing: ".5px" }}>Poincaré</span>
+          <span className="hidden sm:inline text-lav" style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".5px", background: "var(--lav-soft)", borderRadius: 20, padding: "3px 9px" }}>v4</span>
+        </a>
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <a href="#how" className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)" }}>How it works</a>
           <a href="#moat" className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)" }}>The moat</a>
           <ThemeToggle />
@@ -49,7 +53,7 @@ export function Landing() {
 
       {/* ---- hero ---- */}
       <header className="px-6 md:px-10 pt-14 md:pt-20 pb-10">
-        <div className="mx-auto grid items-center gap-10 lg:gap-14" style={{ maxWidth: 1180, gridTemplateColumns: "minmax(0,1.05fr) minmax(0,1fr)" }}>
+        <div className="mx-auto grid items-center gap-10 lg:gap-14 grid-cols-1 lg:grid-cols-[1.05fr_1fr]" style={{ maxWidth: 1180 }}>
           <div>
             <motion.div {...fade(0)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 mb-6" style={{ background: "var(--lav-soft)", color: "var(--lav-deep)", fontSize: 12, fontWeight: 800 }}>
               <Icon name="spark" size={14} /> Adaptive liquidity · live on Unichain Sepolia
@@ -88,7 +92,7 @@ export function Landing() {
 
       {/* ---- numbers ---- */}
       <section className="px-6 md:px-10 py-4">
-        <motion.div {...fade()} className="mx-auto grid gap-3.5" style={{ maxWidth: 1180, gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
           <NumberCard kpi="−14.3%" label="LVR vs constant-product" sub="back-test, same swap path" />
           <NumberCard kpi="6 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
           <NumberCard kpi="~2×" label="less tax on benign flow" sub="vs a symmetric vol-fee" />
@@ -100,7 +104,7 @@ export function Landing() {
       <section className="px-6 md:px-10 py-16">
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="What it is" title="Two parts, kept honest" />
-          <div className="grid gap-5 mt-9" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <Feature icon="brain" color="var(--lav)" title="The detector"
               body="A two-sided CUSUM quickest-change detector runs on every swap. It fires at a data-dependent moment rather than a fixed block count, so there's no countdown to game. Provably optimal for the speed-vs-false-alarm trade-off." />
             <Feature icon="wave" color="var(--honey)" title="The curve"
@@ -115,7 +119,7 @@ export function Landing() {
       <section id="how" className="px-6 md:px-10 py-16" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="How it works" title="Watch · detect · lean" />
-          <div className="grid gap-5 mt-9" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <Step n="01" title="Watch its own price" body="Each swap, the hook samples the pool's reserve-implied price once per block and feeds the signed log-return to the detector. No oracle is consulted." />
             <Step n="02" title="Accumulate evidence" body="Two CUSUM statistics build evidence for an up- or down-trend. Noise never crosses the threshold; a real, sustained move does, and quickly when the drift is strong." />
             <Step n="03" title="Lean the curve" body="On firing, the control law ramps a bounded, rate-limited spread onto the with-trend side and routes it back to LPs. When the trend fades, the curve returns to symmetric." />
@@ -125,7 +129,7 @@ export function Landing() {
 
       {/* ---- moat ---- */}
       <section id="moat" className="px-6 md:px-10 py-16">
-        <div className="mx-auto grid gap-8 items-center" style={{ maxWidth: 1180, gridTemplateColumns: "1fr 1fr" }}>
+        <div className="mx-auto grid gap-8 items-center grid-cols-1 lg:grid-cols-2" style={{ maxWidth: 1180 }}>
           <motion.div {...fade()}>
             <SectionTitle eyebrow="Why you can't game it" title="The manipulator pays their own toll" align="left" />
             <p className="mt-4" style={{ fontSize: 15.5, lineHeight: 1.7, color: "var(--text-2)" }}>

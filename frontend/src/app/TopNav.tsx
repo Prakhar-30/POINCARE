@@ -40,7 +40,7 @@ export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="relative flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-[13px] font-bold"
+              className="relative flex items-center gap-2 rounded-xl px-2.5 sm:px-3.5 py-1.5 text-[13px] font-bold"
               style={{ color: active ? "var(--lav-deep)" : "var(--text-3)", transition: "color .2s ease" }}
             >
               {active && (

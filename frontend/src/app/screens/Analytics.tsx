@@ -6,6 +6,7 @@ import { fmtPct, fmtUsd, fmtNum } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
 import { Oscilloscope } from "@/components/ui/Oscilloscope";
+import { useIsNarrow } from "@/hooks/useMediaQuery";
 
 function regimeOf(trend: string) {
   if (trend === "up") return { label: "Up-trend", color: "var(--up)", ring: "rgba(107,184,154,.15)" };
@@ -20,33 +21,34 @@ export function Analytics() {
   const real = useSignalSeries();
   const regime = regimeOf(s.trend);
   const kappaMax = cfg.kappaMax || 0.1;
+  const narrow = useIsNarrow();
 
   return (
-    <div className="px-6 pb-10 pt-5 flex flex-col" style={{ gap: 18 }}>
+    <div className="px-4 sm:px-6 pb-10 pt-5 flex flex-col" style={{ gap: 18 }}>
       {/* ---- the Brain deep-dive ---- */}
       <div className="card grain overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
+        <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
           <div className="flex items-center gap-2.5">
             <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
             <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>The Brain · CUSUM detector</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· quickest-change, data-dependent firing</span>
+            <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· quickest-change, data-dependent firing</span>
           </div>
           <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ fontSize: 12, fontWeight: 700, color: regime.color, background: regime.ring }}>
             <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: regime.color }} /> live
           </div>
         </div>
 
-        <div className="grid gap-6 p-6" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+        <div className="grid gap-6 p-6" style={{ gridTemplateColumns: narrow ? "1fr" : "1.5fr 1fr" }}>
           <div>
             <Oscilloscope trend={s.trend} intensity={Math.max(s.kappa / kappaMax, s.directionalEfficiency)} real={real} height={210} />
-            <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+            <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
               <Readout label="regime" value={regime.label} color={regime.color} />
               <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
               <Readout label="spread · buy WETH" value={fmtPct(s.spreadOneForZero)} color={s.spreadOneForZero > 0 ? "var(--up)" : "var(--text-2)"} />
             </div>
           </div>
           <div className="flex flex-col items-center justify-center gap-5">
-            <div className="flex gap-6">
+            <div className="flex gap-6 flex-wrap justify-center">
               <Gauge value={s.kappa} max={kappaMax} label="κ · lean" color="var(--honey)" suffix="%" scale={100} />
               <Gauge value={s.directionalEfficiency} max={1} label="D · efficiency" color="var(--lav)" suffix="%" scale={100} />
             </div>
@@ -59,7 +61,7 @@ export function Analytics() {
         </div>
       </div>
 
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr)", gap: 18 }}>
+      <div className="grid gap-4.5" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1fr) minmax(0,1.1fr)", gap: 18 }}>
         {/* ---- detector configuration ---- */}
         <div className="card p-6">
           <div className="flex items-center gap-2.5 mb-1">
@@ -114,7 +116,7 @@ export function Analytics() {
       </div>
 
       {/* ---- LVR headline ---- */}
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(4,1fr)", gap: 18 }}>
+      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
         <HeadStat label="LVR reduction vs x·y=k" value="14.3%" color="var(--up)" tinted sub="back-test, synthetic regime path" />
         <HeadStat label="vs equal-spread vol fee" value="11.5%" color="var(--lav)" sub="same average spread, symmetric" />
         <HeadStat label="LVR avoided · live" value={totals && totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} color="var(--green-label)" sub={`${totals?.swap_count ?? 0} swaps tracked`} />

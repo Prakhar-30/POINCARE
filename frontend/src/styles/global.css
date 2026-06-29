@@ -55,6 +55,12 @@
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
   }
+  /* Safety net: clip stray horizontal overflow on small screens without
+     breaking position: sticky (overflow-x: clip is exempt from that, unlike hidden). */
+  #root {
+    overflow-x: clip;
+    max-width: 100vw;
+  }
   body {
     margin: 0;
     font-family: var(--font-sans);

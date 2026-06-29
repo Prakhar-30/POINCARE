@@ -10,6 +10,7 @@ import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { BondingCurve } from "@/components/ui/BondingCurve";
 import { TxSteps } from "@/components/ui/TxSteps";
+import { useIsNarrow } from "@/hooks/useMediaQuery";
 
 export function Pool() {
   const s = usePoolState();
@@ -17,6 +18,7 @@ export function Pool() {
   const bal = useBalances();
   const totals = usePoolTotals().data;
   const lp = useLiquidity(() => { pos.refetch(); bal.refetch(); });
+  const narrow = useIsNarrow();
 
   const [mode, setMode] = useState<"add" | "remove">("add");
 
@@ -26,7 +28,7 @@ export function Pool() {
   return (
     <>
     <TxSteps stepper={lp.stepper} title={mode === "add" ? "Adding liquidity" : "Removing liquidity"} />
-    <div className="grid gap-4.5 px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
       {/* ---- left: add / remove ---- */}
       <div className="card p-6">
         {/* mode toggle */}
@@ -75,7 +77,7 @@ export function Pool() {
         </div>
 
         {/* position + LP LVR */}
-        <div className="grid gap-4.5" style={{ gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+        <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 18 }}>
           <div className="card-quiet p-5">
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".3px", color: "var(--text-3)", marginBottom: 14 }}>Your position</div>
             {pos.shares > 0 ? (

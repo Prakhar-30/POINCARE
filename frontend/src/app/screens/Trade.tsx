@@ -8,6 +8,7 @@ import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tape } from "@/components/ui/Tape";
 import { TxSteps } from "@/components/ui/TxSteps";
+import { useIsNarrow } from "@/hooks/useMediaQuery";
 
 const SLIP = 0.5; // %
 
@@ -17,6 +18,7 @@ export function Trade() {
   const { swap, status, stepper, reset } = useSwap();
   const faucet = useFaucet();
   const tape = useTape(16).data ?? [];
+  const narrow = useIsNarrow();
 
   const [sellUSDC, setSellUSDC] = useState(true);
   const [amt, setAmt] = useState("1000");
@@ -45,7 +47,7 @@ export function Trade() {
   return (
     <>
     <TxSteps stepper={stepper} title="Swapping" />
-    <div className="grid gap-4.5 px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
       {/* ---- swap form ---- */}
       <div className="card p-6">
         <div className="flex justify-between items-center mb-4">
