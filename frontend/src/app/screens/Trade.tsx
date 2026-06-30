@@ -21,6 +21,17 @@ export function Trade() {
   const tape = useOnchainTape();
   const narrow = useIsNarrow();
 
+  // show 18 at a time; reveal more on demand and page the chain when the buffer runs low
+  const PAGE = 18;
+  const [visible, setVisible] = useState(PAGE);
+  const shownRows = tape.rows.slice(0, visible);
+  const moreInBuffer = visible < tape.rows.length;
+  const tapeHasMore = moreInBuffer || tape.hasMore;
+  const onTapeLoadMore = () => {
+    setVisible((v) => v + PAGE);
+    if (visible + PAGE >= tape.rows.length && tape.hasMore) void tape.loadMore();
+  };
+
   const [sellUSDC, setSellUSDC] = useState(true);
   const [amt, setAmt] = useState("1000");
 
@@ -137,7 +148,7 @@ export function Trade() {
 
       {/* ---- tape ---- */}
       <div className="min-w-0">
-        <Tape rows={tape.rows} onLoadMore={tape.loadMore} hasMore={tape.hasMore} loadingMore={tape.loadingMore} scroll={false} badge="on-chain · live" />
+        <Tape rows={shownRows} onLoadMore={onTapeLoadMore} hasMore={tapeHasMore} loadingMore={tape.loadingMore} maxHeight={360} badge="on-chain · live" />
       </div>
     </div>
     </>

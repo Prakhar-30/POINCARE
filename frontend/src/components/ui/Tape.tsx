@@ -21,6 +21,7 @@ export function Tape({
   hasMore,
   loadingMore,
   scroll = true,
+  maxHeight = 250,
   badge = "live",
 }: {
   rows: SwapRow[];
@@ -28,6 +29,7 @@ export function Tape({
   hasMore?: boolean;
   loadingMore?: boolean;
   scroll?: boolean;
+  maxHeight?: number;
   badge?: string;
 }) {
   return (
@@ -45,7 +47,7 @@ export function Tape({
         <span className="text-right">size · WETH</span>
         <span className="text-right">ago</span>
       </div>
-      <div className={scroll ? "no-scrollbar" : undefined} style={scroll ? { maxHeight: 250, overflowY: "auto" } : undefined}>
+      <div className={scroll ? "no-scrollbar" : undefined} style={scroll ? { maxHeight, overflowY: "auto" } : undefined}>
         {rows.length === 0 && (
           <div className="px-5 py-6 text-center" style={{ fontSize: 12, color: "var(--faint)" }}>
             No trades yet. Be the first to swap.
@@ -73,21 +75,21 @@ export function Tape({
         </AnimatePresence>
       </div>
 
-      {onLoadMore && rows.length > 0 && (
+      {onLoadMore && rows.length > 0 && (hasMore || loadingMore) && (
         <button
           onClick={onLoadMore}
-          disabled={!hasMore || loadingMore}
+          disabled={loadingMore}
           className="w-full text-center font-bold"
           style={{
             padding: "11px",
             fontSize: 12,
-            color: hasMore ? "var(--lav-deep)" : "var(--faint)",
+            color: "var(--lav-deep)",
             background: "var(--surface-2)",
             borderTop: "1px solid var(--divider)",
-            cursor: hasMore && !loadingMore ? "pointer" : "default",
+            cursor: loadingMore ? "default" : "pointer",
           }}
         >
-          {loadingMore ? "Loading…" : hasMore ? "Load more history" : "End of history"}
+          {loadingMore ? "Loading…" : "Load more history"}
         </button>
       )}
     </div>
