@@ -95,7 +95,8 @@ export function useSwap() {
         price: execPrice,
         notional_usdc: quote.notionalUsdc,
         kappa: quote.spread,
-        trend: quote.withTrend ? (zeroForOne ? "down" : "up") : "none",
+        // UI convention: buying WETH (zeroForOne) pushes the USDC/WETH chart up -> "up"
+        trend: quote.withTrend ? (zeroForOne ? "up" : "down") : "none",
         spread_frac: quote.spread,
         with_trend: quote.withTrend,
         lvr_captured_usdc: quote.lvrToLps,

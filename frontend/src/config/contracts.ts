@@ -64,9 +64,14 @@ export const TOKENS = {
 
 export const EXPLORER = "https://sepolia.uniscan.xyz";
 
-// 0 = None, 1 = Up, 2 = Down  (Cusum.Trend)
-export const TREND = ["none", "up", "down"] as const;
-export type TrendLabel = (typeof TREND)[number];
+// Cusum.Trend enum is 0=None, 1=Up, 2=Down — but it runs on the hook's INTERNAL price,
+// priceWad = reserve1/reserve0 = WETH/USDC, which is the INVERSE of the UI's USDC/WETH
+// chart price. So the hook's "Up" (WETH/USDC rising) is a falling chart, and vice-versa.
+// We invert here so the UI trend label matches the direction the user sees on the chart
+// (and the side that gets the with-trend spread). The spread getters are direction-based
+// (effectiveSpread(zeroForOne)) and already correct, so only the label needs flipping.
+export const TREND = ["none", "down", "up"] as const;
+export type TrendLabel = "none" | "up" | "down";
 
 /** Minimal ABI for the PoincareHook public read surface + LP entrypoints. */
 export const HOOK_ABI = [

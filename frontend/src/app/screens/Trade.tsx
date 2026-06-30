@@ -8,6 +8,7 @@ import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tape } from "@/components/ui/Tape";
 import { TokenIcon } from "@/components/ui/TokenIcon";
+import { PoolChart } from "@/components/ui/PoolChart";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 
@@ -123,7 +124,11 @@ export function Trade() {
         )}
       </div>
 
-      {/* ---- middle: explainer ---- */}
+      {/* ---- middle: price chart + explainer ---- */}
+      <div className="flex flex-col gap-4.5 min-w-0" style={{ gap: 18 }}>
+      <div className="card p-5 sm:p-6 min-w-0">
+        <PoolChart rows={tape.rows} />
+      </div>
       <div className="card-quiet p-5 sm:p-6 min-w-0">
         <div className="flex items-center gap-2.5 mb-4">
           <span style={{ color: "var(--lav)" }}><Icon name="shield" size={18} /></span>
@@ -144,6 +149,7 @@ export function Trade() {
           <MiniStat label="Detector regime" value={s.trend === "none" ? "Calm" : s.trend === "up" ? "Up-trend" : "Down-trend"} color={s.trend === "up" ? "var(--up)" : s.trend === "down" ? "var(--down)" : "var(--lav)"} />
           <MiniStat label="This trade → LPs" value={fmtUsd(q.lvrToLps)} color="var(--green-label)" />
         </div>
+      </div>
       </div>
 
       {/* ---- tape ---- */}

@@ -19,3 +19,8 @@ node_modules/
 
 # Local build brief — kept local, never tracked
 CLAUDE.md
+
+# One-off local chain drivers (historical replay / trend demo) — dev tools, no secrets
+frontend/replay.mjs
+frontend/trend.mjs
+frontend/probe*.mjs
