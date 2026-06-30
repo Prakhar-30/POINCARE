@@ -125,19 +125,19 @@ export function Trade() {
       </div>
 
       {/* ---- middle: price chart + explainer ---- */}
-      <div className="flex flex-col gap-4.5 min-w-0" style={{ gap: 18 }}>
+      <div className="flex flex-col min-w-0" style={{ gap: 14 }}>
       <div className="card p-5 sm:p-6 min-w-0">
-        <PoolChart rows={tape.rows} />
+        <PoolChart rows={tape.rows} height={172} />
       </div>
       <div className="card-quiet p-5 sm:p-6 min-w-0">
-        <div className="flex items-center gap-2.5 mb-4">
+        <div className="flex items-center gap-2.5 mb-3.5">
           <span style={{ color: "var(--lav)" }}><Icon name="shield" size={18} /></span>
           <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>How this trade compares to a normal pool</span>
         </div>
         <CompareBar label="Poincaré (this pool)" value={q.out} max={q.baseOut} sym={buySym} color="var(--up)" highlight />
         <CompareBar label="Constant-product · no fee" value={q.baseOut} max={q.baseOut} sym={buySym} color="var(--lav)" />
         <CompareBar label="Normal pool · 0.3% fee" value={q.feeOut} max={q.baseOut} sym={buySym} color="var(--faint)" />
-        <p className="mt-5" style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-3)" }}>
+        <p className="mt-4" style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--text-3)" }}>
           {q.withTrend ? (
             <>You're trading <span style={{ color: "var(--honey-deep)", fontWeight: 700 }}>with the detected trend</span>, so a small spread of {fmtPct(spread)} applies, and that{" "}
             <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(q.lvrToLps)}</span> goes straight to LPs. A normal pool would have leaked it to arbitrageurs. That's the LVR being reduced, in real time.</>
@@ -145,7 +145,7 @@ export function Trade() {
             <>You're trading in <span style={{ color: "var(--up-deep)", fontWeight: 700 }}>{s.trend === "none" ? "a calm market" : "the stabilising direction"}</span>, so Poincaré charges <span style={{ fontWeight: 700, color: "var(--text)" }}>zero spread</span>, so you keep <span style={{ color: "var(--green-label)", fontWeight: 700 }}>{fmtUsd(Math.max(0, q.savedVsFee))}</span> that a 0.3% fee pool would have taken. Protection without taxing honest flow.</>
           )}
         </p>
-        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
+        <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
           <MiniStat label="Detector regime" value={s.trend === "none" ? "Calm" : s.trend === "up" ? "Up-trend" : "Down-trend"} color={s.trend === "up" ? "var(--up)" : s.trend === "down" ? "var(--down)" : "var(--lav)"} />
           <MiniStat label="This trade → LPs" value={fmtUsd(q.lvrToLps)} color="var(--green-label)" />
         </div>
@@ -217,7 +217,7 @@ function Comparison({ q }: { q: ReturnType<typeof quote> }) {
 function CompareBar({ label, value, max, sym, color, highlight }: { label: string; value: number; max: number; sym: string; color: string; highlight?: boolean }) {
   const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
   return (
-    <div className="mb-3">
+    <div className="mb-2.5">
       <div className="flex justify-between mb-1.5" style={{ fontSize: 12 }}>
         <span style={{ color: highlight ? "var(--text)" : "var(--text-3)", fontWeight: highlight ? 800 : 600 }}>{label}</span>
         <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{fmtNum(value, sym === "WETH" ? 5 : 2)} {sym}</span>
