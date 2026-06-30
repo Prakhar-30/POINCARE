@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { priceOf, type SwapRow } from "@/lib/db";
-import { fmtUsd } from "@/lib/format";
+import { fmtNum, fmtUsd } from "@/lib/format";
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** Measure a container's pixel width (so the SVG stays crisp and responsive). */
 function useWidth<T extends HTMLElement>() {
@@ -15,7 +17,7 @@ function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
-type Pt = { t: number; p: number };
+type Pt = { t: number; p: number; buy: boolean; weth: number; usdc: number };
 const DAY = 86_400_000;
 const RANGES = [
   { label: "24H", ms: DAY },
@@ -35,7 +37,16 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
 
   // chronological points (oldest -> newest), de-noised price from the legs
   const all = useMemo<Pt[]>(() => {
-    const pts = [...rows].reverse().map((r) => ({ t: r.ts ? new Date(r.ts).getTime() : 0, p: priceOf(r) }));
+    const pts = [...rows].reverse().map((r) => {
+      const buy = r.side === "buy_weth";
+      return {
+        t: r.ts ? new Date(r.ts).getTime() : 0,
+        p: priceOf(r),
+        buy,
+        weth: buy ? r.amount_out : r.amount_in,
+        usdc: buy ? r.amount_in : r.amount_out,
+      };
+    });
     return pts.filter((x) => x.p > 0);
   }, [rows]);
 
@@ -49,8 +60,8 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
 
   const H = height;
   const padX = 6;
-  const padTop = 10;
-  const padBot = 18;
+  const padTop = 8;
+  const padBot = 14;
   const innerW = Math.max(0, W - padX * 2);
   const innerH = H - padTop - padBot;
 
@@ -89,13 +100,13 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
 
   return (
     <div ref={wrapRef}>
-      {/* header */}
+      {/* header — static height (hover info lives in the floating tooltip, not here) */}
       <div className="flex items-end justify-between gap-3 mb-2 flex-wrap">
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: ".3px" }}>WETH / USDC · pool price</div>
           <div className="flex items-baseline gap-2 mt-0.5">
             <span className="font-display" style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>
-              {last > 0 ? fmtUsd(hp ? hp.p : last) : "—"}
+              {last > 0 ? fmtUsd(last) : "—"}
             </span>
             {pts.length >= 2 && (
               <span style={{ fontSize: 12.5, fontWeight: 800, color: accent }}>
@@ -103,7 +114,6 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
               </span>
             )}
           </div>
-          {hp && <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 2 }}>{new Date(hp.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
         </div>
         <div className="flex gap-1" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3 }}>
           {RANGES.map((r, i) => (
@@ -157,7 +167,43 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
             )}
           </svg>
         )}
+
+        {/* floating tooltip — absolutely positioned so it never reflows the column */}
+        {geom && hp && hi != null && (
+          <div
+            style={{
+              position: "absolute",
+              top: 4,
+              left: clamp(geom.xs[hi] - 82, 4, Math.max(4, W - 168)),
+              width: 164,
+              pointerEvents: "none",
+              zIndex: 4,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 11,
+              boxShadow: "0 10px 26px rgba(20,18,45,.16)",
+              padding: "9px 11px",
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--faint)", marginBottom: 6 }}>
+              {new Date(hp.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </div>
+            <TipRow label="Price" value={`${fmtUsd(hp.p)}`} bold />
+            <TipRow label="Side" value={hp.buy ? "Buy WETH" : "Sell WETH"} color={hp.buy ? "var(--up)" : "var(--down)"} />
+            <TipRow label="Size" value={`${fmtNum(hp.weth, 4)} WETH`} />
+            <TipRow label="Value" value={fmtUsd(hp.usdc)} />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function TipRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
+  return (
+    <div className="flex justify-between items-center" style={{ fontSize: 11.5, padding: "1.5px 0" }}>
+      <span style={{ color: "var(--text-3)" }}>{label}</span>
+      <span style={{ color: color ?? "var(--text-2)", fontWeight: bold ? 800 : 700 }}>{value}</span>
     </div>
   );
 }

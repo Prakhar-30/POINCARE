@@ -127,7 +127,7 @@ export function Trade() {
       {/* ---- middle: price chart + explainer ---- */}
       <div className="flex flex-col min-w-0" style={{ gap: 14 }}>
       <div className="card p-5 sm:p-6 min-w-0">
-        <PoolChart rows={tape.rows} height={172} />
+        <PoolChart rows={tape.rows} height={158} />
       </div>
       <div className="card-quiet p-5 sm:p-6 min-w-0">
         <div className="flex items-center gap-2.5 mb-3.5">
