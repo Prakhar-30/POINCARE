@@ -136,11 +136,18 @@ export function useFaucet() {
       const weth = erc20(CONTRACTS.weth as `0x${string}`);
       const usdcWei = parseUnits(usdcAmt, 18);
       const wethWei = parseUnits(wethAmt, 18);
+
+      // Sequential, one at a time: minting both back-to-back makes the wallet reuse the
+      // same nonce (it hasn't seen the first tx mined yet) -> "nonce" revert. Mint USDC,
+      // wait for it to confirm, then mint WETH.
       const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, usdcWei], account: address }, GAS.mint);
       const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, usdcWei], gas: g1 });
+      await publicClient.waitForTransactionReceipt({ hash: h1 });
+
       const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, wethWei], account: address }, GAS.mint);
       const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, wethWei], gas: g2 });
-      await Promise.all([publicClient.waitForTransactionReceipt({ hash: h1 }), publicClient.waitForTransactionReceipt({ hash: h2 })]);
+      await publicClient.waitForTransactionReceipt({ hash: h2 });
+
       toast.success("Test tokens minted", `${fmtNum(Number(usdcAmt))} USDC and ${fmtNum(Number(wethAmt))} WETH added to your wallet`);
     } catch (e) {
       toast.error("Mint failed", humanizeError(e));
