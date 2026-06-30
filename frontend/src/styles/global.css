@@ -93,6 +93,17 @@
   font-family: var(--font-display);
 }
 
+/* hide scrollbar but keep scroll — used by the trade tape */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 /* card: the single recurring surface primitive */
 .card {
   background: var(--surface);

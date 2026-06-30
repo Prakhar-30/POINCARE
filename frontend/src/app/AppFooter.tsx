@@ -1,5 +1,7 @@
 import { Wordmark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
+import { TokenIcon } from "@/components/ui/TokenIcon";
+import { useFaucet } from "@/hooks/useSwap";
 import { CONTRACTS, EXPLORER } from "@/config/contracts";
 import { shorten } from "@/lib/format";
 
@@ -16,6 +18,38 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
       <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
       <Icon name="external" size={12} />
     </a>
+  );
+}
+
+/** Mint 1,000 of each test token straight from the footer. Testnet only. */
+function FaucetButton() {
+  const faucet = useFaucet();
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <button
+        onClick={() => faucet.mint("1000", "1000")}
+        disabled={faucet.minting}
+        className="inline-flex items-center gap-2 font-bold"
+        style={{
+          background: "var(--lav-soft)",
+          color: "var(--lav-deep)",
+          border: "1px solid var(--lav-border, var(--border))",
+          borderRadius: 12,
+          padding: "9px 14px",
+          fontSize: 12.5,
+          cursor: faucet.minting ? "default" : "pointer",
+        }}
+      >
+        <span className="flex items-center" style={{ marginRight: 1 }}>
+          <TokenIcon sym="USDC" size={16} />
+          <span style={{ marginLeft: -5 }}><TokenIcon sym="WETH" size={16} /></span>
+        </span>
+        {faucet.minting ? "Minting…" : "Get 1,000 USDC + 1,000 WETH"}
+      </button>
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".3px", color: "var(--faint)", textTransform: "uppercase" }}>
+        Testnet only · test tokens, no value
+      </span>
+    </div>
   );
 }
 
@@ -37,6 +71,10 @@ export function AppFooter() {
           <ExplorerLink label="Pool manager" address={CONTRACTS.poolManager} />
           <ExplorerLink label="Router" address={CONTRACTS.router} />
         </div>
+      </div>
+
+      <div className="mx-auto mt-5" style={{ maxWidth: 1180 }}>
+        <FaucetButton />
       </div>
 
       <div className="mx-auto mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1180, borderTop: "1px solid var(--divider)" }}>

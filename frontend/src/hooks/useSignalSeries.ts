@@ -1,4 +1,5 @@
 import { useTape } from "@/hooks/useBackend";
+import { priceOf } from "@/lib/db";
 
 /**
  * Real signal for the oscilloscope: signed log-returns of the price of every swap
@@ -7,7 +8,7 @@ import { useTape } from "@/hooks/useBackend";
  */
 export function useSignalSeries(limit = 48): number[] {
   const tape = useTape(limit).data ?? [];
-  const prices = [...tape].reverse().map((r) => r.price).filter((p) => p > 0);
+  const prices = [...tape].reverse().map(priceOf).filter((p) => p > 0);
   if (prices.length < 2) return [];
 
   const rets: number[] = [];

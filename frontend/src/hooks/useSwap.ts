@@ -75,6 +75,13 @@ export function useSwap() {
       const balAfter = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
       const actualOut = Number(balAfter - balBefore) / 1e18;
       const amtIn = Number(amountInWei) / 1e18;
+      // executed USDC/WETH price from the legs (always finite & positive); fall back to the quote
+      const execPrice =
+        actualOut > 0
+          ? zeroForOne
+            ? amtIn / actualOut // pay USDC, receive WETH
+            : actualOut / amtIn // pay WETH, receive USDC
+          : quote.execPrice;
 
       // 3. record to the shared order tape + LVR accounting
       await recordSwap({
@@ -85,7 +92,7 @@ export function useSwap() {
         side: zeroForOne ? "buy_weth" : "sell_weth",
         amount_in: amtIn,
         amount_out: actualOut > 0 ? actualOut : quote.out,
-        price: quote.execPrice,
+        price: execPrice,
         notional_usdc: quote.notionalUsdc,
         kappa: quote.spread,
         trend: quote.withTrend ? (zeroForOne ? "down" : "up") : "none",
@@ -117,18 +124,23 @@ export function useFaucet() {
   const toast = useToast();
   const [minting, setMinting] = useState(false);
 
-  async function mint() {
-    if (!address || !walletClient || !publicClient) return;
+  async function mint(usdcAmt = "50000", wethAmt = "20") {
+    if (!address || !walletClient || !publicClient) {
+      toast.error("Connect a wallet", "Connect your wallet to mint test tokens.");
+      return;
+    }
     setMinting(true);
     try {
       const usdc = erc20(CONTRACTS.usdc as `0x${string}`);
       const weth = erc20(CONTRACTS.weth as `0x${string}`);
-      const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, parseUnits("50000", 18)], account: address }, GAS.mint);
-      const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, parseUnits("50000", 18)], gas: g1 });
-      const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, parseUnits("20", 18)], account: address }, GAS.mint);
-      const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, parseUnits("20", 18)], gas: g2 });
+      const usdcWei = parseUnits(usdcAmt, 18);
+      const wethWei = parseUnits(wethAmt, 18);
+      const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, usdcWei], account: address }, GAS.mint);
+      const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, usdcWei], gas: g1 });
+      const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, wethWei], account: address }, GAS.mint);
+      const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, wethWei], gas: g2 });
       await Promise.all([publicClient.waitForTransactionReceipt({ hash: h1 }), publicClient.waitForTransactionReceipt({ hash: h2 })]);
-      toast.success("Test tokens minted", "50,000 USDC and 20 WETH added to your wallet");
+      toast.success("Test tokens minted", `${fmtNum(Number(usdcAmt))} USDC and ${fmtNum(Number(wethAmt))} WETH added to your wallet`);
     } catch (e) {
       toast.error("Mint failed", humanizeError(e));
     } finally {

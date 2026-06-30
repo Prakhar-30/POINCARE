@@ -2,11 +2,12 @@ import { useState } from "react";
 import { usePoolState } from "@/hooks/usePoolState";
 import { useBalances } from "@/hooks/useBalances";
 import { useSwap, useFaucet } from "@/hooks/useSwap";
-import { useTape } from "@/hooks/useBackend";
+import { useOnchainTape } from "@/hooks/useOnchainTape";
 import { quote } from "@/lib/curve";
 import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tape } from "@/components/ui/Tape";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 
@@ -17,7 +18,7 @@ export function Trade() {
   const bal = useBalances();
   const { swap, status, stepper, reset } = useSwap();
   const faucet = useFaucet();
-  const tape = useTape(16).data ?? [];
+  const tape = useOnchainTape();
   const narrow = useIsNarrow();
 
   const [sellUSDC, setSellUSDC] = useState(true);
@@ -105,7 +106,7 @@ export function Trade() {
 
         {/* faucet */}
         {sellBal < 1 && (
-          <button onClick={faucet.mint} disabled={faucet.minting} className="mt-3 w-full text-center font-bold" style={{ color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 14, padding: "11px", fontSize: 12.5 }}>
+          <button onClick={() => faucet.mint()} disabled={faucet.minting} className="mt-3 w-full text-center font-bold" style={{ color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 14, padding: "11px", fontSize: 12.5 }}>
             {faucet.minting ? "Minting test tokens…" : "Get test tokens (50k USDC · 20 WETH)"}
           </button>
         )}
@@ -135,14 +136,15 @@ export function Trade() {
       </div>
 
       {/* ---- tape ---- */}
-      <div className="min-w-0"><Tape rows={tape} /></div>
+      <div className="min-w-0">
+        <Tape rows={tape.rows} onLoadMore={tape.loadMore} hasMore={tape.hasMore} loadingMore={tape.loadingMore} scroll={false} badge="on-chain · live" />
+      </div>
     </div>
     </>
   );
 }
 
 function TokenRow({ label, sub, balance, sym, value, onInput, editable }: { label: string; sub?: string; balance?: number; sym: string; value: string; onInput?: (v: string) => void; editable?: boolean }) {
-  const color = sym === "USDC" ? "var(--usdc)" : "var(--eth)";
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 16, background: "var(--surface-2)", padding: "15px 16px" }}>
       <div className="flex justify-between" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 9 }}>
@@ -156,7 +158,7 @@ function TokenRow({ label, sub, balance, sym, value, onInput, editable }: { labe
           <div style={{ flex: 1, minWidth: 0, color: "var(--text)", fontSize: 26, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
         )}
         <div className="flex items-center gap-2" style={{ background: "var(--surface)", border: "1px solid var(--nav-border)", borderRadius: 22, padding: "7px 13px 7px 8px", boxShadow: "var(--shadow-sm)" }}>
-          <span style={{ width: 20, height: 20, borderRadius: 99, background: color, display: "inline-block" }} />
+          <TokenIcon sym={sym} size={20} />
           <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{sym}</span>
         </div>
       </div>

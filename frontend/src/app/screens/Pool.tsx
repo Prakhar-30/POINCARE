@@ -9,6 +9,7 @@ import { usePoolTotals } from "@/hooks/useBackend";
 import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { BondingCurve } from "@/components/ui/BondingCurve";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 
@@ -154,9 +155,9 @@ function AddPanel({ price, bal, lp }: { price: number; bal: ReturnType<typeof us
 
   return (
     <>
-      <LiqInput label="USDC" sub={`balance ${fmtNum(bal.usdc, 2)}`} value={usdc} onInput={onUsdc} color="var(--usdc)" />
+      <LiqInput label="USDC" sub={`balance ${fmtNum(bal.usdc, 2)}`} value={usdc} onInput={onUsdc} />
       <div className="flex items-center justify-center" style={{ margin: "10px 0", color: "var(--faint)" }}><Icon name="plus" size={16} /></div>
-      <LiqInput label="WETH" sub={`balance ${fmtNum(bal.weth, 4)}`} value={weth} onInput={onWeth} color="var(--eth)" />
+      <LiqInput label="WETH" sub={`balance ${fmtNum(bal.weth, 4)}`} value={weth} onInput={onWeth} />
 
       <div className="mt-4 flex flex-col gap-2.5 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
         <Detail label="Deposit value" value={fmtUsd(valueUsdc)} />
@@ -243,7 +244,7 @@ function ctaStyle(disabled: boolean, success: boolean, base = "var(--up-deep)", 
   };
 }
 
-function LiqInput({ label, sub, value, onInput, color }: { label: string; sub: string; value: string; onInput: (v: string) => void; color: string }) {
+function LiqInput({ label, sub, value, onInput }: { label: string; sub: string; value: string; onInput: (v: string) => void }) {
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 16, background: "var(--surface-2)", padding: "15px 16px" }}>
       <div className="flex justify-between" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 9 }}>
@@ -253,7 +254,7 @@ function LiqInput({ label, sub, value, onInput, color }: { label: string; sub: s
         <input value={value} onChange={(e) => onInput(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
           style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 26, fontWeight: 800 }} />
         <div className="flex items-center gap-2" style={{ background: "var(--surface)", border: "1px solid var(--nav-border)", borderRadius: 22, padding: "7px 13px 7px 8px", boxShadow: "var(--shadow-sm)" }}>
-          <span style={{ width: 20, height: 20, borderRadius: 99, background: color, display: "inline-block" }} />
+          <TokenIcon sym={label} size={20} />
           <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{label}</span>
         </div>
       </div>

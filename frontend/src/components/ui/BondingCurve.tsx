@@ -43,9 +43,13 @@ export function BondingCurve({
     const px = sx(x0);
     const py = sy(y0);
 
-    // Marginal slope dy/dx = -k/x^2 at the point, in screen space.
+    // Marginal slope dy/dx = -k/x^2 at the point, mapped into screen space.
+    // dX/dx and dY/dy are the axis scale factors (screen-Y grows downward, hence
+    // the negative). screenSlope = (dY/dy)/(dX/dx) * (dy/dx).
     const slope = -k / (x0 * x0);
-    const screenSlope = slope * ((W - 2 * pad) / (xMax - xMin)) / -((H - 2 * pad) / (yMax - yMin));
+    const dXdx = (W - 2 * pad) / (xMax - xMin);
+    const dYdy = -((H - 2 * pad) / (yMax - yMin));
+    const screenSlope = (slope * dYdy) / dXdx;
     // build a short tangent segment, fanned by the directional spread on each side
     const L = 78;
     const tangent = (spreadFrac: number, dir: 1 | -1) => {

@@ -38,6 +38,17 @@ export type PoolTotals = {
 
 const lc = (a: string) => a.toLowerCase();
 
+/** Executed USDC/WETH price for a swap, derived from the legs so it is always
+ *  positive and finite (the stored `price` can be noisy; the amounts are reliable). */
+export function priceOf(t: Pick<SwapRow, "side" | "amount_in" | "amount_out" | "price" | "notional_usdc">): number {
+  const weth = t.side === "buy_weth" ? t.amount_out : t.amount_in;
+  const usdc = t.side === "buy_weth" ? t.amount_in : t.amount_out;
+  if (weth > 0 && usdc > 0) return usdc / weth;
+  if (Number.isFinite(t.price) && t.price > 0) return t.price;
+  if (t.notional_usdc > 0 && weth > 0) return t.notional_usdc / weth;
+  return 0;
+}
+
 /** Remember a wallet across sessions (first_seen kept, last_seen bumped). */
 export async function upsertWallet(address: string) {
   if (!supabaseReady) return;
@@ -62,6 +73,17 @@ export async function recordLpEvent(evt: LpEvent) {
 export async function fetchTape(limit = 24): Promise<SwapRow[]> {
   if (!supabaseReady) return [];
   const { data } = await supabase.from("swaps").select("*").order("ts", { ascending: false }).limit(limit);
+  return (data as SwapRow[]) ?? [];
+}
+
+/** Paged history (newest first) for the "load more" tape. */
+export async function fetchTapePage(limit: number, offset: number): Promise<SwapRow[]> {
+  if (!supabaseReady) return [];
+  const { data } = await supabase
+    .from("swaps")
+    .select("*")
+    .order("ts", { ascending: false })
+    .range(offset, offset + limit - 1);
   return (data as SwapRow[]) ?? [];
 }
 
