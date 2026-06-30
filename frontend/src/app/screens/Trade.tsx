@@ -154,7 +154,7 @@ export function Trade() {
 
       {/* ---- tape ---- */}
       <div className="min-w-0">
-        <Tape rows={shownRows} onLoadMore={onTapeLoadMore} hasMore={tapeHasMore} loadingMore={tape.loadingMore} maxHeight={360} badge="on-chain · live" />
+        <Tape rows={shownRows} onLoadMore={onTapeLoadMore} hasMore={tapeHasMore} loadingMore={tape.loadingMore} maxHeight={510} badge="on-chain · live" />
       </div>
     </div>
     </>

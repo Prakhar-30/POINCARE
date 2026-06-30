@@ -16,10 +16,12 @@ function useWidth<T extends HTMLElement>() {
 }
 
 type Pt = { t: number; p: number };
+const DAY = 86_400_000;
 const RANGES = [
-  { label: "20", n: 20 },
-  { label: "50", n: 50 },
-  { label: "All", n: Infinity },
+  { label: "24H", ms: DAY },
+  { label: "5D", ms: 5 * DAY },
+  { label: "1M", ms: 30 * DAY },
+  { label: "All", ms: Infinity },
 ];
 
 /**
@@ -28,7 +30,7 @@ const RANGES = [
  */
 export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: number }) {
   const [wrapRef, W] = useWidth<HTMLDivElement>();
-  const [range, setRange] = useState(2); // default "All"
+  const [range, setRange] = useState(3); // default "All"
   const [hover, setHover] = useState<number | null>(null);
 
   // chronological points (oldest -> newest), de-noised price from the legs
@@ -38,8 +40,11 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
   }, [rows]);
 
   const pts = useMemo(() => {
-    const n = RANGES[range].n;
-    return n === Infinity ? all : all.slice(Math.max(0, all.length - n));
+    const ms = RANGES[range].ms;
+    if (ms === Infinity) return all;
+    const cutoff = Date.now() - ms;
+    const windowed = all.filter((x) => x.t >= cutoff);
+    return windowed.length >= 2 ? windowed : all; // fall back to full history if too sparse
   }, [all, range]);
 
   const H = height;
