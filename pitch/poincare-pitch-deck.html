@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Poincaré — Pitch Deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── Poincaré design tokens (mirrors frontend/src/styles/tokens.css, light theme) ── */
+  :root{
+    --page:#f4f1f9; --surface:#ffffff; --surface-2:#faf8fd; --surface-3:#f3effa;
+    --border:#eeeaf4; --border-strong:#e3ddee; --divider:#f1edf7;
+    --text:#3f3a56; --text-2:#5c5775; --text-3:#8a85a0; --muted:#a39db8; --faint:#b6b1c8;
+    --up:#6bb89a; --up-deep:#4e9c7e; --down:#e58ca0; --down-deep:#c96a82;
+    --lav:#8e88d8; --lav-deep:#6f68c8; --lav-dim:#c5c1ed; --lav-soft:#eeebfa;
+    --honey:#e6b25f; --honey-deep:#d49a45;
+    --green-border:#d6ebe0; --green-label:#4e9c7e; --green-sub:#7c9c8e;
+    --warn-border:#f0e2c8; --warn-label:#c99a3e;
+    --shadow-sm:0 2px 14px rgba(123,113,158,.07); --shadow-card:0 4px 20px rgba(123,113,158,.08);
+    --r-sm:12px; --r-md:16px; --r-card:22px;
+    --green-bg:linear-gradient(150deg,#eaf6f0,#f4fbf7);
+    --warn-bg:linear-gradient(150deg,#fbf4e5,#fdf9f0);
+    --app-bg:radial-gradient(900px 500px at 85% -10%, rgba(142,136,216,.10), transparent 60%),
+             radial-gradient(720px 460px at 4% 6%, rgba(107,184,154,.08), transparent 55%), #f4f1f9;
+  }
+  *{box-sizing:border-box; margin:0}
+  html,body{background:#dcd7e6; font-family:"Nunito",ui-sans-serif,system-ui,sans-serif; color:var(--text);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+  .display{font-family:"Quicksand","Nunito",sans-serif}
+
+  /* ── slides: fixed 1280×720, one per printed page ── */
+  .slide{width:1280px; height:720px; margin:28px auto; position:relative; overflow:hidden;
+    background:var(--app-bg); border-radius:18px; box-shadow:0 18px 50px rgba(123,113,158,.16);
+    padding:60px 72px; display:flex; flex-direction:column;}
+  @media print{
+    @page{size:1280px 720px; margin:0}
+    html,body{background:#fff}
+    .slide{margin:0; border-radius:0; box-shadow:none; page-break-after:always}
+    .noprint{display:none}
+  }
+
+  /* ── shared components ── */
+  .eyebrow{font-size:13px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--lav)}
+  h1{font-size:30px; font-weight:700; color:var(--text); margin-top:8px}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-card); padding:26px 28px}
+  .quiet{background:var(--surface-2); box-shadow:none}
+  .pill{display:inline-flex; align-items:center; gap:7px; background:var(--lav-soft); color:var(--lav-deep);
+    font-size:12.5px; font-weight:800; border-radius:20px; padding:6px 14px}
+  .dot{width:7px; height:7px; border-radius:99px; background:var(--lav)}
+  .grid{display:grid; gap:18px}
+  .footer{position:absolute; left:72px; right:72px; bottom:24px; display:flex; justify-content:space-between;
+    font-size:11.5px; font-weight:700; color:var(--faint)}
+  .kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-sm); padding:20px 22px}
+  .kpi .n{font-family:"Quicksand"; font-size:34px; font-weight:700; color:var(--lav-deep); line-height:1}
+  .kpi .l{font-size:13px; font-weight:700; color:var(--text-2); margin-top:8px}
+  .kpi .s{font-size:11.5px; color:var(--muted); margin-top:3px}
+  .kpi.tint{background:var(--green-bg); border-color:var(--green-border)} .kpi.tint .n{color:var(--green-label)}
+  .step-n{font-family:"Quicksand"; font-size:14px; font-weight:700; color:var(--lav)}
+  h3{font-family:"Quicksand"; font-size:18px; font-weight:700; color:var(--text)}
+  p.body{font-size:14.5px; line-height:1.65; color:var(--text-2)}
+  p.small{font-size:13px; line-height:1.6; color:var(--text-3)}
+  .tag-up{color:var(--up-deep); font-weight:800} .tag-down{color:var(--down-deep); font-weight:800}
+  .tag-lav{color:var(--lav-deep); font-weight:800} .tag-honey{color:var(--honey-deep); font-weight:800}
+  table{width:100%; border-collapse:collapse; font-size:13.5px}
+  th{font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); font-weight:800;
+    text-align:left; padding:10px 14px; border-bottom:1px solid var(--border-strong)}
+  td{padding:11px 14px; border-bottom:1px solid var(--divider); color:var(--text-2); font-weight:600}
+  td:first-child{color:var(--text-3)}
+  .check{color:var(--up-deep); font-weight:800}
+  .chart{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-card); padding:16px; display:flex; align-items:center; justify-content:center}
+  .chart img{max-width:100%; max-height:100%; object-fit:contain; border-radius:10px}
+</style>
+</head>
+<body>
+
+<div class="noprint" style="max-width:1280px;margin:26px auto 0;padding:14px 22px;background:var(--surface);border:1px solid var(--border);border-radius:14px;font-size:13px;color:var(--text-2)">
+  <b>Export to PDF:</b> open this file in Chrome/Edge, press Ctrl+P, choose "Save as PDF", set Margins to "None" and turn Background graphics <b>ON</b>, then save. One slide per page, exact theme colors.
+</div>
+
+<!-- ════════ 1 · TITLE ════════ -->
+<section class="slide" style="justify-content:center">
+  <div class="pill" style="position:absolute;top:56px;left:72px"><span class="dot"></span> Uniswap v4 hook · live on Unichain Sepolia</div>
+  <div style="display:flex;align-items:center;gap:26px">
+    <img src="./Logo.png" alt="" style="width:110px;height:110px;object-fit:contain" />
+    <div>
+      <div class="display" style="font-size:64px;font-weight:700;letter-spacing:-.5px;line-height:1.04">
+        Poincaré
+      </div>
+      <div class="display" style="font-size:27px;font-weight:600;color:var(--text-2);margin-top:10px">
+        The pool that knows when the market is really moving <span style="color:var(--lav-deep)">and leans against it.</span>
+      </div>
+    </div>
+  </div>
+  <p class="body" style="max-width:780px;margin-top:34px;font-size:16.5px">
+    Most AMMs quote the same way in a crash as they do on a quiet Sunday. Poincaré watches its own price,
+    runs a <b>change-point detector</b> with a mathematical optimality proof behind it, and only defends its
+    liquidity providers when a genuine trend is underway. No oracle, no keeper, and nothing to bribe.
+  </p>
+  <div style="display:flex;gap:26px;margin-top:38px;font-size:13px;font-weight:700;color:var(--text-3)">
+    <span>◆ Manipulation costs more than it pays, by construction</span>
+    <span>◆ 118 tests green</span>
+    <span>◆ Proven on six months of real market data</span>
+  </div>
+  <div class="footer"><span>Poincaré · 2026</span><span>Uniswap v4 · Unichain Sepolia</span></div>
+</section>
+
+<!-- ════════ 2 · PROBLEM ════════ -->
+<section class="slide">
+  <div class="eyebrow">The problem</div>
+  <h1>Liquidity providers lose money precisely when markets trend</h1>
+  <div class="grid" style="grid-template-columns:1.15fr 1fr;margin-top:26px;flex:1">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <p class="body" style="font-size:15.5px">
+        There is an invisible tax on every pool, and it has a name: <b>Loss-Versus-Rebalancing</b>. Whenever the
+        price moves, arbitrageurs trade against the pool's stale quote and keep the difference. The
+        Milionis–Moallemi–Roughgarden–Zhang result tells us exactly what drives it:
+      </p>
+      <div class="card" style="text-align:center;padding:22px">
+        <span class="display" style="font-size:21px;color:var(--text)">LVR rate ≈ ½ · σ² · marginal liquidity</span>
+      </div>
+      <p class="body">
+        Notice what is missing from that equation: <span class="tag-lav">the fee</span>. Every fee-tweaking hook is
+        pulling a lever that simply is not in the formula. And notice what drives it: sustained, one-directional
+        moves. <span class="tag-down">Chop barely hurts LPs. Trends drain them.</span>
+      </p>
+    </div>
+    <div class="card quiet" style="display:flex;flex-direction:column;justify-content:center;gap:18px">
+      <div>
+        <div class="display" style="font-size:15px;font-weight:700;color:var(--down-deep)">A normal pool during a trend</div>
+        <p class="small" style="margin-top:6px">The curve is frozen, so it offers the same terms to the arbitrageur draining it as to the trader helping it. LPs pay the full tax, block after block, until the trend ends.</p>
+      </div>
+      <div style="border-top:1px solid var(--divider)"></div>
+      <div>
+        <div class="display" style="font-size:15px;font-weight:700;color:var(--text)">What would actually help</div>
+        <p class="small" style="margin-top:6px">A pool that can tell a real trend from noise, and defends itself only while one is happening.</p>
+      </div>
+      <div class="pill" style="align-self:flex-start;background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warn-label)">That judgement call is the hard part, and it is the whole project</div>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>02</span></div>
+</section>
+
+<!-- ════════ 3 · INSIGHT ════════ -->
+<section class="slide">
+  <div class="eyebrow">The insight</div>
+  <h1>"Has a real trend started?" was solved in 1954. Nobody brought it on-chain.</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:26px;flex:1">
+    <div class="card">
+      <h3>Quickest Change Detection</h3>
+      <p class="body" style="margin-top:10px">
+        Statisticians have spent seventy years on exactly this question: how do you detect a regime change as
+        fast as possible without crying wolf? Their workhorse answer is the <b>CUSUM statistic</b>. It quietly
+        accumulates evidence every step and fires the moment that evidence crosses a threshold.
+      </p>
+      <div class="card quiet" style="margin-top:16px;text-align:center;padding:16px">
+        <span class="display" style="font-size:17px">S<sub>t</sub> = max(0, S<sub>t−1</sub> + ℓ<sub>t</sub> − k) &nbsp;→&nbsp; alarm when S<sub>t</sub> ≥ h</span>
+      </div>
+      <p class="small" style="margin-top:14px">
+        And it comes with a proof: under Lorden's criterion, CUSUM minimises the worst-case detection delay for
+        any tolerated false-alarm rate. This is not a heuristic that felt right. It is the best possible answer
+        to the speed-versus-false-alarms question.
+      </p>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <h3>Why an AMM should care</h3>
+      <p class="body">
+        The firing moment depends on the data, not the clock. A strong trend crosses the threshold in a few
+        blocks, while noise never gets there at all. So there is <b>no fixed countdown</b> for an attacker to
+        study and game.
+      </p>
+      <div class="card quiet" style="padding:18px">
+        <div class="display" style="font-size:14px;font-weight:700;color:var(--lav-deep)">Nobody else does this</div>
+        <p class="small" style="margin-top:6px">
+          We scanned the entire 562-hook UHI directory and found <b>zero</b> uses of CUSUM or any change-point
+          method. Everything out there triggers on moving averages and fixed thresholds, which is exactly the
+          kind of signal an attacker can predict.
+        </p>
+      </div>
+      <p class="body">To our knowledge, Poincaré is the <b>first AMM whose behaviour is governed by a provably optimal sequential change detector.</b></p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>03</span></div>
+</section>
+
+<!-- ════════ 4 · DESIGN ════════ -->
+<section class="slide">
+  <div class="eyebrow">The design</div>
+  <h1>A brain that decides, a curve that acts, a fee that breathes</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:26px">
+    <div class="card">
+      <div class="pill" style="background:var(--lav-soft);color:var(--lav-deep)">The brain</div>
+      <h3 style="margin-top:12px">Two-sided CUSUM detector</h3>
+      <p class="small" style="margin-top:8px">
+        It runs on the pool's own log-returns, sampled once per block from pre-swap reserves so flash tricks
+        never reach it. A directional-efficiency gate confirms the move is a march rather than a thrash, and
+        clipped increments keep fat-tailed crypto returns from fooling it.
+      </p>
+    </div>
+    <div class="card">
+      <div class="pill" style="background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warn-label)">The actuator</div>
+      <h3 style="margin-top:12px">A directional spread that LPs keep</h3>
+      <p class="small" style="margin-top:8px">
+        When a trend is confirmed, flow pushing <b>with</b> the trend pays a small, capped spread, and that value
+        goes straight to the LPs it would otherwise have been taken from. Flow that stabilises the pool trades
+        at the full base price, because punishing your friends is bad business.
+      </p>
+    </div>
+    <div class="card">
+      <div class="pill" style="background:var(--green-bg);border:1px solid var(--green-border);color:var(--green-label)">The revenue</div>
+      <h3 style="margin-top:12px">A fee generated from volatility</h3>
+      <p class="small" style="margin-top:8px">
+        In calm markets LPs still earn: the base fee is computed each block from the pool's own realized
+        volatility, so it tightens when things are quiet and widens when they are not. Never a constant someone
+        picked in a meeting.
+      </p>
+    </div>
+  </div>
+  <div class="card quiet" style="margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 26px">
+    <span class="display" style="font-size:15px;font-weight:700;color:var(--text-2)">Once per block:</span>
+    <span class="display" style="font-size:15.5px;font-weight:600;color:var(--text)">
+      pool price → <span class="tag-lav">log-return</span> → <span class="tag-down">CUSUM + gate</span> →
+      <span class="tag-honey">bounded, rate-limited κ</span> → <span class="tag-up">spread on the toxic side only</span>
+    </span>
+  </div>
+  <p class="small" style="margin-top:14px;text-align:center">
+    The signal is the pool's own price and nothing else. No oracle to corrupt, no keeper to bribe, no AVS to trust, and every parameter is injected and calibrated rather than hard-coded.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>04</span></div>
+</section>
+
+<!-- ════════ 5 · LIFECYCLE (fig2) ════════ -->
+<section class="slide">
+  <div class="eyebrow">How it behaves</div>
+  <h1>It ignores the noise, then commits when the evidence is real</h1>
+  <div class="grid" style="grid-template-columns:1fr 1.15fr;margin-top:22px;flex:1;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:14px;justify-content:center">
+      <div class="card quiet" style="padding:18px 22px"><div class="step-n">Calm</div>
+        <p class="small" style="margin-top:6px">Evidence hovers near zero, so the curve stays symmetric and deep. Everyone gets the best price the pool can offer.</p></div>
+      <div class="card quiet" style="padding:18px 22px"><div class="step-n">A trend begins</div>
+        <p class="small" style="margin-top:6px">The statistic starts climbing, but the detector holds its fire because early moves look exactly like noise. Crying wolf here would tax honest traders for nothing.</p></div>
+      <div class="card quiet" style="padding:18px 22px"><div class="step-n">Detection</div>
+        <p class="small" style="margin-top:6px">Evidence crosses the threshold at a moment set by the data, and only then does the curve lean, capped and rate-limited so it can never snap.</p></div>
+      <div class="card quiet" style="padding:18px 22px"><div class="step-n">The trend fades</div>
+        <p class="small" style="margin-top:6px">Returns shrink, the gate closes, and the lean ramps back down with hysteresis so it never flaps.</p></div>
+    </div>
+    <div class="chart"><img src="./fig2_lifecycle_real.png" alt="Lifecycle on a real trend" /></div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>05</span></div>
+</section>
+
+<!-- ════════ 6 · MOAT (fig3) ════════ -->
+<section class="slide">
+  <div class="eyebrow">Why it can't be gamed</div>
+  <h1>Faking a trend means genuinely moving the market, at your own expense</h1>
+  <div class="grid" style="grid-template-columns:1fr 1.15fr;margin-top:22px;flex:1;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:14px;justify-content:center">
+      <div class="card" style="padding:18px 22px"><h3 style="font-size:16px"><span class="tag-lav">1 ·</span> No countdown to study</h3>
+        <p class="small" style="margin-top:6px">The firing time depends on the data, and the detector samples once per block from settled reserves, so a flash loan that unwinds inside a block is simply invisible to it.</p></div>
+      <div class="card" style="padding:18px 22px"><h3 style="font-size:16px"><span class="tag-honey">2 ·</span> Nothing to win</h3>
+        <p class="small" style="margin-top:6px">The spread only ever makes trades worse, never better. The "soft" side trades at the plain base price, so an attacker who fakes a trend finds zero edge waiting on the other side.</p></div>
+      <div class="card" style="padding:18px 22px"><h3 style="font-size:16px"><span class="tag-up">3 ·</span> Arbitrageurs collect the toll</h3>
+        <p class="small" style="margin-top:6px">Pushing the price off fair value opens a gap that arbitrageurs harvest the moment the attacker stops. The chart shows their cost climbing the entire time, and it buys them nothing.</p></div>
+      <p class="small" style="padding:0 6px">All three layers are simulated end-to-end against the real PoolManager in our test suite: fake-trend round trips lose money, flash spikes never reach the detector.</p>
+    </div>
+    <div class="chart"><img src="./fig3_fake_trend.png" alt="A faked trend costs real money" /></div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>06</span></div>
+</section>
+
+<!-- ════════ 7 · STRESS TEST GRAPH ════════ -->
+<section class="slide">
+  <div class="eyebrow">Proof · stress test</div>
+  <h1>Same pool, same trades, one difference: the detector. LPs kept $502k more.</h1>
+  <div class="chart" style="flex:1;margin-top:20px;min-height:0"><img src="./sim_lpvalue.png" alt="LP value retained, Poincaré vs constant-product" /></div>
+  <p class="small" style="margin-top:14px;text-align:center;max-width:1040px;margin-left:auto;margin-right:auto">
+    Two identical pools on the real Uniswap v4 PoolManager, fed the same fair-price path and the same 3,842 swaps
+    across eight regimes. Look at where the blue gap grows: it stays flat through calm, because the detector
+    correctly does nothing, then it widens through every trend and jumps hardest in the flash crash, where LVR was
+    cut by 83%. Protection shows up exactly where LPs bleed the most.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>07</span></div>
+</section>
+
+<!-- ════════ 8 · REAL DATA GRAPH ════════ -->
+<section class="slide">
+  <div class="eyebrow">Proof · real market data</div>
+  <h1>Six months of real ETH/USDC, through a 47% bear market. It never hurt once.</h1>
+  <div class="chart" style="flex:1;margin-top:20px;min-height:0"><img src="./real_lpvalue.png" alt="LP value on real ETH/USDC history" /></div>
+  <p class="small" style="margin-top:14px;text-align:center;max-width:1040px;margin-left:auto;margin-right:auto">
+    The same head-to-head, now driven by real Binance ETH/USDC closes from December 2025 to June 2026, a genuine
+    multi-leg bear market. The advantage stays flat through choppy January, then steps up at the February crash and
+    again at the June leg down, because those are the two real sustained trends the detector caught. LVR came in
+    8.8% lower than the control, and the Poincaré pool never once trailed it. That floor held through every single
+    block, and we assert it in the test suite.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>08</span></div>
+</section>
+
+<!-- ════════ 9 · NUMBERS ════════ -->
+<section class="slide">
+  <div class="eyebrow">Proof · the numbers</div>
+  <h1>Measured, reproducible, and honest about where each number comes from</h1>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-top:26px">
+    <div class="kpi tint"><div class="n">−14.3%</div><div class="l">LVR vs constant-product</div><div class="s">synthetic regime back-test</div></div>
+    <div class="kpi tint"><div class="n">−29.6%</div><div class="l">with the adaptive detector</div><div class="s">thresholds in units of live σ, zero manual tuning</div></div>
+    <div class="kpi"><div class="n">~2×</div><div class="l">less tax on honest flow</div><div class="s">vs a symmetric vol-fee with the same average spread</div></div>
+    <div class="kpi"><div class="n">~96k</div><div class="l">gas per sampled block</div><div class="s">paid once per block, not per swap</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1.2fr 1fr;margin-top:18px;flex:1">
+    <div class="card quiet">
+      <h3>Why it beats a volatility fee</h3>
+      <p class="small" style="margin-top:8px">
+        A symmetric vol-fee defends LPs by taxing everyone, friend and foe alike. Poincaré spends the same
+        friction budget only on the toxic side and only while a trend is confirmed, so it wins on LVR <i>and</i>
+        charges honest traders about half as much. That is the frontier that matters: protection per unit of
+        collateral damage.
+      </p>
+    </div>
+    <div class="card quiet">
+      <h3>The engineering behind the claims</h3>
+      <p class="small" style="margin-top:8px">
+        <span class="check">✓</span> 118 Foundry tests, zero failures<br/>
+        <span class="check">✓</span> Two invariant suites, 128k random operations each, solvency exact to the wei<br/>
+        <span class="check">✓</span> Adversarial sims: fake trends, flash loans, volatility inflation<br/>
+        <span class="check">✓</span> Quotes match on-chain execution exactly, via the Lens
+      </p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>09</span></div>
+</section>
+
+<!-- ════════ 10 · LIVE ════════ -->
+<section class="slide">
+  <div class="eyebrow">Live today</div>
+  <h1>Running on a public testnet, carrying six months of real market history</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:26px">
+    <div class="kpi"><div class="n">179</div><div class="l">real on-chain swaps</div><div class="s">daily ETH/USDC closes replayed through the live pool, block by block</div></div>
+    <div class="kpi tint"><div class="n">$45,676</div><div class="l">LVR captured for LPs</div><div class="s">on $5.7M of replayed volume</div></div>
+    <div class="kpi"><div class="n">16</div><div class="l">with-trend leans</div><div class="s">at full strength during the Feb crash and the June leg down, and zero across three months of chop</div></div>
+  </div>
+  <div class="card quiet" style="margin-top:18px;flex:1">
+    <h3>And it's a product, not just a contract</h3>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+      <p class="small">
+        <span class="tag-lav">▸</span> Every sampled block, the hook publishes its full state as an on-chain event: evidence, volatility, lean, regime and fee. The app charts the real statistics, so what you see is what the contract did.<br/><br/>
+        <span class="tag-lav">▸</span> Quotes come from an on-chain lens that runs the exact pricing code the pool runs, so what you are quoted is what you get, to the wei.
+      </p>
+      <p class="small">
+        <span class="tag-up">▸</span> In our live demo the detector held quiet through twelve buys, fired on the thirteenth once the evidence was in, rode the trend at full lean, then unwound cleanly and re-fired on the reversal.<br/><br/>
+        <span class="tag-up">▸</span> The whole lifecycle from slide five, observable on a public chain by anyone.
+      </p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>10</span></div>
+</section>
+
+<!-- ════════ 11 · DIFFERENTIATION ════════ -->
+<section class="slide">
+  <div class="eyebrow">Differentiation</div>
+  <h1>Everyone else reacts to a heuristic. Poincaré can prove its trigger is optimal.</h1>
+  <div class="card" style="margin-top:26px;padding:14px 10px">
+    <table>
+      <tr><th style="width:20%">Axis</th><th style="width:38%">Existing hooks</th><th>Poincaré</th></tr>
+      <tr><td>Lever</td><td>fee tweaks on a static curve</td><td><b class="tag-lav">trend-gated directional spread, arb-safe by construction</b></td></tr>
+      <tr><td>Trigger</td><td>fixed windows, thresholds, oracles</td><td><b class="tag-lav">CUSUM stopping time, data-dependent and unpredictable</b></td></tr>
+      <tr><td>Optimality</td><td>felt right in a notebook</td><td><b class="tag-lav">Lorden minimax-optimal detection</b></td></tr>
+      <tr><td>Manipulation</td><td>hopes the signal is hard to fake</td><td><b class="tag-lav">zero prize on the soft side, plus arbitrage collects the attacker's toll</b></td></tr>
+      <tr><td>Calm-market LP income</td><td>a flat fee someone chose</td><td><b class="tag-lav">a fee computed from realized volatility, every block</b></td></tr>
+      <tr><td>External dependencies</td><td>oracles, AVSs, keepers</td><td><b class="tag-lav">none, and that is a security property</b></td></tr>
+    </table>
+  </div>
+  <p class="small" style="margin-top:16px;text-align:center">
+    Routing takes care of itself: calm and stabilising flow gets the full base price, so best-execution routers send
+    it here. Confirmed-toxic flow gets quoted worse on purpose, so it goes elsewhere. The pool sheds exactly the
+    flow that costs LPs money and keeps the flow that doesn't.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>11</span></div>
+</section>
+
+<!-- ════════ 12 · HONESTY ════════ -->
+<section class="slide">
+  <div class="eyebrow">Scope, honestly</div>
+  <h1>What it does, and what we refuse to pretend</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:26px;flex:1">
+    <div class="card">
+      <h3 style="color:var(--up-deep)">Where it shines</h3>
+      <p class="body" style="margin-top:10px">
+        Liquid, free-floating, volatile pairs like ETH/USDC, because that is where directional LVR actually
+        lives, the price series is clean, and moving the market costs real money. Pegged pairs degrade
+        gracefully: the curve just stays symmetric, and a depeg is simply a trend it leans into.
+      </p>
+      <div class="card quiet" style="margin-top:14px;padding:16px">
+        <p class="small">It removes the avoidable arbitrage tax, not market risk itself. LPs still hold the assets, and we say so on the landing page rather than in a footnote.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--honey-deep)">We found our own exploit, and shipped around it</h3>
+      <p class="small" style="margin-top:10px">
+        The obvious version of this idea, bending the curve's depth per direction, turns out to be drainable.
+        We proved it with a concrete counterexample: a bot buys the deep branch, sells back on the shallow one,
+        and walks off with pool value. So we shipped the spread construction, which is safe because it can only
+        ever make a round trip worse, and we keep the depth lever on the roadmap behind the safety analysis it
+        deserves.<br/><br/>
+        Same discipline on the adaptive detector: it is built, simulated against volatility attacks, and it
+        backtests at twice the LVR cut, but it will not guard real value until its worst-case bound is derived.
+      </p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>12</span></div>
+</section>
+
+<!-- ════════ 13 · ROADMAP + CLOSE ════════ -->
+<section class="slide">
+  <div class="eyebrow">Roadmap</div>
+  <h1>From live MVP to production</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:24px">
+    <div class="card quiet"><div class="step-n">Now</div>
+      <p class="small" style="margin-top:8px">Calibrate per pair on real return series (the harness is already data-ready), and derive the adaptive detector's manipulation bound so its 29.6% cut can go live safely.</p></div>
+    <div class="card quiet"><div class="step-n">Next</div>
+      <p class="small" style="margin-top:8px">Router and aggregator integration through the Lens, multi-pool coverage, and the depth lever if and only if its safety sizing proves out.</p></div>
+    <div class="card quiet"><div class="step-n">Then</div>
+      <p class="small" style="margin-top:8px">External audit, then mainnet on the volatile majors, where LVR is measured in billions per year across DeFi.</p></div>
+  </div>
+  <div class="card" style="margin-top:18px;flex:1;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 30px">
+    <div>
+      <div class="display" style="font-size:19px;font-weight:700">The thesis in one line</div>
+      <p class="body" style="margin-top:8px;max-width:780px">
+        The only way to fool the detector is to genuinely move the market, which is exactly what it exists to
+        react to. So the protection is bounded by mathematics rather than wished into place.
+      </p>
+      <div style="display:flex;gap:12px;margin-top:16px">
+        <span class="pill"><span class="dot"></span> Live on Unichain Sepolia</span>
+        <span class="pill" style="background:var(--green-bg);border:1px solid var(--green-border);color:var(--green-label)">Open source · 118 tests green</span>
+      </div>
+    </div>
+    <img src="./Logo.png" alt="" style="width:96px;height:96px;object-fit:contain;flex-shrink:0" />
+  </div>
+  <div class="footer"><span>Poincaré · 2026 · research preview, not investment advice</span><span>13</span></div>
+</section>
+
+</body>
+</html>
