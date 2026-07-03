@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { priceOf, type SwapRow } from "@/lib/db";
+import { priceOf } from "@/lib/db";
+import { usePriceSeries, PRICE_WINDOWS, type PriceWindowKey } from "@/hooks/usePriceSeries";
 import { fmtNum, fmtUsd } from "@/lib/format";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -18,45 +19,33 @@ function useWidth<T extends HTMLElement>() {
 }
 
 type Pt = { t: number; p: number; buy: boolean; weth: number; usdc: number };
-const DAY = 86_400_000;
-const RANGES = [
-  { label: "24H", ms: DAY },
-  { label: "5D", ms: 5 * DAY },
-  { label: "1M", ms: 30 * DAY },
-  { label: "All", ms: Infinity },
-];
 
 /**
- * Uniswap-style pool price chart (USDC per WETH) built from the on-chain swap history.
- * Area + line with a hover crosshair; uses real block timestamps for the x-axis.
+ * Uniswap-style pool price chart (USDC per WETH). Data comes from the backend price
+ * series for the selected window — the ENTIRE recorded history for that window, not
+ * whatever slice of the trade tape happens to be loaded on screen.
  */
-export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: number }) {
+export function PoolChart({ height = 220 }: { height?: number }) {
   const [wrapRef, W] = useWidth<HTMLDivElement>();
-  const [range, setRange] = useState(3); // default "All"
+  const [win, setWin] = useState<PriceWindowKey>("All");
   const [hover, setHover] = useState<number | null>(null);
+  const { rows, loading, fetching } = usePriceSeries(win);
 
-  // chronological points (oldest -> newest), de-noised price from the legs
-  const all = useMemo<Pt[]>(() => {
-    const pts = [...rows].reverse().map((r) => {
-      const buy = r.side === "buy_weth";
-      return {
-        t: r.ts ? new Date(r.ts).getTime() : 0,
-        p: priceOf(r),
-        buy,
-        weth: buy ? r.amount_out : r.amount_in,
-        usdc: buy ? r.amount_in : r.amount_out,
-      };
-    });
-    return pts.filter((x) => x.p > 0);
+  // chronological points (already oldest -> newest), de-noised price from the legs
+  const pts = useMemo<Pt[]>(() => {
+    return rows
+      .map((r) => {
+        const buy = r.side === "buy_weth";
+        return {
+          t: r.ts ? new Date(r.ts).getTime() : 0,
+          p: priceOf(r),
+          buy,
+          weth: buy ? r.amount_out : r.amount_in,
+          usdc: buy ? r.amount_in : r.amount_out,
+        };
+      })
+      .filter((x) => x.p > 0);
   }, [rows]);
-
-  const pts = useMemo(() => {
-    const ms = RANGES[range].ms;
-    if (ms === Infinity) return all;
-    const cutoff = Date.now() - ms;
-    const windowed = all.filter((x) => x.t >= cutoff);
-    return windowed.length >= 2 ? windowed : all; // fall back to full history if too sparse
-  }, [all, range]);
 
   const H = height;
   const padX = 6;
@@ -116,29 +105,30 @@ export function PoolChart({ rows, height = 220 }: { rows: SwapRow[]; height?: nu
           </div>
         </div>
         <div className="flex gap-1" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3 }}>
-          {RANGES.map((r, i) => (
+          {PRICE_WINDOWS.map((r) => (
             <button
-              key={r.label}
-              onClick={() => setRange(i)}
+              key={r.key}
+              onClick={() => setWin(r.key)}
               className="font-bold"
               style={{
                 padding: "4px 10px", borderRadius: 7, fontSize: 11.5,
-                background: range === i ? "var(--surface)" : "transparent",
-                color: range === i ? "var(--text)" : "var(--muted)",
-                boxShadow: range === i ? "var(--shadow-sm)" : "none",
+                background: win === r.key ? "var(--surface)" : "transparent",
+                color: win === r.key ? "var(--text)" : "var(--muted)",
+                boxShadow: win === r.key ? "var(--shadow-sm)" : "none",
               }}
             >
-              {r.label}
+              {r.key}
             </button>
           ))}
         </div>
       </div>
 
       {/* chart */}
-      <div style={{ position: "relative", height: H }}>
+      <div style={{ position: "relative", height: H, opacity: fetching && !loading ? 0.75 : 1, transition: "opacity .2s" }}>
         {!geom ? (
-          <div className="flex items-center justify-center" style={{ height: H, fontSize: 12.5, color: "var(--faint)" }}>
-            Not enough swaps yet to chart. Trade to build the price history.
+          <div className="flex items-center justify-center gap-2" style={{ height: H, fontSize: 12.5, color: "var(--faint)" }}>
+            {loading && <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />}
+            {loading ? "Loading price history…" : `No trades in the last ${win === "All" ? "…ever" : win.toLowerCase()} — try a wider window.`}
           </div>
         ) : (
           <svg

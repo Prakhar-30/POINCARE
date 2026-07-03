@@ -88,7 +88,7 @@ export function Dashboard() {
                 </span>
               </div>
               <div className="mt-3.5">
-                <EvidenceChart points={series.points} thresholdH={cfg.h} />
+                <EvidenceChart points={series.points} thresholdH={cfg.h} loading={series.loading} />
               </div>
               <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />

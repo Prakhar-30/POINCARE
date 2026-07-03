@@ -133,6 +133,27 @@ export async function fetchTapePage(limit: number, offset: number): Promise<Swap
   return (data as SwapRow[]) ?? [];
 }
 
+/** The fields the price chart needs from a swap (a projection of SwapRow). */
+export type PricePoint = Pick<SwapRow, "ts" | "side" | "amount_in" | "amount_out" | "price" | "notional_usdc">;
+
+/**
+ * Price history for the chart, straight from the backend (NOT the loaded tape, whose
+ * depth depends on how many pages the user happened to load). Hook-scoped; `sinceIso`
+ * null = all time. Returns ascending by time, newest `limit` rows.
+ */
+export async function fetchPriceSeries(sinceIso: string | null, limit = 2000): Promise<PricePoint[]> {
+  if (!supabaseReady) return [];
+  let q = supabase
+    .from("swaps")
+    .select("ts,side,amount_in,amount_out,price,notional_usdc")
+    .eq("hook", HOOK)
+    .order("ts", { ascending: false })
+    .limit(limit);
+  if (sinceIso) q = q.gte("ts", sinceIso);
+  const { data } = await q;
+  return ((data as PricePoint[]) ?? []).reverse();
+}
+
 export async function fetchPoolTotals(): Promise<PoolTotals> {
   const empty: PoolTotals = { lvr_avoided: 0, volume_usdc: 0, swap_count: 0, volume_24h: 0 };
   if (!supabaseReady) return empty;

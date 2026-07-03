@@ -20,10 +20,12 @@ export function EvidenceChart({
   points,
   thresholdH,
   height = 180,
+  loading = false,
 }: {
   points: DetectorPoint[];
   thresholdH: number; // WAD-fraction units, same scale as s_pos / s_neg
   height?: number;
+  loading?: boolean;
 }) {
   const W = 640; // viewBox units; SVG scales to the container
   const H = 180;
@@ -97,11 +99,12 @@ export function EvidenceChart({
   if (!model) {
     return (
       <div
-        className="relative rounded-md overflow-hidden flex items-center justify-center"
+        className="relative rounded-md overflow-hidden flex items-center justify-center gap-2"
         style={{ height, background: "var(--scope-bg)", border: "1px solid var(--border)" }}
       >
+        {loading && <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />}
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--faint)" }}>
-          Waiting for detector samples — one is recorded per traded block.
+          {loading ? "Loading detector history…" : "Waiting for detector samples — one is recorded per traded block."}
         </span>
       </div>
     );

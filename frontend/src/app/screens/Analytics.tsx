@@ -41,7 +41,7 @@ export function Analytics() {
 
         <div className="grid gap-6 p-6" style={{ gridTemplateColumns: narrow ? "1fr" : "1.5fr 1fr" }}>
           <div>
-            <EvidenceChart points={series.points} thresholdH={cfg.h} height={210} />
+            <EvidenceChart points={series.points} thresholdH={cfg.h} height={210} loading={series.loading} />
             <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
               <Readout label="regime" value={regime.label} color={regime.color} />
               <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />

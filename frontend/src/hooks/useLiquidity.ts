@@ -14,8 +14,10 @@ export type LiquidityStatus = "idle" | "busy" | "success" | "error";
 
 const erc20 = (address: `0x${string}`) => ({ address, abi: ERC20_ABI } as const);
 
-/** Hook-owned add/remove liquidity. Tokens settle to the PoolManager, so that is
- *  the approval target; addLiquidity/removeLiquidity are called on the hook. */
+/** Hook-owned add/remove liquidity. The HOOK executes the `transferFrom` inside its
+ *  unlock callback (it pays the PoolManager itself), so the hook — NOT the PoolManager —
+ *  is the approval target. Approving the manager leaves allowance[user][hook] at zero and
+ *  the add reverts with an allowance underflow (verified on a live failed tx). */
 export function useLiquidity(onDone?: () => void) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -24,20 +26,19 @@ export function useLiquidity(onDone?: () => void) {
   const toast = useToast();
   const [status, setStatus] = useState<LiquidityStatus>("idle");
 
-  const manager = CONTRACTS.poolManager as `0x${string}`;
   const hook = CONTRACTS.hook as `0x${string}`;
 
-  /** Approve the EXACT amount the manager needs for this token (no infinite approvals). */
+  /** Approve the EXACT amount the hook needs for this token (no infinite approvals). */
   async function approveExact(stepKey: string, token: `0x${string}`, need: bigint) {
     if (!address || !walletClient || !publicClient) return;
-    const allowance = (await publicClient.readContract({ ...erc20(token), functionName: "allowance", args: [address, manager] })) as bigint;
+    const allowance = (await publicClient.readContract({ ...erc20(token), functionName: "allowance", args: [address, hook] })) as bigint;
     if (allowance >= need) {
       stepper.complete(stepKey);
       return;
     }
     stepper.activate(stepKey);
-    const gas = await resolveGas(publicClient, { ...erc20(token), functionName: "approve", args: [manager, need], account: address }, GAS.approve);
-    const h = await walletClient.writeContract({ ...erc20(token), functionName: "approve", args: [manager, need], gas, nonce: await nextNonce(publicClient, address) });
+    const gas = await resolveGas(publicClient, { ...erc20(token), functionName: "approve", args: [hook, need], account: address }, GAS.approve);
+    const h = await walletClient.writeContract({ ...erc20(token), functionName: "approve", args: [hook, need], gas, nonce: await nextNonce(publicClient, address) });
     await publicClient.waitForTransactionReceipt({ hash: h });
     stepper.complete(stepKey);
   }
@@ -49,8 +50,8 @@ export function useLiquidity(onDone?: () => void) {
 
     let current = "add";
     try {
-      const al0 = (await publicClient.readContract({ ...erc20(CONTRACTS.usdc as `0x${string}`), functionName: "allowance", args: [address, manager] })) as bigint;
-      const al1 = (await publicClient.readContract({ ...erc20(CONTRACTS.weth as `0x${string}`), functionName: "allowance", args: [address, manager] })) as bigint;
+      const al0 = (await publicClient.readContract({ ...erc20(CONTRACTS.usdc as `0x${string}`), functionName: "allowance", args: [address, hook] })) as bigint;
+      const al1 = (await publicClient.readContract({ ...erc20(CONTRACTS.weth as `0x${string}`), functionName: "allowance", args: [address, hook] })) as bigint;
 
       stepper.begin([
         ...(al0 < a0 ? [{ key: "approve0", label: "Approve USDC" }] : []),

@@ -134,8 +134,9 @@ export const FAUCET_ABI = [
 
 /**
  * Hook-owned liquidity (BaseCustomAccounting). LP shares are the hook's own ERC20.
- * Liquidity tokens settle via transferFrom(sender -> PoolManager), so the user
- * approves USDC and WETH to the PoolManager (not the hook) before addLiquidity.
+ * The HOOK calls transferFrom(sender -> PoolManager) inside its unlock callback, so
+ * the user approves USDC and WETH to the HOOK before addLiquidity (approving the
+ * PoolManager does nothing — the allowance the transfer spends is [user][hook]).
  * tickLower/tickUpper/userInputSalt are unused by the custom curve -> pass 0.
  */
 export const HOOK_LP_ABI = [
