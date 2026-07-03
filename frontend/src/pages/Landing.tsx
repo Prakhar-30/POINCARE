@@ -64,14 +64,14 @@ export function Landing() {
             </motion.div>
 
             <motion.h1 {...fade(0.06)} className="font-display" style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 700, lineHeight: 1.06, color: "var(--text)", letterSpacing: "-.5px" }}>
-              An AMM that feels the trend
-              <span style={{ color: "var(--lav-deep)" }}> and leans into it.</span>
+              An AMM that detects real trends
+              <span style={{ color: "var(--lav-deep)" }}> and leans against them.</span>
             </motion.h1>
 
             <motion.p {...fade(0.12)} className="mt-5 max-w-xl" style={{ fontSize: 17, lineHeight: 1.65, color: "var(--text-2)" }}>
-              Poincaré is a Uniswap v4 hook with a tiny <span style={{ fontWeight: 700, color: "var(--text)" }}>change-point detector</span> for a brain.
-              When it spots a <em>real</em> directional trend, it gently widens the spread on the side that bleeds
-              liquidity providers, while staying cheap and open everywhere else. No oracle. No keeper. Just the pool's own price.
+              Poincaré is a Uniswap v4 hook governed by a <span style={{ fontWeight: 700, color: "var(--text)" }}>CUSUM change-point detector</span>.
+              When it confirms a real directional trend, it widens the spread on the side that bleeds
+              liquidity providers and keeps the base price everywhere else. No oracle. No keeper. Only the pool's own price.
             </motion.p>
 
             <motion.div {...fade(0.18)} className="mt-8 flex items-center gap-4 flex-wrap">
@@ -83,7 +83,7 @@ export function Landing() {
 
             <motion.div {...fade(0.24)} className="mt-9 flex items-center gap-5 flex-wrap" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-3)" }}>
               <Trust icon="shield" text="Manipulation-bounded by design" />
-              <Trust icon="check" text="91 tests · 384k-op invariant" />
+              <Trust icon="check" text="118 tests · 256k-op invariant suite" />
               <Trust icon="target" text="No oracle, no AVS" />
             </motion.div>
           </div>
@@ -97,7 +97,7 @@ export function Landing() {
       {/* ---- numbers ---- */}
       <section className="px-6 md:px-10 py-4">
         <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
-          <NumberCard kpi="−14.3%" label="LVR vs constant-product" sub="back-test, same swap path" />
+          <NumberCard kpi="−14.3%" label="LVR vs constant-product" sub="−29.6% with the adaptive detector" />
           <NumberCard kpi="6 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
           <NumberCard kpi="~2×" label="less tax on benign flow" sub="vs a symmetric vol-fee" />
           <NumberCard kpi="0" label="external dependencies" sub="prices off its own reserves" />
@@ -167,7 +167,7 @@ export function Landing() {
             Trade or provide liquidity on a pool that protects you.
           </h2>
           <p className="mt-3 mx-auto" style={{ maxWidth: 540, fontSize: 15.5, color: "var(--text-2)", lineHeight: 1.6 }}>
-            Connect a wallet on Unichain Sepolia and watch the Brain in real time. Test tokens are free to mint.
+            Connect a wallet on Unichain Sepolia and watch the detector work in real time. Test tokens are free.
           </p>
           <div className="mt-8 flex justify-center">
             <LaunchButton size="lg" />

@@ -1,11 +1,11 @@
 import { usePoolState } from "@/hooks/usePoolState";
 import { useDetectorConfig } from "@/hooks/useDetectorConfig";
-import { useSignalSeries } from "@/hooks/useSignalSeries";
-import { usePoolTotals } from "@/hooks/useBackend";
+import { useDetectorSeries } from "@/hooks/useDetectorSeries";
+import { usePoolTotals, useWalletTotals } from "@/hooks/useBackend";
 import { fmtPct, fmtUsd, fmtNum } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
-import { Oscilloscope } from "@/components/ui/Oscilloscope";
+import { EvidenceChart } from "@/components/ui/EvidenceChart";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 
 function regimeOf(trend: string) {
@@ -18,7 +18,8 @@ export function Analytics() {
   const s = usePoolState();
   const cfg = useDetectorConfig();
   const totals = usePoolTotals().data;
-  const real = useSignalSeries();
+  const users = useWalletTotals().data;
+  const series = useDetectorSeries();
   const regime = regimeOf(s.trend);
   const kappaMax = cfg.kappaMax || 0.1;
   const narrow = useIsNarrow();
@@ -30,7 +31,7 @@ export function Analytics() {
         <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
           <div className="flex items-center gap-2.5">
             <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
-            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>The Brain · CUSUM detector</span>
+            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Detector · two-sided CUSUM</span>
             <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· quickest-change, data-dependent firing</span>
           </div>
           <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ fontSize: 12, fontWeight: 700, color: regime.color, background: regime.ring }}>
@@ -40,11 +41,13 @@ export function Analytics() {
 
         <div className="grid gap-6 p-6" style={{ gridTemplateColumns: narrow ? "1fr" : "1.5fr 1fr" }}>
           <div>
-            <Oscilloscope trend={s.trend} intensity={Math.max(s.kappa / kappaMax, s.directionalEfficiency)} real={real} height={210} />
+            <EvidenceChart points={series.points} thresholdH={cfg.h} height={210} />
             <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
               <Readout label="regime" value={regime.label} color={regime.color} />
               <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
               <Readout label="spread · buy WETH" value={fmtPct(s.spreadOneForZero)} color={s.spreadOneForZero > 0 ? "var(--up)" : "var(--text-2)"} />
+              <Readout label="volatility σ̂" value={fmtPct(s.sigma)} color="var(--text-2)" />
+              <Readout label="base fee" value={fmtPct(s.fee)} color={s.fee > 0 ? "var(--honey-deep)" : "var(--text-2)"} />
             </div>
           </div>
           <div className="flex flex-col items-center justify-center gap-5">
@@ -118,9 +121,18 @@ export function Analytics() {
       {/* ---- LVR headline ---- */}
       <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
         <HeadStat label="LVR reduction vs x·y=k" value="14.3%" color="var(--up)" tinted sub="back-test, synthetic regime path" />
+        <HeadStat label="with the adaptive detector" value="29.6%" color="var(--up)" tinted sub="σ-normalized thresholds, same path" />
         <HeadStat label="vs equal-spread vol fee" value="11.5%" color="var(--lav)" sub="same average spread, symmetric" />
         <HeadStat label="LVR avoided · live" value={totals && totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} color="var(--green-label)" sub={`${totals?.swap_count ?? 0} swaps tracked`} />
         <HeadStat label="Detection delay" value="≈ 6 blocks" color="var(--honey-deep)" sub="after a real trend onset" />
+      </div>
+
+      {/* ---- usage ---- */}
+      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
+        <HeadStat label="Wallets connected" value={users ? fmtNum(users.total_wallets, 0) : "—"} color="var(--text)" sub="all time" />
+        <HeadStat label="New this week" value={users ? fmtNum(users.new_7d, 0) : "—"} color="var(--lav-deep)" sub="first connection in 7 days" />
+        <HeadStat label="Returning" value={users ? fmtNum(users.returning_wallets, 0) : "—"} color="var(--up)" sub="more than one session" />
+        <HeadStat label="Active · 24h" value={users ? fmtNum(users.active_24h, 0) : "—"} color="var(--honey-deep)" sub="seen in the last day" />
       </div>
       <p style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1.6, textAlign: "center", maxWidth: 760, margin: "0 auto" }}>
         Back-test percentages are measured on a seeded regime-switching path, not a named pair, and the engine is

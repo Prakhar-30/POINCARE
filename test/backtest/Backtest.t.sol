@@ -77,9 +77,17 @@ contract BacktestTest is Test {
         //                                       tuned so the vol-fee's average spread ≈ Poincaré's
         //                                       (an apples-to-apples "same friction budget" baseline)
 
+    // --- v2 adaptive detector (README §9.2): thresholds in σ-units (WAD == 1σ̂) ---
+    int256 internal constant K_A = 5e17; //      slack 0.5σ
+    int256 internal constant H_A = 3e18; //      threshold 3σ of evidence
+    int256 internal constant SMAX_A = 12e18; //  saturation 12σ
+    uint256 internal constant SIGMA_FLOOR = 1e15; // min σ̂ for standardization
+    uint256 internal constant CLIP_A = 4e18; //  Huber clip at 4σ per step
+
     uint8 internal constant CPMM = 0;
     uint8 internal constant VOLFEE = 1;
     uint8 internal constant POIN = 2;
+    uint8 internal constant POIN_A = 3; // Poincaré with the v2 adaptive (σ-standardized) detector
 
     struct Pool {
         uint8 mode;
@@ -108,14 +116,9 @@ contract BacktestTest is Test {
         Pool memory cpmm = _newPool(CPMM);
         Pool memory vol = _newPool(VOLFEE);
         Pool memory poin = _newPool(POIN);
+        Pool memory poinA = _newPool(POIN_A);
 
-        uint256 trendSteps;
-        uint256 falseAlarmSteps;
-        uint256 delaySum;
-        uint256 delayCount;
-        uint256 onsetT;
-        bool inTrend;
-        bool detected;
+        Metrics memory m;
 
         uint256 fair = WAD;
         for (uint256 t = 1; t <= T; t++) {
@@ -126,26 +129,14 @@ contract BacktestTest is Test {
             _stepPool(cpmm, fair, noiseDir);
             _stepPool(vol, fair, noiseDir);
             _stepPool(poin, fair, noiseDir);
+            _stepPool(poinA, fair, noiseDir);
 
-            // detection accounting (Poincaré detector)
-            if (isTrend && !inTrend) {
-                inTrend = true;
-                detected = false;
-                onsetT = t;
-            } else if (!isTrend && inTrend) {
-                inTrend = false;
-            }
-            if (isTrend) {
-                trendSteps++;
-                if (!detected && poin.kappa > 0) {
-                    delaySum += (t - onsetT);
-                    delayCount++;
-                    detected = true;
-                }
-            } else if (poin.kappa > 0) {
-                falseAlarmSteps++;
-            }
+            _track(m, t, isTrend, poin.kappa);
         }
+        uint256 trendSteps = m.trendSteps;
+        uint256 falseAlarmSteps = m.falseAlarmSteps;
+        uint256 delaySum = m.delaySum;
+        uint256 delayCount = m.delayCount;
 
         // ---- report ----
         console2.log("== Poincare backtest (synthetic regime path) ==");
@@ -153,7 +144,9 @@ contract BacktestTest is Test {
         console2.log("LVR  cpmm    (wei)", cpmm.lvr);
         console2.log("LVR  volfee  (wei)", vol.lvr);
         console2.log("LVR  poincare(wei)", poin.lvr);
+        console2.log("LVR  poincare-adaptive(wei)", poinA.lvr);
         console2.log("LVR reduction vs cpmm   (bps)", _safeBps(cpmm.lvr, poin.lvr));
+        console2.log("LVR reduction vs cpmm, adaptive (bps)", _safeBps(cpmm.lvr, poinA.lvr));
         console2.log("LVR reduction vs volfee (bps)", _safeBps(vol.lvr, poin.lvr));
         console2.log("avg spread volfee    (wad)", vol.sumNom / T);
         console2.log("avg spread poincare  (wad)", poin.sumNom / T);
@@ -165,8 +158,11 @@ contract BacktestTest is Test {
         console2.log("false-alarm steps (kappa>0 in calm)", falseAlarmSteps);
 
         // ---- claims (definition of done, §9.5) ----
-        // 1. Poincaré reduces LVR vs raw constant-product — the headline result.
+        // 1. Poincaré reduces LVR vs raw constant-product — the headline result. The v2
+        //    adaptive detector, with NO absolute-scale calibration (thresholds purely in
+        //    σ-units), must reproduce the reduction — the self-calibration claim of §9.2.
         assertLt(poin.lvr, cpmm.lvr, "Poincare must reduce LVR vs constant-product");
+        assertLt(poinA.lvr, cpmm.lvr, "the adaptive (sigma-unit) detector must also reduce LVR");
 
         // 2. The edge on honest users: at comparable (here: <=) average friction, the asymmetric
         //    trend-gated spread taxes uninformed flow far LESS than the symmetric vol-fee — it
@@ -182,6 +178,37 @@ contract BacktestTest is Test {
         assertGt(delayCount, 0, "detector must engage on the trend episodes");
         assertLt(delaySum / delayCount, TREND_LEN, "average detection delay must be within a trend burst");
         assertLt(falseAlarmSteps * 2, T - trendSteps, "calm-time false alarms must stay a minority of calm steps");
+    }
+
+    /// @dev Detection accounting for the (absolute-mode) Poincaré detector.
+    struct Metrics {
+        uint256 trendSteps;
+        uint256 falseAlarmSteps;
+        uint256 delaySum;
+        uint256 delayCount;
+        uint256 onsetT;
+        bool inTrend;
+        bool detected;
+    }
+
+    function _track(Metrics memory m, uint256 t, bool isTrend, uint256 kappa) internal pure {
+        if (isTrend && !m.inTrend) {
+            m.inTrend = true;
+            m.detected = false;
+            m.onsetT = t;
+        } else if (!isTrend && m.inTrend) {
+            m.inTrend = false;
+        }
+        if (isTrend) {
+            m.trendSteps++;
+            if (!m.detected && kappa > 0) {
+                m.delaySum += (t - m.onsetT);
+                m.delayCount++;
+                m.detected = true;
+            }
+        } else if (kappa > 0) {
+            m.falseAlarmSteps++;
+        }
     }
 
     /// @dev One block for one pool: charge uninformed flow, run the profit-maximising arbitrage
@@ -245,9 +272,24 @@ contract BacktestTest is Test {
             int256 r = PriceLib.logReturnWad(p.lastP, newP);
             if (p.mode == VOLFEE) {
                 p.volEwma = _ewmaAbs(p.volEwma, r, LAMBDA);
-            } else if (p.mode == POIN) {
+            } else if (p.mode == POIN || p.mode == POIN_A) {
+                // Same pipeline as the hook's `_projectDetector`: (adaptive only) Huber-clip
+                // at CLIP_A σ-equivalents and standardize by the PRE-update σ̂.
+                int256 inc = r;
+                (int256 kk, int256 hh, int256 sm) = (K, H, S_MAX);
+                if (p.mode == POIN_A) {
+                    uint256 sig0 = p.sig.sigmaWad(LAMBDA);
+                    if (sig0 < SIGMA_FLOOR) sig0 = SIGMA_FLOOR;
+                    int256 rCap = int256(FullMath.mulDiv(CLIP_A, sig0, WAD));
+                    if (r > rCap) r = rCap;
+                    else if (r < -rCap) r = -rCap;
+                    inc = r >= 0
+                        ? int256(FullMath.mulDiv(uint256(r), WAD, sig0))
+                        : -int256(FullMath.mulDiv(uint256(-r), WAD, sig0));
+                    (kk, hh, sm) = (K_A, H_A, SMAX_A);
+                }
                 Cusum.State memory cs = Cusum.State(p.sPos, p.sNeg);
-                cs = cs.updateCapped(r, K, S_MAX);
+                cs = cs.updateCapped(inc, kk, sm);
                 p.sPos = cs.sPos;
                 p.sNeg = cs.sNeg;
                 p.sig = p.sig.update(r, LAMBDA);
@@ -255,7 +297,7 @@ contract BacktestTest is Test {
                 (Cusum.Trend dir, int256 ev) =
                     p.sPos >= p.sNeg ? (Cusum.Trend.Up, p.sPos) : (Cusum.Trend.Down, p.sNeg);
                 int256 gated = p.sig.signal() >= D_FLOOR ? ev : int256(0);
-                p.kappa = ControlLaw.step(p.kappa, gated, ControlLaw.Config(H, S_MAX, KAPPA_MIN, KAPPA_MAX, D_MAX));
+                p.kappa = ControlLaw.step(p.kappa, gated, ControlLaw.Config(hh, sm, KAPPA_MIN, KAPPA_MAX, D_MAX));
                 if (gated > 0) p.trend = dir;
             }
         }
@@ -268,7 +310,7 @@ contract BacktestTest is Test {
             uint256 s = p.volEwma * VOLK;
             return s > KAPPA_MAX ? KAPPA_MAX : s;
         }
-        if (p.mode == POIN) return p.kappa;
+        if (p.mode == POIN || p.mode == POIN_A) return p.kappa;
         return 0;
     }
 
@@ -276,7 +318,7 @@ contract BacktestTest is Test {
     ///      CPMM: none. Vol-fee: symmetric (taxes both sides). Poincaré: only the with-trend side.
     function _dirSpread(Pool memory p, bool zeroForOne, uint256 nominal) internal pure returns (uint256) {
         if (p.mode == VOLFEE) return nominal; // symmetric
-        if (p.mode == POIN) {
+        if (p.mode == POIN || p.mode == POIN_A) {
             if (nominal == 0) return 0;
             bool withTrend =
                 (p.trend == Cusum.Trend.Up && !zeroForOne) || (p.trend == Cusum.Trend.Down && zeroForOne);

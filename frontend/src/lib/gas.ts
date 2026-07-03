@@ -33,5 +33,17 @@ export const GAS = {
   swap: 3_000_000n,
   addLiquidity: 3_000_000n,
   removeLiquidity: 2_500_000n,
-  mint: 200_000n,
+  mint: 400_000n,
 } as const;
+
+/**
+ * The account's next nonce, read from the node's PENDING state and passed explicitly
+ * to every write. MetaMask keeps its own nonce cache, and on Unichain Sepolia that
+ * cache goes stale when transactions are sent back-to-back (approve -> swap, or the
+ * two faucet mints): the wallet reuses a nonce, the node rejects it, and the user
+ * sees "nonce out of sync" that even resetting the activity tab doesn't reliably fix.
+ * Pinning the nonce from the node sidesteps the wallet's cache entirely.
+ */
+export async function nextNonce(publicClient: PublicClient, address: `0x${string}`): Promise<number> {
+  return publicClient.getTransactionCount({ address, blockTag: "pending" });
+}

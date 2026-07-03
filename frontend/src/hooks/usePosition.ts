@@ -1,5 +1,10 @@
 import { useAccount, useReadContracts } from "wagmi";
 import { CONTRACTS, HOOK_ABI } from "@/config/contracts";
+import { fromWei } from "@/lib/units";
+
+/** LP shares are the hook's own ERC20, fixed at 18 decimals by the contract —
+ *  a protocol constant, not a token-decimals assumption. */
+const SHARE_DECIMALS = 1e18;
 
 const hook = { address: CONTRACTS.hook as `0x${string}`, abi: HOOK_ABI } as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -32,10 +37,10 @@ export function usePosition(): Position {
   });
 
   const reserves = data?.[0]?.result as readonly [bigint, bigint] | undefined;
-  const r0 = Number(reserves?.[0] ?? 0n) / 1e18;
-  const r1 = Number(reserves?.[1] ?? 0n) / 1e18;
-  const supply = Number((data?.[1]?.result as bigint) ?? 0n) / 1e18;
-  const shares = Number((data?.[2]?.result as bigint) ?? 0n) / 1e18;
+  const r0 = fromWei(reserves?.[0] ?? 0n, "USDC");
+  const r1 = fromWei(reserves?.[1] ?? 0n, "WETH");
+  const supply = Number((data?.[1]?.result as bigint) ?? 0n) / SHARE_DECIMALS;
+  const shares = Number((data?.[2]?.result as bigint) ?? 0n) / SHARE_DECIMALS;
 
   const price = r1 > 0 ? r0 / r1 : 0;
   const sharePct = supply > 0 ? shares / supply : 0;

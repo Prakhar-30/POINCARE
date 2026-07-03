@@ -1,5 +1,6 @@
 import { useAccount, useReadContracts } from "wagmi";
 import { CONTRACTS, ERC20_ABI } from "@/config/contracts";
+import { fromWei } from "@/lib/units";
 
 export function useBalances() {
   const { address } = useAccount();
@@ -11,8 +12,8 @@ export function useBalances() {
     query: { enabled: Boolean(address), refetchInterval: 6000 },
   });
   return {
-    usdc: Number((data?.[0]?.result as bigint) ?? 0n) / 1e18,
-    weth: Number((data?.[1]?.result as bigint) ?? 0n) / 1e18,
+    usdc: fromWei((data?.[0]?.result as bigint) ?? 0n, "USDC"),
+    weth: fromWei((data?.[1]?.result as bigint) ?? 0n, "WETH"),
     refetch,
     isLoading,
   };

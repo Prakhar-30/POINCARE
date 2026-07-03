@@ -1,4 +1,9 @@
 import { supabase, supabaseReady } from "./supabase";
+import { CONTRACTS } from "@/config/contracts";
+import type { DetectorPoint } from "@/lib/onchain";
+
+/** All rows are scoped to the current hook so redeploys don't mix histories. */
+const HOOK = CONTRACTS.hook.toLowerCase();
 
 export type SwapRow = {
   id?: number;
@@ -49,25 +54,66 @@ export function priceOf(t: Pick<SwapRow, "side" | "amount_in" | "amount_out" | "
   return 0;
 }
 
-/** Remember a wallet across sessions (first_seen kept, last_seen bumped). */
-export async function upsertWallet(address: string) {
+/** Remember a wallet across sessions: first sight inserts it, every later session
+ *  bumps last_seen + visit_count (server-side, so the counts survive any client). */
+export async function touchWallet(address: string) {
   if (!supabaseReady) return;
-  await supabase
-    .from("wallets")
-    .upsert({ address: lc(address), last_seen: new Date().toISOString() }, { onConflict: "address" });
+  const { error } = await supabase.rpc("touch_wallet", { addr: lc(address) });
+  if (error) console.warn("touchWallet", error.message);
+}
+
+export type WalletTotals = {
+  total_wallets: number;
+  new_7d: number;
+  returning_wallets: number;
+  active_24h: number;
+};
+
+/** Aggregate user counts for the dashboard (total / new this week / returning). */
+export async function fetchWalletTotals(): Promise<WalletTotals> {
+  const empty: WalletTotals = { total_wallets: 0, new_7d: 0, returning_wallets: 0, active_24h: 0 };
+  if (!supabaseReady) return empty;
+  const { data } = await supabase.from("v_wallet_totals").select("*").single();
+  return (data as WalletTotals) ?? empty;
 }
 
 /** Record a confirmed swap into the shared order tape. */
 export async function recordSwap(row: SwapRow) {
   if (!supabaseReady) return;
-  const { error } = await supabase.from("swaps").insert({ ...row, trader: lc(row.trader) });
+  const { error } = await supabase.from("swaps").insert({ ...row, trader: lc(row.trader), hook: HOOK });
   if (error && error.code !== "23505") console.warn("recordSwap", error.message); // ignore dup tx_hash
 }
 
 export async function recordLpEvent(evt: LpEvent) {
   if (!supabaseReady) return;
-  const { error } = await supabase.from("lp_events").insert({ ...evt, wallet: lc(evt.wallet) });
+  const { error } = await supabase.from("lp_events").insert({ ...evt, wallet: lc(evt.wallet), hook: HOOK });
   if (error && error.code !== "23505") console.warn("recordLpEvent", error.message);
+}
+
+// ---------------------------------------------------------------------------
+// detector_samples — the on-chain DetectorSample trace, mirrored for history
+// ---------------------------------------------------------------------------
+
+/** Mirror freshly-read on-chain samples. Idempotent: unique(hook, block_number). */
+export async function recordDetectorSamples(points: DetectorPoint[]) {
+  if (!supabaseReady || points.length === 0) return;
+  const rows = points.map((p) => ({ ...p, hook: HOOK }));
+  const { error } = await supabase
+    .from("detector_samples")
+    .upsert(rows, { onConflict: "hook,block_number", ignoreDuplicates: true });
+  if (error) console.warn("recordDetectorSamples", error.message);
+}
+
+/** Detector history for this hook, ascending by block (newest `limit` samples). */
+export async function fetchDetectorSeries(limit = 240): Promise<DetectorPoint[]> {
+  if (!supabaseReady) return [];
+  const { data } = await supabase
+    .from("detector_samples")
+    .select("block_number,price,r,s_pos,s_neg,d,sigma,kappa,trend,fee")
+    .eq("hook", HOOK)
+    .order("block_number", { ascending: false })
+    .limit(limit);
+  return ((data as DetectorPoint[]) ?? []).reverse();
 }
 
 export async function fetchTape(limit = 24): Promise<SwapRow[]> {

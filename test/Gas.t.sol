@@ -2,26 +2,23 @@
 pragma solidity ^0.8.26;
 
 import {console2} from "forge-std/Test.sol";
-import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
-import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
-import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
 
 import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomAccounting.sol";
 
 import {PoincareHook} from "../src/PoincareHook.sol";
-import {BaseTest} from "./utils/BaseTest.sol";
+import {PoincareTestBase} from "./utils/PoincareTestBase.sol";
 
 /// @title GasTest — profile the swap path / detector cost (CLAUDE.md §9.6)
 /// @notice Measures end-to-end swap gas (router + PoolManager + hook) and isolates the per-block
 ///         detector-update cost by differencing the first swap of a block (which samples + runs
-///         the two CUSUM updates, the EWMA, and the control law) against a later same-block swap
-///         (which skips sampling). Asserts a generous budget so the figures are tracked, not
-///         silently regressed.
-contract GasTest is BaseTest {
+///         the two CUSUM updates, the EWMA, the control law, and now emits the DetectorSample
+///         trace) against a later same-block swap (which skips sampling). The detector state is
+///         packed to 4 slots (OPEN_ITEMS G8), which pays for the event several times over.
+contract GasTest is PoincareTestBase {
     using CurrencyLibrary for Currency;
 
     Currency currency0;
@@ -29,42 +26,24 @@ contract GasTest is BaseTest {
     PoolKey poolKey;
     PoincareHook hook;
 
-    int256 constant K = 1e15;
-    int256 constant H = 5e15;
-    int256 constant S_MAX = 2e16;
-    uint256 constant KAPPA_MIN = 0;
-    uint256 constant KAPPA_MAX = 1e17;
-    uint256 constant D_MAX = 5e16;
-    uint256 constant LAMBDA = 9e17;
-    uint256 constant D_FLOOR = 5e17;
-
     function setUp() public {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        address flags = address(
-            uint160(
-                Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-                    | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
-            ) ^ (0x4444 << 144)
-        );
-        bytes memory args = abi.encode(poolManager, K, H, S_MAX, KAPPA_MIN, KAPPA_MAX, D_MAX, LAMBDA, D_FLOOR);
-        deployCodeTo("PoincareHook.sol:PoincareHook", args, flags);
-        hook = PoincareHook(payable(flags));
-
-        poolKey = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
-        poolManager.initialize(poolKey, Constants.SQRT_PRICE_1_1);
+        hook = deployPoincare(defaultConfig(), 0x4444);
+        poolKey = initPoincarePool(hook, currency0, currency1);
 
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(hook), type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(hook), type(uint256).max);
         hook.addLiquidity(
-            BaseCustomAccounting.AddLiquidityParams(100 ether, 100 ether, 0, 0, type(uint256).max, -887220, 887220, bytes32(0))
+            BaseCustomAccounting.AddLiquidityParams(
+                100 ether, 100 ether, 0, 0, type(uint256).max, -887220, 887220, bytes32(0)
+            )
         );
 
         // Warm up the detector to STEADY STATE: a few sampled blocks so every detector storage
-        // slot (cusum sPos/sNeg, signal ewmaNet/ewmaTV, kappa, trend, lastSampled*) is already
-        // non-zero. Otherwise the first writes are cold (zero->non-zero, 20k each) and overstate
-        // the recurring per-block cost. This makes the measured figure the one LPs actually pay.
+        // slot is already non-zero. Otherwise the first writes are cold (zero->non-zero, 20k
+        // each) and overstate the recurring per-block cost.
         for (uint256 i = 0; i < 6; i++) {
             vm.roll(block.number + 1);
             _swap(0.1 ether);
@@ -73,7 +52,9 @@ contract GasTest is BaseTest {
 
     function _swap(uint256 amountIn) internal returns (uint256 gasUsed) {
         uint256 g = gasleft();
-        swapRouter.swapExactTokensForTokens(amountIn, 0, true, poolKey, Constants.ZERO_BYTES, address(this), block.timestamp + 1);
+        swapRouter.swapExactTokensForTokens(
+            amountIn, 0, true, poolKey, Constants.ZERO_BYTES, address(this), block.timestamp + 1
+        );
         gasUsed = g - gasleft();
     }
 

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { parseUnits, zeroHash } from "viem";
+import { zeroHash } from "viem";
 import { CONTRACTS, ERC20_ABI, EXPLORER, HOOK_LP_ABI } from "@/config/contracts";
+import { fromWei, toWei } from "@/lib/units";
 import { recordLpEvent } from "@/lib/db";
-import { resolveGas, GAS } from "@/lib/gas";
+import { resolveGas, GAS, nextNonce } from "@/lib/gas";
 import { humanizeError } from "@/lib/errors";
 import { useStepper } from "@/hooks/useStepper";
 import { useToast } from "@/components/ui/Toast";
@@ -36,15 +37,15 @@ export function useLiquidity(onDone?: () => void) {
     }
     stepper.activate(stepKey);
     const gas = await resolveGas(publicClient, { ...erc20(token), functionName: "approve", args: [manager, need], account: address }, GAS.approve);
-    const h = await walletClient.writeContract({ ...erc20(token), functionName: "approve", args: [manager, need], gas });
+    const h = await walletClient.writeContract({ ...erc20(token), functionName: "approve", args: [manager, need], gas, nonce: await nextNonce(publicClient, address) });
     await publicClient.waitForTransactionReceipt({ hash: h });
     stepper.complete(stepKey);
   }
 
   async function add(params: { usdc: string; weth: string; valueUsdc: number }) {
     if (!address || !walletClient || !publicClient) return;
-    const a0 = parseUnits(params.usdc || "0", 18); // currency0 = USDC
-    const a1 = parseUnits(params.weth || "0", 18); // currency1 = WETH
+    const a0 = toWei(params.usdc || "0", "USDC"); // currency0
+    const a1 = toWei(params.weth || "0", "WETH"); // currency1
 
     let current = "add";
     try {
@@ -68,14 +69,14 @@ export function useLiquidity(onDone?: () => void) {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
       const lpArgs = [{ amount0Desired: a0, amount1Desired: a1, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, account: address }, GAS.addLiquidity);
-      const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, gas });
+      const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, gas, nonce: await nextNonce(publicClient, address) });
       await publicClient.waitForTransactionReceipt({ hash });
       stepper.complete("add");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 
-      await recordLpEvent({ tx_hash: hash, wallet: address, kind: "add", shares: 0, amount0: Number(a0) / 1e18, amount1: Number(a1) / 1e18, value_usdc: params.valueUsdc });
+      await recordLpEvent({ tx_hash: hash, wallet: address, kind: "add", shares: 0, amount0: fromWei(a0, "USDC"), amount1: fromWei(a1, "WETH"), value_usdc: params.valueUsdc });
       setStatus("success");
-      toast.success("Liquidity added", `${fmtNum(Number(a0) / 1e18, 2)} USDC and ${fmtNum(Number(a1) / 1e18, 4)} WETH`, `${EXPLORER}/tx/${hash}`);
+      toast.success("Liquidity added", `${fmtNum(fromWei(a0, "USDC"), 2)} USDC and ${fmtNum(fromWei(a1, "WETH"), 4)} WETH`, `${EXPLORER}/tx/${hash}`);
       onDone?.();
       return hash;
     } catch (e) {
@@ -94,7 +95,7 @@ export function useLiquidity(onDone?: () => void) {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
       const rmArgs = [{ liquidity: params.shares, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, account: address }, GAS.removeLiquidity);
-      const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, gas });
+      const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, gas, nonce: await nextNonce(publicClient, address) });
       await publicClient.waitForTransactionReceipt({ hash });
       stepper.complete("remove");
       stepper.finish(`${EXPLORER}/tx/${hash}`);

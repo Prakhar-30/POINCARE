@@ -1,19 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchPoolTotals, fetchTape, fetchTapePage, subscribeSwaps, upsertWallet, type SwapRow } from "@/lib/db";
+import {
+  fetchPoolTotals,
+  fetchTape,
+  fetchTapePage,
+  fetchWalletTotals,
+  subscribeSwaps,
+  touchWallet,
+  type SwapRow,
+} from "@/lib/db";
 
-/** Remember the connected wallet across sessions. */
+/** Register the connected wallet once per browser session — first sight counts it as
+ *  a new user, every later session as a returning one (see v_wallet_totals). */
 export function useWalletIdentity() {
   const { address, isConnected } = useAccount();
   useEffect(() => {
-    if (isConnected && address) void upsertWallet(address);
+    if (!isConnected || !address) return;
+    const key = `poincare-touched-${address.toLowerCase()}`;
+    if (sessionStorage.getItem(key)) return; // one visit per session, not per page load
+    sessionStorage.setItem(key, "1");
+    void touchWallet(address);
   }, [isConnected, address]);
 }
 
 /** Pool-wide totals (LVR avoided, volume) — polled. */
 export function usePoolTotals() {
   return useQuery({ queryKey: ["poolTotals"], queryFn: fetchPoolTotals, refetchInterval: 8000 });
+}
+
+/** User counts: total / new this week / returning / active 24h. */
+export function useWalletTotals() {
+  return useQuery({ queryKey: ["walletTotals"], queryFn: fetchWalletTotals, refetchInterval: 30000 });
 }
 
 /** The live trade tape — seeded by a query, kept fresh by realtime inserts. */

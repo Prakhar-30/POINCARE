@@ -21,13 +21,13 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
   );
 }
 
-/** Mint 1,000 of each test token straight from the footer. Testnet only. */
+/** Fund the connected wallet with the demo tokens straight from the footer. Testnet only. */
 function FaucetButton() {
   const faucet = useFaucet();
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <button
-        onClick={() => faucet.mint("1000", "1000")}
+        onClick={() => faucet.mint()}
         disabled={faucet.minting}
         className="inline-flex items-center gap-2 font-bold"
         style={{
@@ -44,7 +44,7 @@ function FaucetButton() {
           <TokenIcon sym="USDC" size={16} />
           <span style={{ marginLeft: -5 }}><TokenIcon sym="WETH" size={16} /></span>
         </span>
-        {faucet.minting ? "Minting…" : "Get 1,000 USDC + 1,000 WETH"}
+        {faucet.minting ? "Sending…" : "Get test tokens · 50k USDC + 20 WETH"}
       </button>
       <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".3px", color: "var(--faint)", textTransform: "uppercase" }}>
         Testnet only · test tokens, no value

@@ -2,20 +2,15 @@
 pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
-import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
-import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
-import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IUniswapV4Router04} from "hookmate/interfaces/router/IUniswapV4Router04.sol";
 
 import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomAccounting.sol";
 
-import {PoincareHook} from "../../src/PoincareHook.sol";
-import {BaseTest} from "../utils/BaseTest.sol";
+import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
+import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
 
 /// @title PoincareHandler — randomized actor for the invariant run.
 /// @notice Performs bounded random swaps (exact-in/out, both directions), liquidity adds/removes,
@@ -23,7 +18,9 @@ import {BaseTest} from "../utils/BaseTest.sol";
 ///         purely from its OWN measured token-balance deltas (`expR -= handlerDelta`): since the
 ///         handler is the only mutator during the run, the hook's reserves must always equal this
 ///         independent accounting — that is the solvency / no-leak invariant. It also asserts the
-///         constant-product invariant never decreases on a swap (no value extraction by traders).
+///         curve invariant never decreases on a swap (no value extraction by traders): for the E0
+///         deep base the invariant is the OFFSET product `(x+a)(y+b)` with the offsets in force
+///         during the swap (they only move on liquidity events, never inside a swap).
 contract PoincareHandler is Test {
     using CurrencyLibrary for Currency;
 
@@ -72,24 +69,31 @@ contract PoincareHandler is Test {
         expR1 = uint256(int256(expR1) - (int256(b1After) - int256(b1Before)));
     }
 
+    /// @dev The curve invariant with the CURRENT offsets (constant within a swap).
+    function _k(uint256 a, uint256 b) internal view returns (uint256) {
+        return (expR0 + a) * (expR1 + b);
+    }
+
     function swapExactIn(uint256 amtSeed, bool zeroForOne) public {
         uint256 amt = bound(amtSeed, 1e15, 1e18);
-        uint256 kBefore = expR0 * expR1;
+        (uint256 a, uint256 b) = hook.baseOffsets();
+        uint256 kBefore = _k(a, b);
         (uint256 b0, uint256 b1) = _bal();
         try router.swapExactTokensForTokens(amt, 0, zeroForOne, key, "", address(this), block.timestamp + 1) {
             _settle(b0, b1);
-            assertGe(expR0 * expR1, kBefore, "swap must not decrease the constant-product invariant");
+            assertGe(_k(a, b), kBefore, "swap must not decrease the curve invariant");
         } catch {}
     }
 
     function swapExactOut(uint256 amtSeed, bool zeroForOne) public {
         uint256 amt = bound(amtSeed, 1e15, 5e17);
-        uint256 kBefore = expR0 * expR1;
+        (uint256 a, uint256 b) = hook.baseOffsets();
+        uint256 kBefore = _k(a, b);
         (uint256 b0, uint256 b1) = _bal();
         try router.swapTokensForExactTokens(amt, type(uint256).max, zeroForOne, key, "", address(this), block.timestamp + 1)
         {
             _settle(b0, b1);
-            assertGe(expR0 * expR1, kBefore, "swap must not decrease the constant-product invariant");
+            assertGe(_k(a, b), kBefore, "swap must not decrease the curve invariant");
         } catch {}
     }
 
@@ -121,12 +125,14 @@ contract PoincareHandler is Test {
     }
 }
 
-/// @title PoincareInvariantTest — solvency & bounds across random op sequences (CLAUDE.md §9.3)
+/// @title PoincareInvariantBase — solvency & bounds across random op sequences (CLAUDE.md §9.3)
 /// @notice Drives the hook with random swaps / liquidity / block-rolls and asserts the
 ///         system-level invariants the brief gates "done" on: the hook is always solvent (its
 ///         reserves are fully and exactly explained by the net of all token flows — no leak, no
 ///         value creation), reserves never hit zero, and the detector outputs stay in-bounds.
-contract PoincareInvariantTest is BaseTest {
+///         Run twice: on the plain MVP config and on the full-feature config (deep base + vol
+///         fee + adaptive detector), which exercises the E0 offsets and fee accrual paths.
+abstract contract PoincareInvariantBase is PoincareTestBase {
     using CurrencyLibrary for Currency;
 
     Currency currency0;
@@ -136,38 +142,25 @@ contract PoincareInvariantTest is BaseTest {
     PoincareHandler handler;
 
     uint256 constant WAD = 1e18;
-    int256 constant K = 1e15;
-    int256 constant H = 5e15;
-    int256 constant S_MAX = 2e16;
-    uint256 constant KAPPA_MIN = 0;
-    uint256 constant KAPPA_MAX = 1e17;
-    uint256 constant D_MAX = 5e16;
-    uint256 constant LAMBDA = 9e17;
-    uint256 constant D_FLOOR = 5e17;
+
+    /// @dev The config flavor under test; supplied by the concrete suites below.
+    function _config() internal pure virtual returns (PoincareConfig memory);
 
     function setUp() public {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        address flags = address(
-            uint160(
-                Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-                    | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
-            ) ^ (0x4444 << 144)
-        );
-        bytes memory args = abi.encode(poolManager, K, H, S_MAX, KAPPA_MIN, KAPPA_MAX, D_MAX, LAMBDA, D_FLOOR);
-        deployCodeTo("PoincareHook.sol:PoincareHook", args, flags);
-        hook = PoincareHook(payable(flags));
-
-        poolKey = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
-        poolManager.initialize(poolKey, Constants.SQRT_PRICE_1_1);
+        hook = deployPoincare(_config(), 0x4444);
+        poolKey = initPoincarePool(hook, currency0, currency1);
 
         // Seed the pool from the test contract (these shares stay locked here for the whole run,
         // so total supply never returns to zero).
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(hook), type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(hook), type(uint256).max);
         hook.addLiquidity(
-            BaseCustomAccounting.AddLiquidityParams(100 ether, 100 ether, 0, 0, type(uint256).max, -887220, 887220, bytes32(0))
+            BaseCustomAccounting.AddLiquidityParams(
+                100 ether, 100 ether, 0, 0, type(uint256).max, -887220, 887220, bytes32(0)
+            )
         );
 
         (uint256 r0, uint256 r1) = hook.reserves();
@@ -190,17 +183,36 @@ contract PoincareInvariantTest is BaseTest {
     }
 
     /// @notice The pool can never be fully drained — both reserves stay strictly positive, so
-    ///         pricing and the detector never hit a zero-reserve revert (§4.5).
+    ///         pricing and the detector never hit a zero-reserve revert (§4.5). With the E0
+    ///         deep base this additionally exercises the new output-feasibility guard.
     function invariant_reservesStayPositive() public view {
         (uint256 r0, uint256 r1) = hook.reserves();
         assertGt(r0, 0, "reserve0 > 0");
         assertGt(r1, 0, "reserve1 > 0");
     }
 
-    /// @notice The asymmetry stays within its hard cap and the directional signal stays in [0,1],
-    ///         regardless of the swap/detection sequence (the security & seam bounds, §3, §4.1).
+    /// @notice The asymmetry stays within its hard cap, the directional signal stays in [0,1],
+    ///         and the vol fee respects its cap, regardless of the op sequence (§3, §4.1).
     function invariant_detectorOutputsBounded() public view {
-        assertLe(hook.kappa(), KAPPA_MAX, "kappa <= kappa_max");
+        assertLe(hook.kappa(), hook.kappaMax(), "kappa <= kappa_max");
         assertLe(hook.directionalEfficiency(), WAD, "D <= 1");
+        assertLe(hook.currentFeeWad(), hook.feeCap(), "fee <= fee_cap");
+    }
+}
+
+/// @notice The proven MVP baseline: pure x·y=k base, no fee, absolute-threshold detector.
+contract PoincareInvariantPlainTest is PoincareInvariantBase {
+    function _config() internal pure override returns (PoincareConfig memory) {
+        return defaultConfig();
+    }
+}
+
+/// @notice Full-feature flavor: E0 deep base + vol-scaled fee + v2 adaptive detector.
+contract PoincareInvariantFullTest is PoincareInvariantBase {
+    function _config() internal pure override returns (PoincareConfig memory c) {
+        c = adaptiveConfig();
+        c.alphaWad = 5e17; //  1.5x virtual depth
+        c.feeGamma = 5e17; //  fee = 0.5 * sigma
+        c.feeCap = 1e16; //    capped at 1%
     }
 }

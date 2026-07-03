@@ -1,5 +1,6 @@
 import { encodeAbiParameters, keccak256, parseAbiItem, type PublicClient } from "viem";
-import { CONTRACTS } from "@/config/contracts";
+import { CONTRACTS, TREND, type TrendLabel } from "@/config/contracts";
+import { fromWei, fromWad } from "@/lib/units";
 import type { SwapRow } from "@/lib/db";
 
 /**
@@ -31,8 +32,8 @@ export const POOL_ID = keccak256(
   ),
 ) as `0x${string}`;
 
-/** Block the hook was deployed at — the floor for log paging on Unichain Sepolia. */
-export const HOOK_DEPLOY_BLOCK = 55886685n;
+/** Block the hook was deployed at — the floor for log paging (kept with the addresses). */
+export const HOOK_DEPLOY_BLOCK = CONTRACTS.deployBlock;
 
 /** Window width per getLogs call — under the RPC's 10k-block cap, with margin. */
 export const LOG_RANGE = 9000n;
@@ -58,8 +59,8 @@ export async function fetchHookSwaps(
     const a0 = l.args.amount0 as bigint; // currency0 = USDC
     const a1 = l.args.amount1 as bigint; // currency1 = WETH
     const buy = a0 > 0n; // USDC in -> buying WETH
-    const usdc = Number(buy ? a0 : -a0) / 1e18;
-    const weth = Number(buy ? -a1 : a1) / 1e18;
+    const usdc = fromWei(buy ? a0 : -a0, "USDC");
+    const weth = fromWei(buy ? -a1 : a1, "WETH");
     return {
       tx_hash: l.transactionHash,
       block_number: Number(l.blockNumber),
@@ -80,4 +81,59 @@ export async function fetchHookSwaps(
   });
 
   return rows.reverse(); // getLogs is ascending; we want newest-first
+}
+
+// ---------------------------------------------------------------------------
+// DetectorSample — the hook's per-block detector trace (deployments >= July 2026)
+// ---------------------------------------------------------------------------
+
+export const DETECTOR_SAMPLE_EVENT = parseAbiItem(
+  "event DetectorSample(uint256 blockNumber, uint256 priceWad, int256 r, int256 sPos, int256 sNeg, uint256 dWad, uint256 sigmaWad, uint256 kappaWad, uint8 trend, uint256 feeWad)",
+);
+
+/** One decoded detector sample — the full state of the brain at one block. */
+export type DetectorPoint = {
+  block_number: number;
+  /** UI price, USDC per WETH (the on-chain priceWad is WETH/USDC — inverted here). */
+  price: number;
+  /** Clipped log-return the detector consumed (hook orientation). */
+  r: number;
+  s_pos: number;
+  s_neg: number;
+  d: number;
+  sigma: number;
+  kappa: number;
+  /** UI trend label (hook orientation inverted to match the chart; see TREND). */
+  trend: TrendLabel;
+  fee: number;
+};
+
+/** Fetch + decode DetectorSample logs in [fromBlock, toBlock], ascending by block. */
+export async function fetchDetectorSamples(
+  client: PublicClient,
+  fromBlock: bigint,
+  toBlock: bigint,
+): Promise<DetectorPoint[]> {
+  const logs = await client.getLogs({
+    address: CONTRACTS.hook as `0x${string}`,
+    event: DETECTOR_SAMPLE_EVENT,
+    fromBlock,
+    toBlock,
+  });
+
+  return logs.map((l) => {
+    const priceWad = fromWad(l.args.priceWad as bigint); // WETH per USDC (hook orientation)
+    return {
+      block_number: Number(l.args.blockNumber as bigint),
+      price: priceWad > 0 ? 1 / priceWad : 0,
+      r: fromWad(l.args.r as bigint),
+      s_pos: fromWad(l.args.sPos as bigint),
+      s_neg: fromWad(l.args.sNeg as bigint),
+      d: fromWad(l.args.dWad as bigint),
+      sigma: fromWad(l.args.sigmaWad as bigint),
+      kappa: fromWad(l.args.kappaWad as bigint),
+      trend: TREND[Number(l.args.trend)] ?? "none",
+      fee: fromWad(l.args.feeWad as bigint),
+    };
+  });
 }

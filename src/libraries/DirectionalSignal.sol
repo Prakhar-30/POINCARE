@@ -93,6 +93,20 @@ library DirectionalSignal {
         return efficiency(_abs(self.ewmaNet), self.ewmaTV);
     }
 
+    /// @notice Live per-step volatility estimate σ̂ (WAD): the exponentially-weighted mean
+    ///         absolute return implied by the accumulators.
+    /// @dev `ewmaTV` is the EW *sum* of |r| whose weights total `1/(1-λ/WAD)`; multiplying by
+    ///      `(WAD-λ)/WAD` converts the sum into the weighted *mean* |r|. This is a mean-absolute
+    ///      -deviation volatility proxy (∝ σ for any fixed return shape; the exact Gaussian
+    ///      factor √(2/π) is absorbed by whatever coefficient consumes σ̂, so no correction is
+    ///      applied here). Powers the vol-scaled base fee and the v2 standardized (adaptive)
+    ///      CUSUM increment (README §9.2) — σ̂ is already on-chain, so both come for free.
+    /// @param lambda The SAME decay the accumulators were built with (injected, validated).
+    /// @return sigma σ̂ in WAD. 0 until the first return is folded in (callers floor it).
+    function sigmaWad(State memory self, uint256 lambda) internal pure returns (uint256 sigma) {
+        sigma = FullMath.mulDiv(self.ewmaTV, WAD - lambda, WAD);
+    }
+
     /// @notice Validate the decay parameter. Asserted once at hook construction (§4.3);
     ///         the hot-path `update` skips the check for gas.
     /// @dev `lambda == 0` makes D degenerate (every step looks perfectly trending);

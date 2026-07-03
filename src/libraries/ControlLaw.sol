@@ -72,4 +72,27 @@ library ControlLaw {
     function isValidConfig(Config memory c) internal pure returns (bool) {
         return c.h >= 0 && c.sMax > c.h && c.kappaMax >= c.kappaMin && c.kappaMax < WAD && c.dMax > 0;
     }
+
+    // ------------------------------------------------------------------
+    // Volatility fee law — σ̂ -> bounded base fee (calm-market LP revenue)
+    // ------------------------------------------------------------------
+
+    /// @notice Base fee generated from the live volatility estimate: `min(γ·σ̂, feeCap)`.
+    ///         This is the calm-market revenue lever: the fee NUMBER is never a constant —
+    ///         it is produced each block from the pool's own realized volatility (σ̂ from
+    ///         `DirectionalSignal.sigmaWad`), so it breathes with the market (tightens when
+    ///         dead-calm, widens when turbulent), the classic vol-proportional market-making
+    ///         spread. Distinct from the DIRECTIONAL spread κ: the fee is symmetric (both
+    ///         directions pay it), κ is the trend lever charged to the toxic side only.
+    /// @dev    Monotone in σ̂ and hard-capped, so it inherits κ's safety shape: an attacker
+    ///         pumping σ̂ raises the fee for *themselves* too, and never past `feeCap`. Both
+    ///         `feeGamma` and `feeCap` are injected calibration params (§8), never baked.
+    /// @param sigmaWad  Live volatility estimate σ̂ (WAD).
+    /// @param feeGamma  WAD multiplier on σ̂ (0 disables the fee entirely).
+    /// @param feeCap    Hard cap, a WAD fraction < WAD (the hook validates this).
+    /// @return feeWad   The base fee as a WAD fraction, `min(γ·σ̂/WAD, feeCap)`.
+    function volFee(uint256 sigmaWad, uint256 feeGamma, uint256 feeCap) internal pure returns (uint256 feeWad) {
+        feeWad = FullMath.mulDiv(feeGamma, sigmaWad, WAD);
+        if (feeWad > feeCap) feeWad = feeCap;
+    }
 }

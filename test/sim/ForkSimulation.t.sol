@@ -17,7 +17,7 @@ import {IUniswapV4Router04} from "hookmate/interfaces/router/IUniswapV4Router04.
 import {AddressConstants} from "hookmate/constants/AddressConstants.sol";
 import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomAccounting.sol";
 
-import {PoincareHook} from "../../src/PoincareHook.sol";
+import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {Cusum} from "../../src/libraries/Cusum.sol";
 import {MintableERC20} from "./MintableERC20.sol";
 
@@ -117,9 +117,17 @@ contract ForkSimulationTest is Test {
                     | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             ) ^ (uint160(ns) << 144)
         );
-        bytes memory args =
-            abi.encode(pm, K, H, S_MAX, KAPPA_MIN, kappaMax, D_MAX, LAMBDA, D_FLOOR);
-        deployCodeTo("PoincareHook.sol:PoincareHook", args, flags);
+        PoincareConfig memory cfg;
+        cfg.k = K;
+        cfg.h = H;
+        cfg.sMax = S_MAX;
+        cfg.lambda = LAMBDA;
+        cfg.dFloor = D_FLOOR;
+        cfg.clipWad = 1e18; // inert clip: no per-block move in the sim approaches 100% log-return
+        cfg.kappaMin = KAPPA_MIN;
+        cfg.kappaMax = kappaMax;
+        cfg.dMax = D_MAX;
+        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, cfg), flags);
         h = PoincareHook(payable(flags));
     }
 

@@ -97,7 +97,7 @@ Why this is the right tool, and not a heuristic:
 - **The firing moment is a *stopping time*: data-dependent and unpredictable.** A strong, real trend crosses `h` fast; weak noise never does. There is no fixed "after N blocks" for an attacker to exploit.
 - **It is provably optimal.** CUSUM is asymptotically optimal under **Lorden's minimax criterion**: it minimises the worst-case delay to detect a true change for any given false-alarm rate. That is the best-possible resolution of the "react fast vs don't get fooled" tension.
 
-### 3.4 The hardening: robust / minimax QCD *(roadmap)*
+### 3.4 The hardening: robust / minimax QCD *(clip shipped; full minimax analysis on the roadmap)*
 
 The attacker who tries to fool the detector is itself a studied problem. **Minimax-robust QCD** designs the test against worst-case (least-favourable) distributions, and the **covert-adversary-vs-CUSUM** results let us *quantify* how costly it is to delay or trigger the detector.
 
@@ -370,13 +370,24 @@ never hurts** (LVR ≤ control throughout, asserted). With params merely sensibl
 `FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol` →
 `python analysis/simulation/plot_realdata.py`.
 
-### 9.2 v2: a self-normalizing, self-calibrating detector
+### 9.2 v2: a self-normalizing, self-calibrating detector *(now implemented as a deploy-time mode)*
 
-That last sentence ("calibration would raise the captured fraction") points straight at the most
-promising upgrade. In the shipped MVP the detector parameters (`k` slack, `h` threshold, …) are
-**fixed at deploy**: calibrated, but static, so a structural change in the pair's volatility
-eventually makes them stale. The **v2 variant** makes the *detection* thresholds **adapt to the
-market automatically**, with no governance and no parameter writes:
+> **Status (2026-07): built, tested, backtested.** The hook takes an `adaptive` flag: when set,
+> the CUSUM consumes the standardized increment `r_t/σ̂_t` (σ̂ from the on-chain `ewmaTV`), with
+> `k, h, sMax` expressed in σ-units and a `sigmaFloor` guard, plus an always-on Huber clip
+> (`clipWad`) that bounds any single block's influence. On the same synthetic backtest path the
+> adaptive detector cuts LVR **29.6%** vs constant-product — versus 14.3% for the absolute mode —
+> **with no absolute-scale calibration at all** (the self-calibration claim, demonstrated). The
+> σ-inflation attack is simulated end-to-end (`test/manipulation/`): whipsawing σ̂ up burns value
+> every block and the blindness decays with λ. What remains open before `adaptive = true` carries
+> real value is the *quantitative* worst-case bound below (OPEN_ITEMS V1); the live testnet demo
+> deploys the proven absolute mode.
+
+The original design rationale, kept for context. In the absolute mode the detector parameters
+(`k` slack, `h` threshold, …) are **fixed at deploy**: calibrated, but static, so a structural
+change in the pair's volatility eventually makes them stale. The **v2 variant** makes the
+*detection* thresholds **adapt to the market automatically**, with no governance and no
+parameter writes:
 
 - Express the slack and threshold in **units of the running volatility σ** rather than in absolute
   log-return units (e.g. `k ≈ 0.5σ`, `h ≈ 5σ`) and feed the CUSUM the **standardized increment**
@@ -401,19 +412,19 @@ validate it.
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 91 passing Foundry tests (unit, fuzz, invariant/solvency over 384k ops, end-to-end manipulation sims, gas). The items below are what remains to go from MVP to production.
+> **Status:** the MVP described above is **built and green**, 118 passing Foundry tests (unit,
+> fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
+> end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas). The items below
+> are what remains to go from MVP to production.
 
-**Built (MVP):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens; and the full Foundry suite (fuzz, invariant/solvency, end-to-end manipulation sims, gas).
+**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; and the full Foundry suite.
 
 **Next, to production:**
 
 1. **Real-data calibration:** replay a historical series for the target pair to pin `k, h (ARL₀), window, κ_max`; the engine is already data-ready.
-2. **v2 self-calibrating detector (§9.2):** express `k, h` in units of the running volatility σ
-   (already tracked on-chain via `DirectionalSignal.ewmaTV`) so the detection thresholds adapt to
-   the market automatically, with no governance; fold in the robust / heavy-tailed increment (§3.4)
-   for crypto's fat tails. Security params (`κ_max, Δκ_max`) stay fixed; needs its own
-   manipulation-cost bound before shipping.
+2. **Adaptive-mode manipulation bound (OPEN_ITEMS V1):** the v2 detector is implemented and
+   simulated against σ-inflation, but the quantitative worst-case bound must be derived before
+   `adaptive = true` guards real value. Security params (`κ_max, Δκ_max`) stay fixed by design.
 3. **Depth / curvature lever** (the §3.1 offset design), *only* once the manipulation-cost sizing that keeps it arb-safe is derived; the spread lever ships first because it is safe by construction.
-4. **Deep, stableswap-like base curve** option (the engine already supports virtual offsets).
-5. **Router / aggregator integration** through the Lens, plus native-ETH and multi-pool coverage.
-6. **External security audit** before mainnet.
+4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
+5. **External security audit** before mainnet.

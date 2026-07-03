@@ -251,4 +251,104 @@ contract AsymmetricCurveTest is Test {
 
         assertLe(back0, amountIn, "mirror spread round trip must never profit");
     }
+
+    // ---------------------------------------------------------------------
+    // full pricing pipeline: vol fee + curve + spread (the hook/Lens shared path)
+    // ---------------------------------------------------------------------
+
+    function test_priced_zeroFeeZeroSpread_equalsBase() public pure {
+        uint256 base = AsymmetricCurve.swapExactIn(100e18, 100e18, 0, 0, 10e18, true);
+        (uint256 out, uint256 feeAmt) = AsymmetricCurve.swapExactInPriced(100e18, 100e18, 0, 0, 10e18, true, 0, 0);
+        assertEq(out, base, "no fee, no spread -> the base swap");
+        assertEq(feeAmt, 0, "no fee charged");
+    }
+
+    function test_priced_feeChargedOnInputSide() public pure {
+        // 1% fee on a 10-token input: exactly 0.1 token withheld, output priced on 9.9.
+        (uint256 out, uint256 feeAmt) = AsymmetricCurve.swapExactInPriced(100e18, 100e18, 0, 0, 10e18, true, 0, 1e16);
+        assertEq(feeAmt, 1e17, "fee = ceil(amountIn * feeWad)");
+        assertEq(out, AsymmetricCurve.swapExactIn(100e18, 100e18, 0, 0, 10e18 - 1e17, true), "output priced on the net input");
+    }
+
+    function test_priced_exactOut_feeSplitConsistent() public pure {
+        (uint256 amountIn, uint256 feeAmt) =
+            AsymmetricCurve.swapExactOutPriced(100e18, 100e18, 0, 0, 5e18, true, 1e17, 1e16);
+        uint256 baseIn = AsymmetricCurve.swapExactOutWithSpread(100e18, 100e18, 0, 0, 5e18, true, 1e17);
+        assertEq(amountIn - feeAmt, baseIn, "total input = curve+spread input + the fee on top");
+        assertGt(feeAmt, 0, "fee charged");
+    }
+
+    function test_priced_rejectsOutputBeyondRealReserve() public {
+        // Deep base: virtual reserve 200 but the pool holds only 100 token1. The formula would
+        // quote outputs past 100 — the pipeline must reject them (A7 extended to exact-in).
+        // (External self-calls so expectRevert can observe the library revert.)
+        vm.expectRevert(bytes("AsymmetricCurve: output exceeds reserve"));
+        this.pricedInExternal(100e18, 100e18, 100e18, 100e18, 500e18, true, 0, 0);
+
+        vm.expectRevert(bytes("AsymmetricCurve: output exceeds reserve"));
+        this.pricedOutExternal(100e18, 100e18, 100e18, 100e18, 100e18, true, 0, 0);
+    }
+
+    /// @dev expectRevert helpers: internal library calls happen at the test's own depth, so
+    ///      they must be routed through an external call to be observable.
+    function pricedInExternal(uint256 x, uint256 y, uint256 a, uint256 b, uint256 amt, bool zfo, uint256 s, uint256 f)
+        external
+        pure
+        returns (uint256 out, uint256 fee)
+    {
+        return AsymmetricCurve.swapExactInPriced(x, y, a, b, amt, zfo, s, f);
+    }
+
+    function pricedOutExternal(uint256 x, uint256 y, uint256 a, uint256 b, uint256 amt, bool zfo, uint256 s, uint256 f)
+        external
+        pure
+        returns (uint256 amtIn, uint256 fee)
+    {
+        return AsymmetricCurve.swapExactOutPriced(x, y, a, b, amt, zfo, s, f);
+    }
+
+    /// @notice Fee + spread are BOTH non-negative haircuts on the same symmetric base, so the
+    ///         priced round trip inherits the no-profit guarantee for any fee/spread combo.
+    function testFuzz_pricedRoundTrip_neverProfits(
+        uint256 x,
+        uint256 y,
+        uint256 a,
+        uint256 b,
+        uint256 amountIn,
+        uint256 spread,
+        uint256 fee
+    ) public pure {
+        x = bound(x, 1e15, MAX);
+        y = bound(y, 1e15, MAX);
+        a = bound(a, 0, MAX);
+        b = bound(b, 0, MAX);
+        amountIn = bound(amountIn, 1e6, x / 2);
+        spread = bound(spread, 0, 9e17);
+        fee = bound(fee, 0, 1e17); // up to a 10% fee, far past any sane cap
+
+        // Leg 1 — sell token0 (fee + possible spread). Skip infeasible draws (deep-base
+        // trades whose output would exceed the real reserve — the guard's job, tested above).
+        (uint256 got1, bool ok1) = _feasiblePricedIn(x, y, a, b, amountIn, true, spread, fee);
+        vm.assume(ok1 && got1 > 0);
+
+        // The pool keeps the WHOLE input (fee included) and pays out got1.
+        // Leg 2 — buy back with everything received.
+        (uint256 back0, bool ok2) = _feasiblePricedIn(x + amountIn, y - got1, a, b, got1, false, spread, fee);
+        vm.assume(ok2);
+
+        assertLe(back0, amountIn, "priced round trip must never profit");
+    }
+
+    /// @dev Priced exact-in that reports infeasible trades instead of reverting, so the fuzz
+    ///      explores only the trades the hook would accept. Feasibility is checked against the
+    ///      LARGEST possible output (no fee, no spread) — if that fits, the priced one does.
+    function _feasiblePricedIn(uint256 x, uint256 y, uint256 a, uint256 b, uint256 amt, bool zfo, uint256 spread, uint256 fee)
+        private
+        pure
+        returns (uint256 out, bool ok)
+    {
+        if (AsymmetricCurve.swapExactIn(x, y, a, b, amt, zfo) >= (zfo ? y : x)) return (0, false);
+        (out,) = AsymmetricCurve.swapExactInPriced(x, y, a, b, amt, zfo, spread, fee);
+        ok = true;
+    }
 }

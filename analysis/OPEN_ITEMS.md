@@ -7,6 +7,32 @@ Status keys: 🔴 blocking-for-MVP · 🟠 must-resolve-before-deploy · 🟡 tr
 Last full review: through M8 (hardening) + fork simulations (synthetic + real ETH/USDC) + an
 item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 kept for external audit).
 
+**2026-07 feature pass** (suite now 118 tests, 0 failures; invariants run in TWO flavors —
+plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k calls each, 0 reverts):
+- **E0 shipped**: deep symmetric base via SUPPLY-SCALED virtual offsets (see E0 below for why the
+  two obvious parameterisations are unsafe). Output-feasibility guards added for both swap kinds.
+- **E2 shipped**: always-on Huber clip on the detector increment (`clipWad`, injected).
+- **v2 adaptive detector shipped** as a deploy-time mode (`adaptive`): CUSUM increments
+  standardized by the live σ̂ (from `ewmaTV`), `k/h/sMax` in σ-units, `sigmaFloor` guard.
+  Backtest: −29.6% LVR vs CPMM on the synthetic path (vs −14.3% for the absolute mode) with NO
+  absolute-scale calibration. σ-inflation attack simulated in `Manipulation.t.sol` (costs value
+  every block; blindness decays with λ). The full §9.2 manipulation-cost bound for production
+  remains open — see V1 below.
+- **Vol-scaled base fee** (`feeGamma`, `feeCap`): `fee = min(γ·σ̂, cap)`, charged input-side in
+  pricing (accrues to reserves/LPs), reported via `_getSwapFeeAmount` for the HookSwap event.
+  Calm-market LP revenue generated from data, never a constant.
+- **Detector exposure**: `DetectorSample` event (one per sampled block: price, r, S⁺/S⁻, D, σ̂,
+  κ, trend, fee), `cusumState`/`signalState`/`sigmaWad`/`currentFeeWad`/`baseOffsets` views.
+- **Projection architecture**: detector logic lives in the view `_projectDetector`; the swap
+  path persists it, `previewSpread`/`previewDetector` expose it, and the Lens quotes through it —
+  quotes now match execution to the wei even in a FRESH block (proven in `PoincareLens.t.sol`).
+- **G8 resolved**: detector state packed 8 slots → 4; per-block overhead ~120k → ~96k gas
+  (including the new event + fee law).
+- **Native-ETH pairs covered**: `PoincareNativeEth.t.sol` (seed with msg.value + refund, swaps
+  both directions, Lens parity, removal pays ETH).
+- **Config struct**: constructor takes `PoincareConfig`; all new params injected + validated.
+- Template leftovers (`Counter` test/scripts) removed; build compiles clean from a fresh clone.
+
 ---
 
 ## A. Security
@@ -56,9 +82,29 @@ item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 k
 
 ## E. Deferred features (post-MVP-core or pending analysis)
 
-- **E0. Deep "stableswap-like" calm base (§2.1).** The brief wants both sides to use *large* offsets in calm regimes (deep, low-impact, stableswap-like), with the asymmetry layered on top. The MVP passes `a=b=0` to the curve (plain `x·y=k`) as the base, so calm trading is constant-product, not deep. The curve library already supports offsets (`swapExactIn(x,y,a,b,…)`); wiring a non-zero calm base is a config/parameterisation change, not new math. Deferred, since it is orthogonal to the detector (the novel part) and to arb-safety. The Lens (M7) mirrors the same `a=b=0` base so quotes match.
+- **E0. Deep "stableswap-like" calm base (§2.1).** ✅ **Shipped (2026-07)** via `alphaWad`:
+  offsets are anchored at the first deposit (`a₀ = α·r0_seed, b₀ = α·r1_seed`) and thereafter
+  scale ONLY with the LP share supply. Why this exact parameterisation, recorded so it is never
+  "simplified" away:
+  * offsets ∝ CURRENT reserves recomputed per swap are round-trip **drainable** (at α = 1 a
+    100/100 pool is emptied in two swaps — the re-anchoring shifts the mid);
+  * FIXED absolute offsets shift the mid on every ratio deposit/withdrawal (free arb per LP op);
+  * supply-scaled offsets are constant within/between swaps (one fixed curve, K conserved, no
+    seam) and scale homothetically with ratio liquidity ops (mid preserved EXACTLY — asserted).
+  New feasibility guards reject outputs ≥ the REAL reserve (the virtual reserve is larger, A7
+  extended to exact-in). Covered by unit + fuzz + the full-feature invariant flavor. The Lens
+  reads `baseOffsets()` live, so quotes keep matching.
 - **E1. Curvature / depth-asymmetry lever (§3.1, §10).** The brief's headline lever (small vs large offsets) is arb-unsafe alone (A2). Deploying it safely needs the manipulation-cost sizing (A4) to bound the depth-arb with a dominating spread. Deferred until §4.2 analysis exists. Current MVP uses the spread lever, which is safe and still implements the bid-ask asymmetry.
-- **E2. Robust / heavy-tailed CUSUM increment (§1.4).** Only the Gaussian-form increment exists. Add a Huberised/clipped variant behind the same interface.
+- **E2. Robust / heavy-tailed CUSUM increment (§1.4).** ✅ **Shipped (2026-07)**: an always-on
+  Huber clip (`clipWad`, injected; absolute units in fixed mode, σ-units in adaptive mode) bounds
+  any single block's influence on the signal, σ̂ AND the evidence. Doubles as the σ-inflation
+  guard for the adaptive mode (σ̂ can grow at most a clip-bounded factor per block).
+- **V1. Adaptive-mode (v2) manipulation-cost bound (README §9.2).** 🟠 The adaptive detector is
+  implemented, tested (incl. the σ-inflation sim) and backtested, but the *quantitative*
+  worst-case bound for σ-driven attacks (inflate-to-blind / suppress-to-trigger) has not been
+  derived analytically. Fine for the testnet demo (which deploys the absolute mode); required
+  before deploying `adaptive = true` with real value. Guards in place: `sigmaFloor` (suppression),
+  clip (per-block inflation rate), once-per-block sampling, D-gate, absolute κ/fee caps.
 - **E3. ~~Lens/Quoter (§5, M7)~~ ✅, ~~back-test harness (§6, M6)~~ ✅, invariant suite (§9.3), gas profiling (§9.6).**
   Lens DONE: `src/PoincareLens.sol` + `test/PoincareLens.t.sol` (8 tests). Reads reserves + the
   directional spread (`hook.effectiveSpread`) from the hook and runs the SAME `AsymmetricCurve`
@@ -79,7 +125,7 @@ item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 k
 | G3 | **Defense-in-depth on config-derived inputs.** `Cusum.updateCapped` assumes `sMax ≥ 0`; `AsymmetricCurve.*WithSpread` assume `spreadWad < WAD` (else underflow / div-by-zero → revert, violating §4.5). No in-function guards, since both rely on upstream `isValidConfig` (`sMax = ControlLaw.sMax > h ≥ 0`; `spreadWad = κ ≤ κ_max < WAD`). | low | Documented as a hard convention (added to D-list, D6). Kept guard-free for gas; the hook MUST source these from validated config. |
 | G4 | **No security breach in the pure libraries.** K-invariant (never decreases), arb-safe spread (round-trip never profits, now tested both directions), bounded EWMA (`|net| ≤ tv` preserved under flooring), validated configs, all hold. The real risks are **system-level** (A1 single-block manipulation, A3/A4 manipulation sizing) and surface only once the hook assembles the parts. | n/a | Tracked in §A; gated on M5/M8. |
 | G5 | ~~**All libraries are proven in ISOLATION; zero integration tests.**~~ | ✅ resolved (M8) | Integration coverage now: hook (M5), Lens quote-match (M7), and the invariant suite (`test/invariant/`, 384k randomized ops, solvency + bounds). |
-| G8 | **Per-block detector gas ~120k (warm), not "trivial."** Dominated by ~8 cold storage writes (`_cusum` 2 slots, `_signal` 2 slots, `kappa`, `trend`, `lastSampled*`) + `lnWad`. Measured in `test/Gas.t.sol`. | low / optimization | Paid ONCE per block (first swapper), not per swap, and within the 400k budget. Future optimization: pack `sPos/sNeg` (int128 each) into one slot, and `kappa`/`trend`/`lastSampledBlock` into another, to cut writes. Not MVP-blocking. |
+| G8 | ~~**Per-block detector gas ~120k (warm).**~~ | ✅ resolved (2026-07) | Detector state packed 8 slots → 4 (`sPos/sNeg` int128 pair; `ewmaNet/ewmaTV` int128/uint128 pair; `kappa` uint64 + `trend` + `lastSampledBlock` uint64 in one slot). Downcast safety: `sMax ≤ int128.max` enforced at construction; EWMA bound `|r| ≤ ~94e18` (lnWad domain, G2) × `WAD/(WAD−λ)` stays under int128.max for every valid λ. Measured ~96k/block warm INCLUDING the new `DetectorSample` event + fee law (`test/Gas.t.sol`). |
 | G6 | **Stale trend label during a reversal.** `trend = dir` was assigned every sample, even when evidence was gated off (chop / D below floor) while `κ` was still ramping down from a prior episode, a noise-driven flip of the dominant statistic could briefly harden the wrong side. | low | ✅ **Fixed** (M6 review): `trend` is now re-labelled only when `gatedEvidence > 0`, so the label always matches the side κ was built for; once κ reaches 0 the label is irrelevant. Arb-safe either way (non-negative haircut), so this was a market-quality nit, not a solvency bug. |
 | G7 | **Dead code sweep (M6 review).** `Cusum.reset()` was unused in `src` and `test` (the reset-on-fire path is inside `step()`; the hook ends episodes via the D-gate ramp-down, not an explicit reset). | cleanup | ✅ **Removed.** Kept (test-only / reserved): `Cusum.step`/`alarm`/uncapped `update` (reset-on-fire + back-test paths), `marginalPriceWad` (reserved for the Lens, M7), `PriceLib.logReturnFromReserves` (back-test). All exercised by the M6 harness or M7. |
 

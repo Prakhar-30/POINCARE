@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { parseUnits } from "viem";
-import { CONTRACTS, ERC20_ABI, EXPLORER, POOL_KEY, ROUTER_ABI } from "@/config/contracts";
+import { CONTRACTS, ERC20_ABI, EXPLORER, FAUCET_ABI, POOL_KEY, ROUTER_ABI, hasFaucet } from "@/config/contracts";
 import { recordSwap } from "@/lib/db";
-import { resolveGas, GAS } from "@/lib/gas";
+import { resolveGas, GAS, nextNonce } from "@/lib/gas";
 import { humanizeError } from "@/lib/errors";
+import { fromWei, legsOf, toWei } from "@/lib/units";
 import { useStepper } from "@/hooks/useStepper";
 import { useToast } from "@/components/ui/Toast";
 import { fmtNum } from "@/lib/format";
-import type { Quote } from "@/lib/curve";
+import type { TradeQuote } from "@/hooks/useQuote";
 
 export type SwapStatus = "idle" | "busy" | "success" | "error";
 
@@ -22,16 +22,15 @@ export function useSwap() {
   const toast = useToast();
   const [status, setStatus] = useState<SwapStatus>("idle");
 
-  async function swap(params: { amountIn: string; zeroForOne: boolean; minOut: number; quote: Quote }) {
+  async function swap(params: { amountIn: string; zeroForOne: boolean; minOutWei: bigint; quote: TradeQuote }) {
     if (!address || !walletClient || !publicClient) return;
-    const { amountIn, zeroForOne, minOut, quote } = params;
-    const sellSym = zeroForOne ? "USDC" : "WETH";
-    const buySym = zeroForOne ? "WETH" : "USDC";
+    const { amountIn, zeroForOne, minOutWei, quote } = params;
+    const { inSym, outSym } = legsOf(zeroForOne);
     const tokenIn = (zeroForOne ? CONTRACTS.usdc : CONTRACTS.weth) as `0x${string}`;
     const tokenOut = (zeroForOne ? CONTRACTS.weth : CONTRACTS.usdc) as `0x${string}`;
     const router = CONTRACTS.router as `0x${string}`;
-    const amountInWei = parseUnits(amountIn, 18);
-    const minOutWei = parseUnits(minOut.toFixed(18), 18);
+    const amountInWei = toWei(amountIn, inSym);
+    const outDp = outSym === "WETH" ? 5 : 2;
 
     let current = "swap";
     try {
@@ -39,9 +38,11 @@ export function useSwap() {
       const allowance = (await publicClient.readContract({ ...erc20(tokenIn), functionName: "allowance", args: [address, router] })) as bigint;
       const needApprove = allowance < amountInWei;
 
+      // The step labels double as the trade preview (pay / receive amounts): the wallet's
+      // own simulation is unreliable on this chain, so the app states the numbers itself.
       stepper.begin([
-        ...(needApprove ? [{ key: "approve", label: `Approve ${sellSym}` }] : []),
-        { key: "swap", label: `Swap ${sellSym} for ${buySym}` },
+        ...(needApprove ? [{ key: "approve", label: `Approve ${fmtNum(Number(amountIn), 2)} ${inSym}` }] : []),
+        { key: "swap", label: `Pay ${fmtNum(Number(amountIn), 2)} ${inSym} · receive ≥ ${fmtNum(fromWei(minOutWei, outSym), outDp)} ${outSym}` },
       ]);
       setStatus("busy");
 
@@ -50,14 +51,15 @@ export function useSwap() {
         current = "approve";
         stepper.activate("approve");
         const gas = await resolveGas(publicClient, { ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], account: address }, GAS.approve);
-        const aHash = await walletClient.writeContract({ ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], gas });
+        const aHash = await walletClient.writeContract({ ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], gas, nonce: await nextNonce(publicClient, address) });
         await publicClient.waitForTransactionReceipt({ hash: aHash });
         stepper.complete("approve");
       }
 
       const balBefore = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
 
-      // 2. swap through the v4 router (the hook prices it with the live directional spread)
+      // 2. swap through the v4 router (the hook prices it with the live directional spread).
+      //    minOut is wei-exact from the Lens quote, so slippage protection is real.
       current = "swap";
       stepper.activate("swap");
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
@@ -67,14 +69,14 @@ export function useSwap() {
         { address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, account: address },
         GAS.swap,
       );
-      const hash = await walletClient.writeContract({ address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, gas });
+      const hash = await walletClient.writeContract({ address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, gas, nonce: await nextNonce(publicClient, address) });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       stepper.complete("swap");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 
       const balAfter = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
-      const actualOut = Number(balAfter - balBefore) / 1e18;
-      const amtIn = Number(amountInWei) / 1e18;
+      const actualOut = fromWei(balAfter - balBefore, outSym);
+      const amtIn = fromWei(amountInWei, inSym);
       // executed USDC/WETH price from the legs (always finite & positive); fall back to the quote
       const execPrice =
         actualOut > 0
@@ -104,7 +106,7 @@ export function useSwap() {
 
       setStatus("success");
       const outShown = actualOut > 0 ? actualOut : quote.out;
-      toast.success("Swap confirmed", `${fmtNum(amtIn, 2)} ${sellSym} for ${fmtNum(outShown, buySym === "WETH" ? 5 : 2)} ${buySym}`, `${EXPLORER}/tx/${hash}`);
+      toast.success("Swap confirmed", `${fmtNum(amtIn, 2)} ${inSym} for ${fmtNum(outShown, outDp)} ${outSym}`, `${EXPLORER}/tx/${hash}`);
       return hash;
     } catch (e) {
       const msg = humanizeError(e);
@@ -117,7 +119,8 @@ export function useSwap() {
   return { swap, status, stepper, reset: () => setStatus("idle") };
 }
 
-/** Free-mint the demo tokens so a fresh wallet can trade. */
+/** Fund a fresh wallet with the demo tokens. One `drip` transaction when the faucet
+ *  contract is deployed; otherwise falls back to two sequential mints (older deployment). */
 export function useFaucet() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -125,32 +128,42 @@ export function useFaucet() {
   const toast = useToast();
   const [minting, setMinting] = useState(false);
 
-  async function mint(usdcAmt = "50000", wethAmt = "20") {
+  const USDC_AMT = "50000";
+  const WETH_AMT = "20";
+
+  async function mint() {
     if (!address || !walletClient || !publicClient) {
-      toast.error("Connect a wallet", "Connect your wallet to mint test tokens.");
+      toast.error("Connect a wallet", "Connect your wallet to get test tokens.");
       return;
     }
     setMinting(true);
     try {
-      const usdc = erc20(CONTRACTS.usdc as `0x${string}`);
-      const weth = erc20(CONTRACTS.weth as `0x${string}`);
-      const usdcWei = parseUnits(usdcAmt, 18);
-      const wethWei = parseUnits(wethAmt, 18);
+      if (hasFaucet) {
+        // One transaction, one wallet confirmation: the faucet mints both tokens.
+        const faucet = CONTRACTS.faucet as `0x${string}`;
+        const gas = await resolveGas(publicClient, { address: faucet, abi: FAUCET_ABI, functionName: "drip", args: [address], account: address }, GAS.mint * 2n);
+        const hash = await walletClient.writeContract({ address: faucet, abi: FAUCET_ABI, functionName: "drip", args: [address], gas, nonce: await nextNonce(publicClient, address) });
+        await publicClient.waitForTransactionReceipt({ hash });
+      } else {
+        // Older deployment: two mints, strictly sequential, each with the PENDING nonce
+        // pinned from the node — MetaMask's own nonce cache goes stale on this chain and
+        // rejects the second tx even after an activity-tab reset (see nextNonce).
+        const usdc = erc20(CONTRACTS.usdc as `0x${string}`);
+        const weth = erc20(CONTRACTS.weth as `0x${string}`);
+        const usdcWei = toWei(USDC_AMT, "USDC");
+        const wethWei = toWei(WETH_AMT, "WETH");
 
-      // Sequential, one at a time: minting both back-to-back makes the wallet reuse the
-      // same nonce (it hasn't seen the first tx mined yet) -> "nonce" revert. Mint USDC,
-      // wait for it to confirm, then mint WETH.
-      const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, usdcWei], account: address }, GAS.mint);
-      const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, usdcWei], gas: g1 });
-      await publicClient.waitForTransactionReceipt({ hash: h1 });
+        const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, usdcWei], account: address }, GAS.mint);
+        const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, usdcWei], gas: g1, nonce: await nextNonce(publicClient, address) });
+        await publicClient.waitForTransactionReceipt({ hash: h1 });
 
-      const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, wethWei], account: address }, GAS.mint);
-      const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, wethWei], gas: g2 });
-      await publicClient.waitForTransactionReceipt({ hash: h2 });
-
-      toast.success("Test tokens minted", `${fmtNum(Number(usdcAmt))} USDC and ${fmtNum(Number(wethAmt))} WETH added to your wallet`);
+        const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, wethWei], account: address }, GAS.mint);
+        const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, wethWei], gas: g2, nonce: await nextNonce(publicClient, address) });
+        await publicClient.waitForTransactionReceipt({ hash: h2 });
+      }
+      toast.success("Test tokens received", `${fmtNum(Number(USDC_AMT))} USDC and ${fmtNum(Number(WETH_AMT))} WETH added to your wallet`);
     } catch (e) {
-      toast.error("Mint failed", humanizeError(e));
+      toast.error("Faucet failed", humanizeError(e));
     } finally {
       setMinting(false);
     }

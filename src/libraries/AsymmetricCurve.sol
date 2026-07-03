@@ -144,4 +144,67 @@ library AsymmetricCurve {
         uint256 baseIn = swapExactOut(x, y, a, b, amountOut, zeroForOne);
         amountIn = FullMath.mulDivRoundingUp(baseIn, WAD, WAD - spreadWad);
     }
+
+    // ------------------------------------------------------------------
+    // Full pricing composition — vol fee + curve + directional spread
+    // ------------------------------------------------------------------
+    //
+    // The ONE pricing pipeline both the hook's swap path and the Lens quote through, so the
+    // two can never drift (CLAUDE.md §5 "cannot diverge"). Composition, exact-in:
+    //
+    //   feeAmount = ceil(amountIn · fee)              (vol fee, charged on the INPUT side so
+    //   effIn     = amountIn − feeAmount               the HookSwap event's "fee paid in the
+    //   amountOut = curve(effIn) · (1 − spread)        input currency" convention holds)
+    //
+    // and the exact-out inverse. The fee amount stays in the pool's reserves, so it accrues
+    // pro-rata to LP shares with no extra accounting. Both haircuts round against the trader
+    // (D5): fee rounds UP, curve output rounds DOWN, exact-out input rounds UP.
+    //
+    // ARB-SAFETY is inherited: fee and spread are non-negative haircuts on the SAME symmetric
+    // base, so they can only make a round trip strictly worse for the trader.
+    //
+    // FEASIBILITY (E0): with a deep base (b > 0) the curve formula can quote an output that
+    // exceeds the REAL reserve (the virtual reserve Y = y + b is larger than y). That trade
+    // cannot settle, so it is rejected here against the real reserve — the same "cannot buy
+    // more than the pool holds" boundary as exact-out (OPEN_ITEMS A7), now enforced for both
+    // swap kinds. Strict `<` keeps reserves > 0 (A5). Unreachable when a = b = 0.
+
+    /// @notice Exact-input swap through the full pipeline: vol fee, offset curve, spread.
+    /// @param feeWad Symmetric vol fee fraction in [0, WAD) (validated upstream, D6).
+    /// @return amountOut Output after fee + spread, rounded against the trader.
+    /// @return feeAmount The fee charged, in the INPUT currency (event reporting).
+    function swapExactInPriced(
+        uint256 x,
+        uint256 y,
+        uint256 a,
+        uint256 b,
+        uint256 amountIn,
+        bool zeroForOne,
+        uint256 spreadWad,
+        uint256 feeWad
+    ) internal pure returns (uint256 amountOut, uint256 feeAmount) {
+        feeAmount = FullMath.mulDivRoundingUp(amountIn, feeWad, WAD);
+        amountOut = swapExactInWithSpread(x, y, a, b, amountIn - feeAmount, zeroForOne, spreadWad);
+        require(amountOut < (zeroForOne ? y : x), "AsymmetricCurve: output exceeds reserve");
+    }
+
+    /// @notice Exact-output swap through the full pipeline: vol fee, offset curve, spread.
+    /// @param feeWad Symmetric vol fee fraction in [0, WAD) (validated upstream, D6).
+    /// @return amountIn Total input including fee + spread, rounded against the trader.
+    /// @return feeAmount The fee charged, in the INPUT currency (event reporting).
+    function swapExactOutPriced(
+        uint256 x,
+        uint256 y,
+        uint256 a,
+        uint256 b,
+        uint256 amountOut,
+        bool zeroForOne,
+        uint256 spreadWad,
+        uint256 feeWad
+    ) internal pure returns (uint256 amountIn, uint256 feeAmount) {
+        require(amountOut < (zeroForOne ? y : x), "AsymmetricCurve: output exceeds reserve");
+        uint256 baseIn = swapExactOutWithSpread(x, y, a, b, amountOut, zeroForOne, spreadWad);
+        amountIn = FullMath.mulDivRoundingUp(baseIn, WAD, WAD - feeWad);
+        feeAmount = amountIn - baseIn;
+    }
 }

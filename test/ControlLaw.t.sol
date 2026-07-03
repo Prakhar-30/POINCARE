@@ -122,4 +122,27 @@ contract ControlLawTest is Test {
         bad.kappaMax = 2e17;
         assertFalse(ControlLaw.isValidConfig(bad), "kappa_max must be >= kappa_min");
     }
+
+    // ---------------------------------------------------------------------
+    // vol fee law — σ̂ -> bounded base fee
+    // ---------------------------------------------------------------------
+
+    function test_volFee_zeroWithoutVolOrGamma() public pure {
+        assertEq(ControlLaw.volFee(0, 5e17, 1e16), 0, "no realized vol -> no fee");
+        assertEq(ControlLaw.volFee(1e16, 0, 1e16), 0, "gamma 0 disables the fee");
+    }
+
+    function test_volFee_proportionalThenCapped() public pure {
+        // gamma = 0.5: sigma of 0.4% -> fee 0.2%; sigma of 10% -> capped at 1%.
+        assertEq(ControlLaw.volFee(4e15, 5e17, 1e16), 2e15, "fee = gamma * sigma below the cap");
+        assertEq(ControlLaw.volFee(1e17, 5e17, 1e16), 1e16, "fee saturates at the cap");
+    }
+
+    function testFuzz_volFee_boundedAndMonotone(uint256 sigma, uint256 sigmaMore) public pure {
+        sigma = bound(sigma, 0, 1e20);
+        sigmaMore = bound(sigmaMore, sigma, 1e20);
+        uint256 fee = ControlLaw.volFee(sigma, 5e17, 1e16);
+        assertLe(fee, 1e16, "fee never exceeds the cap");
+        assertLe(fee, ControlLaw.volFee(sigmaMore, 5e17, 1e16), "fee is monotone in sigma");
+    }
 }

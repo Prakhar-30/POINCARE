@@ -127,6 +127,36 @@ contract DirectionalSignalTest is Test {
         assertFalse(DirectionalSignal.isValidConfig(WAD + 1), "lambda > WAD is invalid");
     }
 
+    // ---------------------------------------------------------------------
+    // σ̂ — the live volatility estimate (powers the vol fee and adaptive CUSUM)
+    // ---------------------------------------------------------------------
+
+    function test_sigma_steadyState_equalsMeanAbsReturn() public pure {
+        // Feeding a constant |r| forever drives ewmaTV to |r|·N (N = effective window), so
+        // σ̂ = ewmaTV·(1-λ) must converge to exactly the per-step |r| — the interpretable
+        // anchor tying the estimate to "the typical per-block move".
+        DirectionalSignal.State memory s;
+        for (uint256 i = 0; i < 400; i++) {
+            s = s.update(i % 2 == 0 ? R : -R, LAMBDA); // sign-free: σ̂ sees magnitudes
+        }
+        assertApproxEqRel(s.sigmaWad(LAMBDA), uint256(R), 1e12, "sigma converges to the constant |r|");
+    }
+
+    function test_sigma_zeroBeforeAnyReturn_decaysAfterCalm() public pure {
+        DirectionalSignal.State memory s;
+        assertEq(s.sigmaWad(LAMBDA), 0, "no data -> no estimate");
+
+        s = s.update(R, LAMBDA);
+        uint256 sigmaActive = s.sigmaWad(LAMBDA);
+        assertGt(sigmaActive, 0, "one return -> live estimate");
+
+        // A calm stretch (zero returns) must decay the estimate geometrically.
+        for (uint256 i = 0; i < 10; i++) {
+            s = s.update(0, LAMBDA);
+        }
+        assertLt(s.sigmaWad(LAMBDA), sigmaActive / 2, "sigma decays through calm");
+    }
+
     /// @notice The accumulator stays bounded and `signal()` stays in [0, WAD] for any
     ///         bounded log-return stream — no revert, no out-of-range D. (CLAUDE.md §4.5)
     function testFuzz_ewma_boundedAndInRange(int256[16] calldata rs) public pure {

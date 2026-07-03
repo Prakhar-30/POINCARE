@@ -1,14 +1,15 @@
 import { usePoolState } from "@/hooks/usePoolState";
 import { usePoolTotals, useTape } from "@/hooks/useBackend";
 import { useDetectorConfig } from "@/hooks/useDetectorConfig";
-import { useSignalSeries } from "@/hooks/useSignalSeries";
+import { useDetectorSeries } from "@/hooks/useDetectorSeries";
 import { fmtUsd, fmtNum, fmtPct, shorten } from "@/lib/format";
 import { CONTRACTS } from "@/config/contracts";
+import { fromWei } from "@/lib/units";
 import { useIsNarrow, useIsMobile } from "@/hooks/useMediaQuery";
 import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
 import { Tape } from "@/components/ui/Tape";
-import { Oscilloscope } from "@/components/ui/Oscilloscope";
+import { EvidenceChart } from "@/components/ui/EvidenceChart";
 
 function regimeOf(trend: string) {
   if (trend === "up") return { label: "Up-trend", color: "var(--up)", ring: "rgba(107,184,154,.15)" };
@@ -42,11 +43,11 @@ export function Dashboard() {
   const cfg = useDetectorConfig();
   const totals = usePoolTotals().data;
   const tape = useTape(10).data ?? [];
-  const real = useSignalSeries();
+  const series = useDetectorSeries();
   const regime = regimeOf(s.trend);
   const narrow = useIsNarrow();
   const mobile = useIsMobile();
-  const tvl = (Number(s.r0) / 1e18) * 2; // balanced pool, both legs ≈ r0 in USDC terms
+  const tvl = fromWei(s.r0, "USDC") * 2; // balanced pool, both legs ≈ r0 in USDC terms
   const kappaMax = cfg.kappaMax || 0.1;
 
   return (
@@ -67,8 +68,8 @@ export function Dashboard() {
           <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
             <div className="flex items-center gap-2.5">
               <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
-              <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>The Brain</span>
-              <span className="hidden sm:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· CUSUM drift detector</span>
+              <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Detector</span>
+              <span className="hidden sm:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· two-sided CUSUM, sampled per block</span>
             </div>
             <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ fontSize: 12, fontWeight: 700, color: regime.color, background: regime.ring }}>
               <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: regime.color }} />
@@ -87,11 +88,13 @@ export function Dashboard() {
                 </span>
               </div>
               <div className="mt-3.5">
-                <Oscilloscope trend={s.trend} intensity={Math.max(s.kappa / kappaMax, s.directionalEfficiency)} real={real} />
+                <EvidenceChart points={series.points} thresholdH={cfg.h} />
               </div>
               <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
                 <Readout label="spread · buy WETH" value={fmtPct(s.spreadOneForZero)} color={s.spreadOneForZero > 0 ? "var(--up)" : "var(--text-2)"} />
+                <Readout label="volatility σ̂ · per block" value={fmtPct(s.sigma)} color="var(--text-2)" />
+                <Readout label="base fee · vol-scaled" value={fmtPct(s.fee)} color={s.fee > 0 ? "var(--honey-deep)" : "var(--text-2)"} />
               </div>
             </div>
 
@@ -126,8 +129,8 @@ export function Dashboard() {
 
           <div className="card-quiet p-5">
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".3px", color: "var(--text-3)", marginBottom: 14 }}>Pool reserves</div>
-            <Row label="WETH (currency1)" value={`${fmtNum(Number(s.r1) / 1e18, 2)} WETH`} />
-            <Row label="USDC (currency0)" value={`${fmtNum(Number(s.r0) / 1e18, 0)} USDC`} />
+            <Row label="WETH (currency1)" value={`${fmtNum(fromWei(s.r1, "WETH"), 2)} WETH`} />
+            <Row label="USDC (currency0)" value={`${fmtNum(fromWei(s.r0, "USDC"), 0)} USDC`} />
             <Row label="implied price" value={`${fmtUsd(s.price)} / WETH`} />
             <Row label="hook" value={shorten(CONTRACTS.hook)} mono />
           </div>

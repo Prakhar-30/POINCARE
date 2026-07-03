@@ -2,8 +2,10 @@ import { useState } from "react";
 import { usePoolState } from "@/hooks/usePoolState";
 import { useBalances } from "@/hooks/useBalances";
 import { useSwap, useFaucet } from "@/hooks/useSwap";
+import { useTradeQuote } from "@/hooks/useQuote";
 import { useOnchainTape } from "@/hooks/useOnchainTape";
-import { quote } from "@/lib/curve";
+import { fromWei, legsOf, toWei } from "@/lib/units";
+import type { Quote } from "@/lib/curve";
 import { fmtNum, fmtUsd, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tape } from "@/components/ui/Tape";
@@ -12,7 +14,7 @@ import { PoolChart } from "@/components/ui/PoolChart";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 
-const SLIP = 0.5; // %
+const SLIPPAGE_OPTIONS = [0.1, 0.5, 1.0] as const; // %
 
 export function Trade() {
   const s = usePoolState();
@@ -35,13 +37,19 @@ export function Trade() {
 
   const [sellUSDC, setSellUSDC] = useState(true);
   const [amt, setAmt] = useState("1000");
+  const [slip, setSlip] = useState<number>(0.5); // %
 
-  const r0 = Number(s.r0) / 1e18; // USDC
-  const r1 = Number(s.r1) / 1e18; // WETH
   const zeroForOne = sellUSDC; // currency0 = USDC
   const spread = zeroForOne ? s.spreadZeroForOne : s.spreadOneForZero;
-  const q = quote(r0, r1, Number(amt) || 0, zeroForOne, spread);
-  const minOut = q.out * (1 - SLIP / 100);
+  const q = useTradeQuote(s, amt, zeroForOne);
+
+  // minOut in wei, from the wei-exact Lens quote when available (real slippage
+  // protection); the float model only backstops older deployments.
+  const { outSym } = legsOf(zeroForOne);
+  const slipBps = BigInt(Math.round(slip * 100));
+  const minOutWei =
+    q.outWei !== null ? (q.outWei * (10_000n - slipBps)) / 10_000n : toWei(q.out * (1 - slip / 100), outSym);
+  const minOut = fromWei(minOutWei, outSym);
 
   const sellSym = sellUSDC ? "USDC" : "WETH";
   const buySym = sellUSDC ? "WETH" : "USDC";
@@ -52,7 +60,7 @@ export function Trade() {
   const disabled = busy || !amt || Number(amt) <= 0 || q.out <= 0 || insufficient;
 
   async function onSwap() {
-    await swap({ amountIn: amt, zeroForOne, minOut, quote: q });
+    await swap({ amountIn: amt, zeroForOne, minOutWei, quote: q });
     bal.refetch();
     setTimeout(reset, 2500);
   }
@@ -61,9 +69,10 @@ export function Trade() {
     <>
     <TxSteps stepper={stepper} title="Swapping" />
     <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
-      {/* ---- swap form ---- */}
-      <div className="card p-5 sm:p-6 min-w-0">
-        <div className="flex justify-between items-center mb-4">
+      {/* ---- swap form (spacing tuned so its lower edge lines up with the tape +
+           comparison cards in the other columns) ---- */}
+      <div className="card p-4 sm:p-5 min-w-0">
+        <div className="flex justify-between items-center mb-3">
           <span className="font-display" style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Swap</span>
           <span className="flex items-center gap-1.5" style={{ fontSize: 11, fontWeight: 700, color: "var(--lav)" }}>
             <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--lav)" }} /> live quote
@@ -85,27 +94,51 @@ export function Trade() {
         {/* trend badge */}
         <TrendBadge withTrend={q.withTrend} trend={s.trend} spread={spread} />
 
-        {/* the comparison — this is the LVR story per trade */}
+        {/* the comparison — the LVR story per trade */}
         <Comparison q={q} />
 
         {/* details */}
-        <div className="mt-4 flex flex-col gap-2.5 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
+        <div className="mt-3 flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
           <Detail label="Effective price" value={`${fmtUsd(q.execPrice)} / WETH`} />
-          <Detail label="Spread applied" value={fmtPct(spread)} color={spread > 0 ? "var(--honey-deep)" : undefined} />
+          <Detail label="Directional spread" value={fmtPct(spread)} color={spread > 0 ? "var(--honey-deep)" : undefined} />
+          {s.fee > 0 && <Detail label="Base fee · vol-scaled" value={fmtPct(s.fee)} />}
           <Detail label="Price impact" value={fmtPct(q.impact)} color={q.impact > 0.01 ? "var(--down)" : undefined} />
-          <Detail label={`Min received · slip ${SLIP}%`} value={`${fmtNum(minOut, buySym === "WETH" ? 5 : 2)} ${buySym}`} />
+          <Detail label="Min received" value={`${fmtNum(minOut, buySym === "WETH" ? 5 : 2)} ${buySym}`} />
+          <div className="flex justify-between items-center" style={{ fontSize: 12 }}>
+            <span style={{ color: "var(--text-3)" }}>Slippage tolerance</span>
+            <div className="flex gap-1">
+              {SLIPPAGE_OPTIONS.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSlip(v)}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "3px 9px",
+                    borderRadius: 8,
+                    border: `1px solid ${slip === v ? "var(--lav)" : "var(--border)"}`,
+                    background: slip === v ? "var(--lav-soft)" : "transparent",
+                    color: slip === v ? "var(--lav-deep)" : "var(--text-3)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {v}%
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* CTA */}
         <button
           onClick={onSwap}
           disabled={disabled}
-          className="mt-5 w-full text-center font-bold"
+          className="mt-4 w-full text-center font-bold"
           style={{
             color: "#fff",
             background: disabled ? "var(--faint)" : status === "success" ? "var(--up)" : "var(--up-deep)",
             borderRadius: 16,
-            padding: "15px",
+            padding: "13px",
             fontSize: 14.5,
             letterSpacing: ".3px",
             boxShadow: disabled ? "none" : "0 8px 20px rgba(107,184,154,.3)",
@@ -200,7 +233,7 @@ function TrendBadge({ withTrend, trend, spread }: { withTrend: boolean; trend: s
   );
 }
 
-function Comparison({ q }: { q: ReturnType<typeof quote> }) {
+function Comparison({ q }: { q: Quote }) {
   const positive = !q.withTrend && q.savedVsFee > 0;
   return (
     <div className="mt-3 flex items-center justify-between" style={{ background: positive ? "var(--change-up-bg)" : "var(--surface-2)", border: `1px solid ${positive ? "var(--green-border)" : "var(--border)"}`, borderRadius: 14, padding: "12px 15px" }}>
