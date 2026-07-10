@@ -4,13 +4,13 @@ import { fromWei, fromWad } from "@/lib/units";
 import type { SwapRow } from "@/lib/db";
 
 /**
- * On-chain swap history for THIS pool, read straight from the hook's `HookSwap`
- * event — no backend, no contract change. The native PoolManager `Swap` event is
- * empty for a custom-curve hook (it bypasses native accounting), but the hook emits
- * `HookSwap(poolId, sender, amount0, amount1, fee0, fee1)` on every swap, where
- * amount0=currency0 (USDC), amount1=currency1 (WETH), positive=input / negative=output.
+ * On-chain swap history for this pool, read from the hook's `HookSwap` event. The
+ * native PoolManager `Swap` event is empty for a custom-curve hook (it bypasses
+ * native accounting); the hook emits HookSwap(poolId, sender, amount0, amount1,
+ * fee0, fee1) on every swap, with amount0 = currency0 (USDC), amount1 = currency1
+ * (WETH), positive = input, negative = output.
  *
- * The public RPC caps `eth_getLogs` at 10k blocks per call, so deep history is read
+ * The public RPC caps eth_getLogs at 10k blocks per call, so deep history is read
  * by paging in <=10k-block windows (see useOnchainTape).
  */
 
@@ -18,7 +18,7 @@ export const HOOK_SWAP_EVENT = parseAbiItem(
   "event HookSwap(bytes32 indexed poolId, address indexed sender, int128 amount0, int128 amount1, uint128 hookLPfeeAmount0, uint128 hookLPfeeAmount1)",
 );
 
-/** PoolId = keccak256(abi.encode(PoolKey)) — derived, verified against on-chain logs. */
+/** PoolId = keccak256(abi.encode(PoolKey)), verified against on-chain logs. */
 export const POOL_ID = keccak256(
   encodeAbiParameters(
     [{ type: "address" }, { type: "address" }, { type: "uint24" }, { type: "int24" }, { type: "address" }],
@@ -32,10 +32,10 @@ export const POOL_ID = keccak256(
   ),
 ) as `0x${string}`;
 
-/** Block the hook was deployed at — the floor for log paging (kept with the addresses). */
+/** Block the hook was deployed at; the floor for log paging. */
 export const HOOK_DEPLOY_BLOCK = CONTRACTS.deployBlock;
 
-/** Window width per getLogs call — under the RPC's 10k-block cap, with margin. */
+/** Window width per getLogs call: under the RPC's 10k-block cap, with margin. */
 export const LOG_RANGE = 9000n;
 
 type TsOf = (block: bigint) => string;
@@ -83,18 +83,16 @@ export async function fetchHookSwaps(
   return rows.reverse(); // getLogs is ascending; we want newest-first
 }
 
-// ---------------------------------------------------------------------------
-// DetectorSample — the hook's per-block detector trace (deployments >= July 2026)
-// ---------------------------------------------------------------------------
+// DetectorSample: the hook's per-block detector trace (deployments >= July 2026)
 
 export const DETECTOR_SAMPLE_EVENT = parseAbiItem(
   "event DetectorSample(uint256 blockNumber, uint256 priceWad, int256 r, int256 sPos, int256 sNeg, uint256 dWad, uint256 sigmaWad, uint256 kappaWad, uint8 trend, uint256 feeWad)",
 );
 
-/** One decoded detector sample — the full state of the brain at one block. */
+/** One decoded detector sample: the full detector state at one block. */
 export type DetectorPoint = {
   block_number: number;
-  /** UI price, USDC per WETH (the on-chain priceWad is WETH/USDC — inverted here). */
+  /** UI price, USDC per WETH (the on-chain priceWad is WETH/USDC, inverted here). */
   price: number;
   /** Clipped log-return the detector consumed (hook orientation). */
   r: number;

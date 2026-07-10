@@ -13,9 +13,9 @@ import {PoincareLens} from "../src/PoincareLens.sol";
 import {Cusum} from "../src/libraries/Cusum.sol";
 import {PoincareTestBase} from "./utils/PoincareTestBase.sol";
 
-/// @title PoincareLensTest — the Lens quotes must match on-chain execution (CLAUDE.md §5, M7)
-/// @notice Proves the read-only quoter prices identically to the hook's swap path — to the wei,
-///         rounding included — in the calm and trend regimes, for exact-input and exact-output,
+/// @title PoincareLensTest: the Lens quotes must match on-chain execution
+/// @notice Proves the read-only quoter prices identically to the hook's swap path: to the wei,
+///         rounding included: in the calm and trend regimes, for exact-input and exact-output,
 ///         and (via the hook's projection) even for quotes taken in a FRESH block before the
 ///         once-per-block detector sample has run. Also covered: the full-feature config
 ///         (vol fee + deep base), which quotes through the same shared pipeline.
@@ -166,8 +166,8 @@ contract PoincareLensTest is PoincareTestBase {
         assertGt(sZeroForOne, sOneForZero, "executable curve has a directional bid-ask spread");
     }
 
-    /// @notice The projection guarantee: a quote taken in a FRESH block — before anyone has
-    ///         swapped, so before the once-per-block detector sample — must still match the
+    /// @notice The projection guarantee: a quote taken in a FRESH block: before anyone has
+    ///         swapped, so before the once-per-block detector sample: must still match the
     ///         execution of the first swap of that block, which runs the sample first. The
     ///         Lens gets this from `hook.previewSpread` (the same `_projectDetector` the swap
     ///         path persists), so there is no stale-across-blocks quote window at all.

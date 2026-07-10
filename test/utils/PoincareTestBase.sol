@@ -11,7 +11,7 @@ import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {BaseTest} from "./BaseTest.sol";
 
-/// @title PoincareTestBase — shared config + deployment plumbing for every hook-level test.
+/// @title PoincareTestBase - shared config + deployment plumbing for every hook-level test.
 /// @notice One place for the illustrative test configuration and the mine-flags/deployCodeTo
 ///         boilerplate, so a config-shape change touches exactly one file.
 abstract contract PoincareTestBase is BaseTest {

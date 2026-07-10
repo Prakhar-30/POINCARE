@@ -3,120 +3,81 @@ pragma solidity ^0.8.26;
 
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 
-/// @title DirectionalSignal — directional-efficiency ("trend vs chop") signal (CLAUDE.md §1.1)
-/// @notice Directional efficiency is a cheap on-chain proxy for how *trending* a price path
-///         is over a window:
+/// @title DirectionalSignal - directional-efficiency ("trend vs chop") signal
+/// @notice D = |net displacement| / total variation over a window, in [0, 1].
+///         D near 1 means the path marched one way (trend); D near 0 means it moved a
+///         lot but went nowhere (chop). D gates the detector as a noise floor; the
+///         signed increments themselves are what feed the CUSUM.
 ///
-///             D = |P_now - P_window_start| / Σ_i |P_i - P_{i-1}|   ∈ [0, 1]
-///
-///         D ≈ 1 means the path marched (almost) straight in one direction (a trend);
-///         D ≈ 0 means it moved a lot but went nowhere (chop). Per the brief, D is used as
-///         the noise floor / diagnostic; the *signed* return increments are what actually
-///         feed the CUSUM detector.
-///
-/// @dev    DESIGN DECISIONS (settled with the project owner; CLAUDE.md §4 "do NOT silently
-///         guess"). The stateful window is maintained as an O(1) EXPONENTIALLY-WEIGHTED
-///         moving accumulator, NOT a ring buffer of samples. Rationale: a fixed sample
-///         window has a hard edge — an attacker knows a move leaves the window at a *known*
-///         future block, a predictable boundary that contradicts the data-dependent,
-///         unpredictable spirit of the detector (§4.2). EWMA has no edge (old data decays
-///         smoothly), is O(1) storage, and is inherently revert-safe (geometric decay
-///         self-bounds the state given bounded increments — see §4.5). The increments are
-///         LOG-PRICE returns: `r_t = Δ ln(price)`, so D is directional efficiency in
-///         log-space and the CUSUM slack/threshold are scale-stable across price levels.
-///
-/// @dev    SEPARATION OF CONCERNS. This library consumes an already-computed signed
-///         increment `r` (the same `r_t` fed to `Cusum`); it does NOT compute the log
-///         itself. Deriving `r_t = lnP_t - lnP_{t-1}` from the pool/hook reserves (the one
-///         `ln` per swap) lives at the hook boundary, off the curve hot-path. This keeps
-///         the library pure, `ln`-free and unit-testable.
-///
-/// @dev    `absNet` and `totalVariation` must be non-negative and in the SAME units. By the
-///         triangle inequality `absNet <= totalVariation` always holds for a real path, so
-///         D ∈ [0, 1]; `efficiency` clamps defensively in case a caller violates that.
+/// @dev    The window is an O(1) exponentially-weighted accumulator, not a ring buffer:
+///         a fixed sample window has a hard edge (an attacker knows exactly when a move
+///         falls out of it), while EWMA decays smoothly, costs one slot, and self-bounds
+///         given bounded increments, so it can never revert a swap. Increments are
+///         log-price returns, which keeps the CUSUM slack/threshold scale-stable across
+///         price levels. Computing the log itself happens at the hook boundary; this
+///         library stays ln-free and pure.
 library DirectionalSignal {
     using DirectionalSignal for DirectionalSignal.State;
 
-    /// @dev WAD fixed-point unit. `efficiency`/`signal` return D scaled so that 1e18 == 1.0.
     uint256 internal constant WAD = 1e18;
 
-    /// @notice O(1) exponentially-weighted accumulators for the directional signal.
-    /// @dev `ewmaNet` is the exponentially-weighted sum of *signed* increments (a net
-    ///      log-displacement proxy); `ewmaTV` is the exponentially-weighted sum of their
-    ///      magnitudes (a total-variation proxy). Per the triangle inequality
-    ///      `|ewmaNet| <= ewmaTV`, so `signal()` ∈ [0, 1]. With a decay `lambda ∈ (0, WAD)`
-    ///      and bounded `|r|`, both are bounded by `max|r| / (1 - lambda/WAD)` and therefore
-    ///      cannot overflow under sustained input — the accumulator never reverts (§4.5).
+    /// @notice `ewmaNet` is the EW sum of signed increments (net displacement proxy),
+    ///         `ewmaTV` the EW sum of magnitudes (total-variation proxy). By the triangle
+    ///         inequality |ewmaNet| <= ewmaTV, so `signal()` stays in [0, 1]. With
+    ///         lambda < WAD and bounded |r| both are bounded by max|r| / (1 - lambda/WAD).
     struct State {
-        int256 ewmaNet; // exponentially-weighted Σ r_i  (signed; net displacement)
-        uint256 ewmaTV; // exponentially-weighted Σ |r_i| (total variation)
+        int256 ewmaNet;
+        uint256 ewmaTV;
     }
 
-    /// @notice Directional efficiency D ∈ [0, WAD] from net displacement and total variation.
-    /// @param absNet         |P_now - P_window_start|  (>= 0).
-    /// @param totalVariation Σ |P_i - P_{i-1}| over the window (>= 0).
-    /// @return d Directional efficiency in WAD: WAD == perfectly trending, 0 == pure chop
-    ///         (or no movement / undefined denominator, treated as "no trend", the safe side).
+    /// @notice Directional efficiency D in WAD from net displacement and total variation.
     function efficiency(uint256 absNet, uint256 totalVariation) internal pure returns (uint256 d) {
-        // No movement over the window: denominator is 0 and the ratio is undefined. Treat
-        // it as "no trend" (D = 0) — the conservative choice (keeps the curve symmetric).
+        // Zero denominator = no movement; treat as "no trend", the side that keeps the
+        // curve symmetric.
         if (totalVariation == 0) {
             return 0;
         }
-        // Defensive clamp: a real path satisfies absNet <= totalVariation, so D <= 1.
+        // A real path satisfies absNet <= totalVariation; clamp in case a caller doesn't.
         if (absNet >= totalVariation) {
             return WAD;
         }
-        // 0 <= absNet < totalVariation  =>  0 <= d < WAD. FullMath avoids overflow in absNet*WAD.
         d = FullMath.mulDiv(absNet, WAD, totalVariation);
     }
 
-    /// @notice Fold one signed log-return increment `r` into the EWMA accumulators.
-    /// @dev Recursion (decay-then-add, most weight on the newest increment):
-    ///        ewmaNet_t = (lambda · ewmaNet_{t-1}) / WAD  +  r
-    ///        ewmaTV_t  = (lambda · ewmaTV_{t-1})  / WAD  +  |r|
-    ///      The decays use FullMath so the multiply cannot overflow; since `lambda < WAD`
-    ///      the decayed magnitude never exceeds the previous one, so with bounded `|r|` the
-    ///      state is bounded and this never reverts (§4.5).
-    /// @param r      Signed log-return increment this step (WAD-scaled), same `r_t` fed to Cusum.
-    /// @param lambda Decay factor in (0, WAD). Larger == longer memory; effective window
-    ///               length ≈ WAD / (WAD - lambda). A calibration parameter (§8), injected.
+    /// @notice Fold one signed log-return `r` into the accumulators (decay, then add).
+    /// @param lambda Decay in (0, WAD); effective window length ~ WAD / (WAD - lambda).
     function update(State memory self, int256 r, uint256 lambda) internal pure returns (State memory) {
         int256 net = _decaySigned(self.ewmaNet, lambda) + r;
         uint256 tv = FullMath.mulDiv(self.ewmaTV, lambda, WAD) + _abs(r);
         return State({ewmaNet: net, ewmaTV: tv});
     }
 
-    /// @notice Current directional efficiency D ∈ [0, WAD] implied by the accumulators.
-    /// @dev Reuses the pure `efficiency` ratio with `(|ewmaNet|, ewmaTV)`.
+    /// @notice Current directional efficiency D in [0, WAD].
     function signal(State memory self) internal pure returns (uint256) {
         return efficiency(_abs(self.ewmaNet), self.ewmaTV);
     }
 
-    /// @notice Live per-step volatility estimate σ̂ (WAD): the exponentially-weighted mean
-    ///         absolute return implied by the accumulators.
-    /// @dev `ewmaTV` is the EW *sum* of |r| whose weights total `1/(1-λ/WAD)`; multiplying by
-    ///      `(WAD-λ)/WAD` converts the sum into the weighted *mean* |r|. This is a mean-absolute
-    ///      -deviation volatility proxy (∝ σ for any fixed return shape; the exact Gaussian
-    ///      factor √(2/π) is absorbed by whatever coefficient consumes σ̂, so no correction is
-    ///      applied here). Powers the vol-scaled base fee and the v2 standardized (adaptive)
-    ///      CUSUM increment (README §9.2) — σ̂ is already on-chain, so both come for free.
-    /// @param lambda The SAME decay the accumulators were built with (injected, validated).
-    /// @return sigma σ̂ in WAD. 0 until the first return is folded in (callers floor it).
+    /// @notice Per-step volatility estimate σ̂ (WAD): the exponentially-weighted mean
+    ///         absolute return.
+    /// @dev `ewmaTV` is an EW sum whose weights total 1/(1-λ/WAD); multiplying by
+    ///      (WAD-λ)/WAD turns it into the weighted mean |r|. Mean-absolute-deviation is
+    ///      proportional to σ for a fixed return shape; the Gaussian √(2/π) factor is
+    ///      absorbed by whatever coefficient consumes σ̂. Powers the vol-scaled fee and
+    ///      the standardized (adaptive) CUSUM increment.
+    /// @param lambda Must be the same decay the accumulators were built with.
     function sigmaWad(State memory self, uint256 lambda) internal pure returns (uint256 sigma) {
         sigma = FullMath.mulDiv(self.ewmaTV, WAD - lambda, WAD);
     }
 
-    /// @notice Validate the decay parameter. Asserted once at hook construction (§4.3);
-    ///         the hot-path `update` skips the check for gas.
-    /// @dev `lambda == 0` makes D degenerate (every step looks perfectly trending);
-    ///      `lambda >= WAD` removes decay so the state grows unbounded — both are rejected.
+    /// @notice Asserted once at construction; the hot path skips the check.
+    /// @dev lambda == 0 makes D degenerate (every step looks perfectly trending);
+    ///      lambda >= WAD removes decay and the state grows unbounded.
     function isValidConfig(uint256 lambda) internal pure returns (bool) {
         return lambda > 0 && lambda < WAD;
     }
 
-    /// @dev `a · lambda / WAD`, sign-preserving and overflow-safe. Since `lambda < WAD` the
-    ///      result magnitude never exceeds `|a|`, so re-casting to int256 cannot overflow.
+    /// @dev a * lambda / WAD, sign-preserving. lambda < WAD means the magnitude never
+    ///      grows, so the cast back to int256 cannot overflow.
     function _decaySigned(int256 a, uint256 lambda) private pure returns (int256) {
         if (a == 0) return 0;
         bool neg = a < 0;
@@ -125,7 +86,7 @@ library DirectionalSignal {
         return neg ? -int256(scaled) : int256(scaled);
     }
 
-    /// @dev Magnitude of a signed value. `r` is a bounded log-return, never `type(int256).min`.
+    /// @dev `r` is a bounded log-return, never type(int256).min.
     function _abs(int256 x) private pure returns (uint256) {
         return uint256(x >= 0 ? x : -x);
     }

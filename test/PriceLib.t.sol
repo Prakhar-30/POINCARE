@@ -17,12 +17,12 @@ contract PriceLibHarness {
     }
 }
 
-/// @title PriceLibTest — coverage for reserve price + log-return derivation (CLAUDE.md §1.1)
+/// @title PriceLibTest: coverage for reserve price + log-return derivation
 /// @notice Proves the detector's input pipeline is real and correct: prices from reserves,
 ///         and log-returns that are signed correctly, vanish on no move, and COMPOSE
 ///         (consecutive log-returns sum to the log-return over the whole move). The
 ///         composition property is what makes EWMA-of-increments equal a windowed
-///         net-log-displacement — the basis of the directional signal.
+///         net-log-displacement: the basis of the directional signal.
 contract PriceLibTest is Test {
     uint256 internal constant WAD = 1e18;
     int256 internal constant LN2 = 693147180559945309; // ln(2) in WAD (reference)

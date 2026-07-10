@@ -1,5 +1,5 @@
 /**
- * Real token glyphs for the WETH / USDC chips — the Ethereum diamond and the
+ * Real token glyphs for the WETH / USDC chips: the Ethereum diamond and the
  * USDC dollar disc, rendered inline so they theme with the rest of the UI.
  */
 export function TokenIcon({ sym, size = 20 }: { sym: string; size?: number }) {

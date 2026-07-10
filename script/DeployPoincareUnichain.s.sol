@@ -97,23 +97,21 @@ contract DemoFaucet {
 contract DeployPoincareUnichain is Script {
     // CREATE2_FACTORY (canonical deterministic deployer) is inherited from forge-std's Script.
 
-    // ---- Detector / curve config (illustrative, lively for a live demo) ----
-    // Same shape as the test/sim config: engages quickly so the lean is visible on a testnet.
-    // Absolute (non-adaptive) mode: the proven live behavior. The vol fee is ON so the
-    // calm-market revenue lever is visible; base depth stays plain x*y=k so demo trades keep
-    // moving the price enough to exercise the detector.
-    int256 constant K = 1e15; //          slack 0.001 (noise floor)
-    int256 constant H = 5e15; //          threshold 0.005
-    int256 constant S_MAX = 2e16; //      evidence cap 0.02
-    uint256 constant KAPPA_MIN = 0; //    symmetric when calm
+    // Demo-pool config: engages quickly so the lean is visible on a testnet. Absolute
+    // (non-adaptive) mode; vol fee on; base depth plain x*y=k so demo trades keep moving
+    // the price enough to exercise the detector.
+    int256 constant K = 1e15; // slack 0.001 (noise floor)
+    int256 constant H = 5e15; // threshold 0.005
+    int256 constant S_MAX = 2e16; // evidence cap 0.02
+    uint256 constant KAPPA_MIN = 0; // symmetric when calm
     uint256 constant KAPPA_MAX = 1e17; // 0.10 max directional spread
-    uint256 constant D_MAX = 5e16; //     kappa ramp rate / block
-    uint256 constant LAMBDA = 9e17; //    EWMA decay 0.9
-    uint256 constant D_FLOOR = 5e17; //   directional-efficiency gate 0.5
-    uint256 constant CLIP = 2e17; //      Huber clip: 20% log-return per block
-    uint256 constant FEE_GAMMA = 5e17; // fee = 0.5 * sigma ...
-    uint256 constant FEE_CAP = 3e15; //   ... capped at 0.30% (a vanilla pool's fee)
-    uint256 constant ALPHA = 0; //        plain constant-product base for the demo pool
+    uint256 constant D_MAX = 5e16; // kappa ramp rate / block
+    uint256 constant LAMBDA = 9e17; // EWMA decay 0.9
+    uint256 constant D_FLOOR = 5e17; // directional-efficiency gate 0.5
+    uint256 constant CLIP = 2e17; // Huber clip: 20% log-return per block
+    uint256 constant FEE_GAMMA = 5e17; // fee = 0.5 * sigma,
+    uint256 constant FEE_CAP = 3e15; // capped at 0.30%
+    uint256 constant ALPHA = 0; // plain constant-product base for the demo pool
 
     // 1000 WETH : 3,000,000 USDC -> implied price 3000
     uint256 constant WETH_SEED = 1000e18;
@@ -143,30 +141,26 @@ contract DeployPoincareUnichain is Script {
     }
 
     function _deployAll(IPoolManager pm) internal returns (Deployment memory d) {
-        // 1. Mock tokens (free-mint, 18 decimals) so the pool is fully tradeable on testnet,
-        //    plus the one-transaction faucet for fresh wallets.
         DemoERC20 weth = new DemoERC20("Poincare Wrapped Ether", "WETH");
         DemoERC20 usdc = new DemoERC20("Poincare USD Coin", "USDC");
         DemoFaucet faucet = new DemoFaucet(weth, usdc);
         weth.mint(msg.sender, WETH_SEED * 1000); // plenty left over for trading/faucet
         usdc.mint(msg.sender, USDC_SEED * 1000);
 
-        // 2. Sort into currency0 < currency1 (v4 invariant).
+        // v4 requires currency0 < currency1.
         (Currency c0, Currency c1) = address(weth) < address(usdc)
             ? (Currency.wrap(address(weth)), Currency.wrap(address(usdc)))
             : (Currency.wrap(address(usdc)), Currency.wrap(address(weth)));
 
-        // 3. Mine + CREATE2-deploy the hook with the correct permission flags, plus its Lens
-        //    (the quoter routers and the frontend price through).
         PoincareHook hook = _deployHook(pm);
         PoincareLens lens = new PoincareLens(hook);
 
-        // 4. Initialise the pool. The custom curve prices off reserves, not slot0, so the
-        //    starting sqrtPrice is cosmetic; 1:1 is fine.
+        // The custom curve prices off reserves, not slot0, so the starting sqrtPrice is
+        // cosmetic; 1:1 is fine.
         PoolKey memory key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
         pm.initialize(key, Constants.SQRT_PRICE_1_1);
 
-        // 5. Seed hook-owned liquidity at the 3000 price (amounts follow the sorted order).
+        // Seed hook-owned liquidity at the 3000 price (amounts follow the sorted order).
         weth.approve(address(hook), type(uint256).max);
         usdc.approve(address(hook), type(uint256).max);
         bool wethIs0 = Currency.unwrap(c0) == address(weth);

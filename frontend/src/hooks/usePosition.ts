@@ -2,8 +2,8 @@ import { useAccount, useReadContracts } from "wagmi";
 import { CONTRACTS, HOOK_ABI } from "@/config/contracts";
 import { fromWei } from "@/lib/units";
 
-/** LP shares are the hook's own ERC20, fixed at 18 decimals by the contract —
- *  a protocol constant, not a token-decimals assumption. */
+/** LP shares are the hook's own ERC20, fixed at 18 decimals by the contract
+ *  (a protocol constant, not a token-decimals assumption). */
 const SHARE_DECIMALS = 1e18;
 
 const hook = { address: CONTRACTS.hook as `0x${string}`, abi: HOOK_ABI } as const;

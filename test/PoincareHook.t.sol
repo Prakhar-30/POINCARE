@@ -14,12 +14,12 @@ import {AsymmetricCurve} from "../src/libraries/AsymmetricCurve.sol";
 import {Cusum} from "../src/libraries/Cusum.sol";
 import {PoincareTestBase} from "./utils/PoincareTestBase.sol";
 
-/// @title PoincareHookTest — end-to-end integration of the assembled hook (CLAUDE.md §7.5)
+/// @title PoincareHookTest: end-to-end integration of the assembled hook
 /// @notice Deploys the hook on a real PoolManager (via the hookmate harness), seeds hook-owned
 ///         liquidity, and exercises swaps. Validates: liquidity in/out, swaps route through the
 ///         custom curve, the detector stays calm with no trend and engages the directional
-///         spread on a sustained one-way move; plus the newer layers — the DetectorSample
-///         trace event, the exposed CUSUM/σ̂ state, the vol-scaled base fee, the E0 deep base,
+///         spread on a sustained one-way move; plus the newer layers: the DetectorSample
+///         trace event, the exposed CUSUM/σ̂ state, the vol-scaled base fee, the deep base,
 ///         and the v2 adaptive (σ-standardized) detector mode.
 contract PoincareHookTest is PoincareTestBase {
     using CurrencyLibrary for Currency;
@@ -231,7 +231,7 @@ contract PoincareHookTest is PoincareTestBase {
     }
 
     // ------------------------------------------------------------------
-    // E0 deep base (supply-scaled symmetric offsets)
+    // deep base (supply-scaled symmetric offsets)
     // ------------------------------------------------------------------
 
     function test_deepBase_offsetsAnchored_andMidPreservedByLiquidity() public {
@@ -285,7 +285,7 @@ contract PoincareHookTest is PoincareTestBase {
         uint256 t1Before = currency1.balanceOf(address(this));
 
         // Buy-then-sell-back across blocks (offsets are supply-anchored, so there is no
-        // re-anchoring seam to harvest — the drainable construction this replaces).
+        // re-anchoring seam to harvest: the drainable construction this replaces).
         _swap(deepKey, 3 ether, true);
         vm.roll(block.number + 1);
         uint256 t1Got = currency1.balanceOf(address(this)) - t1Before;

@@ -12,12 +12,12 @@ import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCus
 import {PoincareHook} from "../src/PoincareHook.sol";
 import {PoincareTestBase} from "./utils/PoincareTestBase.sol";
 
-/// @title GasTest — profile the swap path / detector cost (CLAUDE.md §9.6)
+/// @title GasTest: profile the swap path / detector cost
 /// @notice Measures end-to-end swap gas (router + PoolManager + hook) and isolates the per-block
 ///         detector-update cost by differencing the first swap of a block (which samples + runs
 ///         the two CUSUM updates, the EWMA, the control law, and now emits the DetectorSample
 ///         trace) against a later same-block swap (which skips sampling). The detector state is
-///         packed to 4 slots (OPEN_ITEMS G8), which pays for the event several times over.
+///         packed to 4 slots, which pays for the event several times over.
 contract GasTest is PoincareTestBase {
     using CurrencyLibrary for Currency;
 

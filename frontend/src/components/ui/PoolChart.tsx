@@ -5,7 +5,6 @@ import { fmtNum, fmtUsd } from "@/lib/format";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** Measure a container's pixel width (so the SVG stays crisp and responsive). */
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
@@ -21,9 +20,8 @@ function useWidth<T extends HTMLElement>() {
 type Pt = { t: number; p: number; buy: boolean; weth: number; usdc: number };
 
 /**
- * Uniswap-style pool price chart (USDC per WETH). Data comes from the backend price
- * series for the selected window — the ENTIRE recorded history for that window, not
- * whatever slice of the trade tape happens to be loaded on screen.
+ * Pool price chart (USDC per WETH), fed by the backend price series for the selected
+ * window rather than whatever slice of the trade tape is loaded on screen.
  */
 export function PoolChart({ height = 220 }: { height?: number }) {
   const [wrapRef, W] = useWidth<HTMLDivElement>();
@@ -31,7 +29,6 @@ export function PoolChart({ height = 220 }: { height?: number }) {
   const [hover, setHover] = useState<number | null>(null);
   const { rows, loading, fetching } = usePriceSeries(win);
 
-  // chronological points (already oldest -> newest), de-noised price from the legs
   const pts = useMemo<Pt[]>(() => {
     return rows
       .map((r) => {
@@ -83,13 +80,11 @@ export function PoolChart({ height = 220 }: { height?: number }) {
   const accent = up ? "var(--up)" : "var(--down)";
   const gid = up ? "poolgrad-up" : "poolgrad-down";
 
-  // nearest point to the hovered x
   const hi = hover != null && geom ? nearest(geom.xs, hover) : null;
   const hp = hi != null ? pts[hi] : null;
 
   return (
     <div ref={wrapRef}>
-      {/* header — static height (hover info lives in the floating tooltip, not here) */}
       <div className="flex items-end justify-between gap-3 mb-2 flex-wrap">
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: ".3px" }}>WETH / USDC · pool price</div>
@@ -123,7 +118,6 @@ export function PoolChart({ height = 220 }: { height?: number }) {
         </div>
       </div>
 
-      {/* chart */}
       <div style={{ position: "relative", height: H, opacity: fetching && !loading ? 0.75 : 1, transition: "opacity .2s" }}>
         {!geom ? (
           <div className="flex items-center justify-center gap-2" style={{ height: H, fontSize: 12.5, color: "var(--faint)" }}>
@@ -146,9 +140,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
             </defs>
             <path d={geom.area} fill={`url(#${gid})`} />
             <path d={geom.line} fill="none" stroke={accent} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-            {/* last point */}
             <circle cx={geom.xs[geom.xs.length - 1]} cy={geom.ys[geom.ys.length - 1]} r={3.5} fill={accent} />
-            {/* hover crosshair */}
             {hi != null && (
               <g>
                 <line x1={geom.xs[hi]} y1={padTop} x2={geom.xs[hi]} y2={H - padBot} stroke="var(--divider)" strokeWidth={1} />
@@ -158,7 +150,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
           </svg>
         )}
 
-        {/* floating tooltip — absolutely positioned so it never reflows the column */}
+        {/* absolutely positioned so hover never reflows the column */}
         {geom && hp && hi != null && (
           <div
             style={{

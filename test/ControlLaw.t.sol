@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {ControlLaw} from "../src/libraries/ControlLaw.sol";
 
-/// @title ControlLawTest — bounded kappa from CUSUM evidence (CLAUDE.md §7.4)
+/// @title ControlLawTest: bounded kappa from CUSUM evidence
 /// @notice Proves the control-law guarantees: symmetric below threshold, hard cap at kappa_max,
 ///         monotone ramp, and the per-step rate limit (seam safety) + hysteresis.
 contract ControlLawTest is Test {
@@ -124,7 +124,7 @@ contract ControlLawTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // vol fee law — σ̂ -> bounded base fee
+    // vol fee law: σ̂ -> bounded base fee
     // ---------------------------------------------------------------------
 
     function test_volFee_zeroWithoutVolOrGamma() public pure {

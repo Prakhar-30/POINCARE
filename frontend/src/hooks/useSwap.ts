@@ -34,7 +34,6 @@ export function useSwap() {
 
     let current = "swap";
     try {
-      // does the router already have enough allowance?
       const allowance = (await publicClient.readContract({ ...erc20(tokenIn), functionName: "allowance", args: [address, router] })) as bigint;
       const needApprove = allowance < amountInWei;
 
@@ -46,7 +45,7 @@ export function useSwap() {
       ]);
       setStatus("busy");
 
-      // 1. approve the EXACT amount the router needs (no infinite approvals)
+      // Approve the exact amount, never infinite.
       if (needApprove) {
         current = "approve";
         stepper.activate("approve");
@@ -58,8 +57,7 @@ export function useSwap() {
 
       const balBefore = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
 
-      // 2. swap through the v4 router (the hook prices it with the live directional spread).
-      //    minOut is wei-exact from the Lens quote, so slippage protection is real.
+      // minOut is wei-exact from the Lens quote, so slippage protection is real.
       current = "swap";
       stepper.activate("swap");
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
@@ -77,7 +75,7 @@ export function useSwap() {
       const balAfter = (await publicClient.readContract({ ...erc20(tokenOut), functionName: "balanceOf", args: [address] })) as bigint;
       const actualOut = fromWei(balAfter - balBefore, outSym);
       const amtIn = fromWei(amountInWei, inSym);
-      // executed USDC/WETH price from the legs (always finite & positive); fall back to the quote
+      // Executed price from the legs; fall back to the quote if the balance diff failed.
       const execPrice =
         actualOut > 0
           ? zeroForOne
@@ -85,7 +83,6 @@ export function useSwap() {
             : actualOut / amtIn // pay WETH, receive USDC
           : quote.execPrice;
 
-      // 3. record to the shared order tape + LVR accounting
       await recordSwap({
         tx_hash: hash,
         block_number: Number(receipt.blockNumber),
@@ -145,8 +142,8 @@ export function useFaucet() {
         const hash = await walletClient.writeContract({ address: faucet, abi: FAUCET_ABI, functionName: "drip", args: [address], gas, nonce: await nextNonce(publicClient, address) });
         await publicClient.waitForTransactionReceipt({ hash });
       } else {
-        // Older deployment: two mints, strictly sequential, each with the PENDING nonce
-        // pinned from the node — MetaMask's own nonce cache goes stale on this chain and
+        // Older deployment: two mints, strictly sequential, each with the pending nonce
+        // pinned from the node. MetaMask's own nonce cache goes stale on this chain and
         // rejects the second tx even after an activity-tab reset (see nextNonce).
         const usdc = erc20(CONTRACTS.usdc as `0x${string}`);
         const weth = erc20(CONTRACTS.weth as `0x${string}`);

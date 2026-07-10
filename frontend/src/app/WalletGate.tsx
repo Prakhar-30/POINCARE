@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Mark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
 
-/** Shown on /app until a wallet is connected — the dashboard only exists for a connected user. */
+/** Shown on /app until a wallet is connected. */
 export function WalletGate() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ background: "var(--app-bg)" }}>

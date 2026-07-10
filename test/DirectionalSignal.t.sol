@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {DirectionalSignal} from "../src/libraries/DirectionalSignal.sol";
 
-/// @title DirectionalSignalTest — coverage for the directional-efficiency ratio (CLAUDE.md §7.2)
+/// @title DirectionalSignalTest: coverage for the directional-efficiency ratio
 /// @notice Verifies the brief's gates for the signal core: a pure trend -> ~1, chop -> ~0,
 ///         and the [0,1] / no-movement behaviour. The stateful windowing is intentionally
 ///         not built yet (pending an architectural decision), so only the pure ratio is tested.
@@ -62,7 +62,7 @@ contract DirectionalSignalTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // EWMA accumulator (the stateful directional signal, CLAUDE.md §7.2)
+    // EWMA accumulator (the stateful directional signal)
     // ---------------------------------------------------------------------
 
     using DirectionalSignal for DirectionalSignal.State;
@@ -128,12 +128,12 @@ contract DirectionalSignalTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // σ̂ — the live volatility estimate (powers the vol fee and adaptive CUSUM)
+    // σ̂: the live volatility estimate (powers the vol fee and adaptive CUSUM)
     // ---------------------------------------------------------------------
 
     function test_sigma_steadyState_equalsMeanAbsReturn() public pure {
         // Feeding a constant |r| forever drives ewmaTV to |r|·N (N = effective window), so
-        // σ̂ = ewmaTV·(1-λ) must converge to exactly the per-step |r| — the interpretable
+        // σ̂ = ewmaTV·(1-λ) must converge to exactly the per-step |r|: the interpretable
         // anchor tying the estimate to "the typical per-block move".
         DirectionalSignal.State memory s;
         for (uint256 i = 0; i < 400; i++) {
@@ -158,7 +158,7 @@ contract DirectionalSignalTest is Test {
     }
 
     /// @notice The accumulator stays bounded and `signal()` stays in [0, WAD] for any
-    ///         bounded log-return stream — no revert, no out-of-range D. (CLAUDE.md §4.5)
+    ///         bounded log-return stream: no revert, no out-of-range D.
     function testFuzz_ewma_boundedAndInRange(int256[16] calldata rs) public pure {
         DirectionalSignal.State memory s;
         for (uint256 i = 0; i < rs.length; i++) {

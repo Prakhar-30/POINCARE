@@ -11,7 +11,7 @@ import {
   type SwapRow,
 } from "@/lib/db";
 
-/** Register the connected wallet once per browser session — first sight counts it as
+/** Register the connected wallet once per browser session; first sight counts it as
  *  a new user, every later session as a returning one (see v_wallet_totals). */
 export function useWalletIdentity() {
   const { address, isConnected } = useAccount();
@@ -24,7 +24,7 @@ export function useWalletIdentity() {
   }, [isConnected, address]);
 }
 
-/** Pool-wide totals (LVR avoided, volume) — polled. */
+/** Pool-wide totals (LVR avoided, volume), polled. */
 export function usePoolTotals() {
   return useQuery({ queryKey: ["poolTotals"], queryFn: fetchPoolTotals, refetchInterval: 8000 });
 }
@@ -34,7 +34,7 @@ export function useWalletTotals() {
   return useQuery({ queryKey: ["walletTotals"], queryFn: fetchWalletTotals, refetchInterval: 30000 });
 }
 
-/** The live trade tape — seeded by a query, kept fresh by realtime inserts. */
+/** The live trade tape: seeded by a query, kept fresh by realtime inserts. */
 export function useTape(limit = 24) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["tape", limit], queryFn: () => fetchTape(limit) });

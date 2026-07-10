@@ -18,11 +18,11 @@ export function humanizeError(e: unknown): string {
   if (m.includes("nonce"))
     return "Wallet nonce is out of sync. Reset the account in your wallet and retry.";
   if (m.includes("intrinsic gas") || m.includes("gas required exceeds") || m.includes("out of gas"))
-    return "Gas estimation failed. We set a manual limit — please retry.";
+    return "Gas estimation failed. A manual limit was set, please retry.";
   if (m.includes("chain") && m.includes("mismatch"))
     return "Wrong network. Switch your wallet to Unichain Sepolia.";
 
-  // first line, trimmed — viem stuffs the useful bit up front
+  // viem stuffs the useful bit in the first line
   const first = raw.split("\n")[0].replace(/^Error:\s*/i, "").trim();
   return first.length > 140 ? first.slice(0, 140) + "…" : first || "Transaction failed.";
 }

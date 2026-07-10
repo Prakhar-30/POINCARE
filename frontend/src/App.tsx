@@ -5,7 +5,7 @@ import { AppShell } from "@/app/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // HashRouter (URLs like /#/app) so a hard refresh on any route always loads
-// index.html — works on every static host / IPFS with no server rewrite config.
+// index.html; works on any static host with no server rewrite config.
 export function App() {
   return (
     <ErrorBoundary>
@@ -15,7 +15,6 @@ export function App() {
           <Route path="/app" element={<AppShell />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        {/* Vercel Web Analytics — collects anonymous page views across all routes. */}
         <Analytics />
       </HashRouter>
     </ErrorBoundary>

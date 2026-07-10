@@ -21,11 +21,11 @@ import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {Cusum} from "../../src/libraries/Cusum.sol";
 import {MintableERC20} from "./MintableERC20.sol";
 
-/// @title ForkSimulationTest — comparative WETH/USDC simulation on a Sepolia v4 fork (real PoolManager)
+/// @title ForkSimulationTest - comparative WETH/USDC simulation on a Sepolia v4 fork (real PoolManager)
 /// @notice Two IDENTICAL pools on the real Sepolia Uniswap v4 PoolManager, seeded the same and fed
 ///         the SAME fair-price path + the SAME order flow, differing in ONE thing only:
-///           * POINCARE  — the hook with the detector + directional spread live;
-///           * CONTROL   — the same hook with kappa_max = 0, i.e. a pure constant-product AMM.
+///           * POINCARE: the hook with the detector + directional spread live;
+///           * CONTROL: the same hook with kappa_max = 0, i.e. a pure constant-product AMM.
 ///         The control IS the apples-to-apples baseline (everything else equal), so any difference
 ///         in LP value / LVR is attributable purely to the Poincaré asymmetry.
 ///
@@ -34,7 +34,7 @@ import {MintableERC20} from "./MintableERC20.sol";
 ///         hits both pools. Every order is logged (the "order book"); per-block pool state and a
 ///         per-scenario summary are written as CSVs for plotting.
 ///
-///         WETH/USDC are 18-decimal mocks (the detector + curve are decimal-agnostic — log-returns
+///         WETH/USDC are 18-decimal mocks (the detector + curve are decimal-agnostic; log-returns
 ///         are scale-invariant), priced at 3000 USDC/WETH. token0=WETH, token1=USDC,
 ///         price = token1/token0 = USDC per WETH.
 contract ForkSimulationTest is Test {

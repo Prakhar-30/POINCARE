@@ -90,9 +90,7 @@ export async function recordLpEvent(evt: LpEvent) {
   if (error && error.code !== "23505") console.warn("recordLpEvent", error.message);
 }
 
-// ---------------------------------------------------------------------------
-// detector_samples — the on-chain DetectorSample trace, mirrored for history
-// ---------------------------------------------------------------------------
+// detector_samples: the on-chain DetectorSample trace, mirrored for history
 
 /** Mirror freshly-read on-chain samples. Idempotent: unique(hook, block_number). */
 export async function recordDetectorSamples(points: DetectorPoint[]) {
@@ -137,9 +135,9 @@ export async function fetchTapePage(limit: number, offset: number): Promise<Swap
 export type PricePoint = Pick<SwapRow, "ts" | "side" | "amount_in" | "amount_out" | "price" | "notional_usdc">;
 
 /**
- * Price history for the chart, straight from the backend (NOT the loaded tape, whose
- * depth depends on how many pages the user happened to load). Hook-scoped; `sinceIso`
- * null = all time. Returns ascending by time, newest `limit` rows.
+ * Price history for the chart, straight from the backend rather than the loaded tape
+ * (whose depth depends on how many pages the user happened to load). Hook-scoped;
+ * `sinceIso` null = all time. Returns ascending by time, newest `limit` rows.
  */
 export async function fetchPriceSeries(sinceIso: string | null, limit = 2000): Promise<PricePoint[]> {
   if (!supabaseReady) return [];

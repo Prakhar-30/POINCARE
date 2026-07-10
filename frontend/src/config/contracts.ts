@@ -1,10 +1,10 @@
 // Live Poincaré deployment on Unichain Sepolia (chain 1301).
-// Source of truth: deployments/unichain-sepolia.json at the repo root — after a redeploy,
+// Source of truth is deployments/unichain-sepolia.json at the repo root; after a redeploy,
 // update the DEPLOYMENT block below (and nothing else) from that file.
-// These are public testnet addresses, safe to commit.
+// Public testnet addresses, safe to commit.
 
-/** Paste-from-deployments block. `lens`/`faucet` may be empty on an older deployment —
- *  every feature that needs them checks `hasLens`/`hasFaucet` and degrades gracefully. */
+/** `lens`/`faucet` may be empty on an older deployment; every feature that needs them
+ *  checks `hasLens`/`hasFaucet` and degrades gracefully. */
 const DEPLOYMENT = {
   chainId: 1301,
   poolManager: "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
@@ -15,13 +15,13 @@ const DEPLOYMENT = {
   // (the deploy tooling picks the token creation order so this holds by construction).
   usdc: "0x3Ab3D6986A1076E72d1f3Fb96D0739C0C4dd90E4",
   weth: "0x642037396D62891302f06dDE0bc21071834A0260",
-  /** Block the hook was deployed at — the floor for on-chain log paging. */
+  /** Block the hook was deployed at; the floor for on-chain log paging. */
   deployBlock: 56191210n,
 } as const;
 
 export const CONTRACTS = {
   ...DEPLOYMENT,
-  // V4 swap router on Unichain Sepolia (hookmate IUniswapV4Router04) — canonical, survives redeploys.
+  // v4 swap router on Unichain Sepolia (hookmate IUniswapV4Router04); canonical, survives redeploys.
   router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba",
   currency0: DEPLOYMENT.usdc,
   currency1: DEPLOYMENT.weth,
@@ -71,8 +71,9 @@ export const ROUTER_ABI = [
 ] as const;
 
 // reserves() returns (r0, r1) = (USDC, WETH); reserve-implied price = r1/r0 in raw units.
-// Both mock tokens are 18 decimals; ALWAYS convert through TOKENS[...].decimals (lib/units.ts),
-// never a hardcoded 1e18 — a real USDC is 6 decimals and silent breakage is the failure mode.
+// Both mock tokens are 18 decimals, but always convert through TOKENS[...].decimals
+// (lib/units.ts), never a hardcoded 1e18: a real USDC is 6 decimals and the breakage
+// would be silent.
 export const TOKENS = {
   WETH: { address: CONTRACTS.weth, symbol: "WETH", decimals: 18, color: "var(--eth)" },
   USDC: { address: CONTRACTS.usdc, symbol: "USDC", decimals: 18, color: "var(--usdc)" },
@@ -81,12 +82,11 @@ export type TokenSym = keyof typeof TOKENS;
 
 export const EXPLORER = "https://sepolia.uniscan.xyz";
 
-// Cusum.Trend enum is 0=None, 1=Up, 2=Down — but it runs on the hook's INTERNAL price,
-// priceWad = reserve1/reserve0 = WETH/USDC, which is the INVERSE of the UI's USDC/WETH
-// chart price. So the hook's "Up" (WETH/USDC rising) is a falling chart, and vice-versa.
-// We invert here so the UI trend label matches the direction the user sees on the chart
-// (and the side that gets the with-trend spread). The spread getters are direction-based
-// (effectiveSpread(zeroForOne)) and already correct, so only the label needs flipping.
+// Cusum.Trend enum is 0=None, 1=Up, 2=Down, but it runs on the hook's internal price
+// (reserve1/reserve0 = WETH/USDC), the inverse of the UI's USDC/WETH chart price. The
+// hook's "Up" is therefore a falling chart and vice-versa, so the label is inverted here
+// to match what the user sees. The spread getters are direction-based
+// (effectiveSpread(zeroForOne)) and already correct; only the label needs flipping.
 export const TREND = ["none", "down", "up"] as const;
 export type TrendLabel = "none" | "up" | "down";
 
@@ -97,13 +97,13 @@ export const HOOK_ABI = [
   { type: "function", name: "trend", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
   { type: "function", name: "directionalEfficiency", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "effectiveSpread", stateMutability: "view", inputs: [{ name: "zeroForOne", type: "bool" }], outputs: [{ type: "uint256" }] },
-  // -- detector exposure (deployments from July 2026 on) --
+  // detector exposure (deployments from July 2026 on)
   { type: "function", name: "cusumState", stateMutability: "view", inputs: [], outputs: [{ name: "sPos", type: "int256" }, { name: "sNeg", type: "int256" }] },
   { type: "function", name: "sigmaWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "currentFeeWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "previewSpread", stateMutability: "view", inputs: [{ name: "zeroForOne", type: "bool" }], outputs: [{ name: "spreadWad", type: "uint256" }, { name: "feeWad", type: "uint256" }] },
   { type: "function", name: "baseOffsets", stateMutability: "view", inputs: [], outputs: [{ name: "a", type: "uint256" }, { name: "b", type: "uint256" }] },
-  // -- immutable config --
+  // immutable config
   { type: "function", name: "thresholdH", stateMutability: "view", inputs: [], outputs: [{ type: "int256" }] },
   { type: "function", name: "k", stateMutability: "view", inputs: [], outputs: [{ type: "int256" }] },
   { type: "function", name: "sMax", stateMutability: "view", inputs: [], outputs: [{ type: "int256" }] },
@@ -134,10 +134,10 @@ export const FAUCET_ABI = [
 
 /**
  * Hook-owned liquidity (BaseCustomAccounting). LP shares are the hook's own ERC20.
- * The HOOK calls transferFrom(sender -> PoolManager) inside its unlock callback, so
- * the user approves USDC and WETH to the HOOK before addLiquidity (approving the
- * PoolManager does nothing — the allowance the transfer spends is [user][hook]).
- * tickLower/tickUpper/userInputSalt are unused by the custom curve -> pass 0.
+ * The hook calls transferFrom(sender -> PoolManager) inside its unlock callback, so
+ * the user must approve USDC and WETH to the HOOK before addLiquidity. Approving the
+ * PoolManager does nothing: the allowance the transfer spends is [user][hook].
+ * tickLower/tickUpper/userInputSalt are unused by the custom curve; pass 0.
  */
 export const HOOK_LP_ABI = [
   {

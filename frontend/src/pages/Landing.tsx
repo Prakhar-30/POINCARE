@@ -40,7 +40,7 @@ function LaunchButton({ size = "md" }: { size?: "md" | "lg" }) {
 export function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
-      {/* ---- nav ---- */}
+      {/* nav */}
       <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
         <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
           <Mark size={34} />
@@ -55,7 +55,7 @@ export function Landing() {
         </div>
       </nav>
 
-      {/* ---- hero ---- */}
+      {/* hero */}
       <header className="px-6 md:px-10 pt-14 md:pt-20 pb-10">
         <div className="mx-auto grid items-center gap-10 lg:gap-14 grid-cols-1 lg:grid-cols-[1.05fr_1fr]" style={{ maxWidth: 1180 }}>
           <div>
@@ -94,7 +94,7 @@ export function Landing() {
         </div>
       </header>
 
-      {/* ---- numbers ---- */}
+      {/* numbers */}
       <section className="px-6 md:px-10 py-4">
         <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
           <NumberCard kpi="−14.3%" label="LVR vs constant-product" sub="−29.6% with the adaptive detector" />
@@ -104,7 +104,7 @@ export function Landing() {
         </motion.div>
       </section>
 
-      {/* ---- what it does ---- */}
+      {/* what it does */}
       <section className="px-6 md:px-10 py-16">
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="What it is" title="Two parts, kept honest" />
@@ -119,7 +119,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ---- how it works ---- */}
+      {/* how it works */}
       <section id="how" className="px-6 md:px-10 py-16" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="How it works" title="Watch · detect · lean" />
@@ -131,7 +131,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ---- moat ---- */}
+      {/* moat */}
       <section id="moat" className="px-6 md:px-10 py-16">
         <div className="mx-auto grid gap-8 items-center grid-cols-1 lg:grid-cols-2" style={{ maxWidth: 1180 }}>
           <motion.div {...fade()}>
@@ -160,7 +160,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ---- final CTA ---- */}
+      {/* final CTA */}
       <section className="px-6 md:px-10 pb-20">
         <motion.div {...fade()} className="mx-auto relative grain overflow-hidden text-center" style={{ maxWidth: 1180, borderRadius: 28, padding: "60px 24px", background: "linear-gradient(135deg, var(--lav-soft), var(--surface))", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}>
           <h2 className="font-display" style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 700, color: "var(--text)" }}>
@@ -175,7 +175,7 @@ export function Landing() {
         </motion.div>
       </section>
 
-      {/* ---- footer ---- */}
+      {/* footer */}
       <footer className="px-6 md:px-10 py-8" style={{ borderTop: "1px solid var(--border)" }}>
         <div className="mx-auto flex items-center justify-between flex-wrap gap-4" style={{ maxWidth: 1180 }}>
           <Wordmark size={28} />

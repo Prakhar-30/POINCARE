@@ -12,13 +12,13 @@ import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCus
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
 
-/// @title PoincareHandler — randomized actor for the invariant run.
+/// @title PoincareHandler: randomized actor for the invariant run.
 /// @notice Performs bounded random swaps (exact-in/out, both directions), liquidity adds/removes,
 ///         and block rolls against the live hook. It keeps a ghost copy of the reserves updated
 ///         purely from its OWN measured token-balance deltas (`expR -= handlerDelta`): since the
 ///         handler is the only mutator during the run, the hook's reserves must always equal this
-///         independent accounting — that is the solvency / no-leak invariant. It also asserts the
-///         curve invariant never decreases on a swap (no value extraction by traders): for the E0
+///         independent accounting: that is the solvency / no-leak invariant. It also asserts the
+///         curve invariant never decreases on a swap (no value extraction by traders): for the deep-base
 ///         deep base the invariant is the OFFSET product `(x+a)(y+b)` with the offsets in force
 ///         during the swap (they only move on liquidity events, never inside a swap).
 contract PoincareHandler is Test {
@@ -125,13 +125,13 @@ contract PoincareHandler is Test {
     }
 }
 
-/// @title PoincareInvariantBase — solvency & bounds across random op sequences (CLAUDE.md §9.3)
+/// @title PoincareInvariantBase: solvency & bounds across random op sequences
 /// @notice Drives the hook with random swaps / liquidity / block-rolls and asserts the
 ///         system-level invariants the brief gates "done" on: the hook is always solvent (its
-///         reserves are fully and exactly explained by the net of all token flows — no leak, no
+///         reserves are fully and exactly explained by the net of all token flows: no leak, no
 ///         value creation), reserves never hit zero, and the detector outputs stay in-bounds.
 ///         Run twice: on the plain MVP config and on the full-feature config (deep base + vol
-///         fee + adaptive detector), which exercises the E0 offsets and fee accrual paths.
+///         fee + adaptive detector), which exercises the deep-base offsets and fee accrual paths.
 abstract contract PoincareInvariantBase is PoincareTestBase {
     using CurrencyLibrary for Currency;
 
@@ -182,8 +182,8 @@ abstract contract PoincareInvariantBase is PoincareTestBase {
         assertEq(r1, handler.expR1(), "reserve1 must equal net token1 flow");
     }
 
-    /// @notice The pool can never be fully drained — both reserves stay strictly positive, so
-    ///         pricing and the detector never hit a zero-reserve revert (§4.5). With the E0
+    /// @notice The pool can never be fully drained: both reserves stay strictly positive, so
+    ///         pricing and the detector never hit a zero-reserve revert. With the deep-base
     ///         deep base this additionally exercises the new output-feasibility guard.
     function invariant_reservesStayPositive() public view {
         (uint256 r0, uint256 r1) = hook.reserves();
@@ -192,7 +192,7 @@ abstract contract PoincareInvariantBase is PoincareTestBase {
     }
 
     /// @notice The asymmetry stays within its hard cap, the directional signal stays in [0,1],
-    ///         and the vol fee respects its cap, regardless of the op sequence (§3, §4.1).
+    ///         and the vol fee respects its cap, regardless of the op sequence.
     function invariant_detectorOutputsBounded() public view {
         assertLe(hook.kappa(), hook.kappaMax(), "kappa <= kappa_max");
         assertLe(hook.directionalEfficiency(), WAD, "D <= 1");
@@ -207,7 +207,7 @@ contract PoincareInvariantPlainTest is PoincareInvariantBase {
     }
 }
 
-/// @notice Full-feature flavor: E0 deep base + vol-scaled fee + v2 adaptive detector.
+/// @notice Full-feature flavor: deep base + vol-scaled fee + v2 adaptive detector.
 contract PoincareInvariantFullTest is PoincareInvariantBase {
     function _config() internal pure override returns (PoincareConfig memory c) {
         c = adaptiveConfig();

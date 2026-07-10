@@ -34,7 +34,7 @@ export function useOnchainTape() {
   const headRef = useRef<bigint>(0n); // highest block already shown
   const tsOf = useRef<(b: bigint) => string>(() => new Date().toISOString());
 
-  // initial load — newest non-empty window
+  // initial load: newest non-empty window
   useEffect(() => {
     if (!client) return;
     let alive = true;

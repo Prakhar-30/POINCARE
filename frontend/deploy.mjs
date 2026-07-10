@@ -1,6 +1,6 @@
 // Direct deployment of the full Poincaré system to Unichain Sepolia, bypassing
 // `forge script --broadcast` (this chain's eth_estimateGas is unreliable for these
-// txns, so every tx here carries an explicit gas limit — the same workaround the
+// txns, so every tx here carries an explicit gas limit, the same workaround the
 // frontend uses). Also guarantees USDC = currency0: token CREATE addresses are
 // precomputed from the deployer nonce and the constructor order is chosen so the
 // USDC token lands on the lower address (the whole app assumes that orientation).
@@ -23,7 +23,7 @@ const CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 const POOL_MANAGER = "0x00B036B58a818B1BC34d502D3fE730Db729e62AC";
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n; // 2^96
 
-// ---- config (mirror of script/DeployPoincareUnichain.s.sol) ----
+// config, mirrored from script/DeployPoincareUnichain.s.sol
 const CFG = {
   k: 10n ** 15n, //            slack 0.001
   h: 5n * 10n ** 15n, //       threshold 0.005
@@ -44,7 +44,7 @@ const WETH_SEED = parseUnits("1000", 18);
 const USDC_SEED = parseUnits("3000000", 18);
 const EXTRA_MINT = 1000n; // seed x1000 spare for trading/faucet
 
-// v4 hook permission flags (lowest 14 address bits must match EXACTLY)
+// v4 hook permission flags (the lowest 14 address bits must match)
 const FLAGS =
   (1n << 13n) /* BEFORE_INITIALIZE */ |
   (1n << 11n) /* BEFORE_ADD_LIQUIDITY */ |
@@ -113,7 +113,7 @@ async function main() {
   console.log(`deployer ${account.address} · balance ${formatEther(await pub.getBalance({ address: account.address }))} ETH`);
   nonce = await pub.getTransactionCount({ address: account.address, blockTag: "pending" });
 
-  // 1. Tokens — choose constructor order so USDC gets the LOWER address (currency0).
+  // Tokens: choose constructor order so USDC gets the lower address (currency0).
   const addrA = getContractAddress({ from: account.address, nonce: BigInt(nonce) });
   const addrB = getContractAddress({ from: account.address, nonce: BigInt(nonce) + 1n });
   const usdcFirst = addrA.toLowerCase() < addrB.toLowerCase();
@@ -130,11 +130,11 @@ async function main() {
     await deployToken("Poincare USD Coin", "USDC");
   }
 
-  // 2. Faucet.
+  // Faucet.
   const faucetRcpt = await send("deploy DemoFaucet", { data: deployData(FAUCET_ART, FAUCET_ABI, [wethAddr, usdcAddr]) }, 1_000_000n);
   const faucetAddr = faucetRcpt.contractAddress;
 
-  // 3. Mine + CREATE2-deploy the hook (permission flags in the address).
+  // Mine and CREATE2-deploy the hook (permission flags live in the address).
   const hookInit = deployData(HOOK_ART, [{ type: "constructor", inputs: HOOK_CTOR }], [POOL_MANAGER, CFG]);
   const initHash = keccak256(hookInit);
   let salt = 0n, hookAddr;
@@ -154,18 +154,18 @@ async function main() {
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  // 4. Lens.
+  // Lens.
   const lensRcpt = await send("deploy PoincareLens", { data: deployData(LENS_ART, LENS_ABI, [hookAddr]) }, 2_000_000n);
   const lensAddr = lensRcpt.contractAddress;
 
   const sendCall = (desc, to, abi, fn, args, gas) =>
     send(desc, { to, data: encodeFunctionData({ abi, functionName: fn, args }) }, gas);
 
-  // 5. Initialise the pool (custom curve prices off reserves; sqrtPrice is cosmetic).
+  // Initialise the pool; the custom curve prices off reserves, so sqrtPrice is cosmetic.
   const poolKey = { currency0: usdcAddr, currency1: wethAddr, fee: 0x800000, tickSpacing: 60, hooks: hookAddr };
   await sendCall("initialize pool", POOL_MANAGER, PM_ABI, "initialize", [poolKey, SQRT_PRICE_1_1], 600_000n);
 
-  // 6. Mint spare balances + seed hook-owned liquidity at 3000 USDC/WETH.
+  // Mint spare balances and seed hook-owned liquidity at 3000 USDC/WETH.
 
   await sendCall("mint USDC", usdcAddr, ERC20_ABI, "mint", [account.address, USDC_SEED * EXTRA_MINT], 300_000n);
   await sendCall("mint WETH", wethAddr, ERC20_ABI, "mint", [account.address, WETH_SEED * EXTRA_MINT], 300_000n);
@@ -177,7 +177,7 @@ async function main() {
     userInputSalt: "0x0000000000000000000000000000000000000000000000000000000000000000",
   }], 2_500_000n);
 
-  // 7. Persist.
+  // Persist.
   const out = {
     chainId: 1301,
     poolManager: POOL_MANAGER,

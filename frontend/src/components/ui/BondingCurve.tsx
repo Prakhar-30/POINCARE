@@ -50,16 +50,15 @@ export function BondingCurve({
     const dXdx = (W - 2 * pad) / (xMax - xMin);
     const dYdy = -((H - 2 * pad) / (yMax - yMin));
     const screenSlope = (slope * dYdy) / dXdx;
-    // build a short tangent segment, fanned by the directional spread on each side
+    // Short tangent segments, fanned apart by the directional spread on each side; a
+    // positive spread tilts the executable line steeper on the with-trend side.
     const L = 78;
     const tangent = (spreadFrac: number, dir: 1 | -1) => {
-      // a positive spread tilts the executable line steeper on the with-trend side
       const s = screenSlope * (1 + spreadFrac * 6);
       const dx = (dir * L) / Math.sqrt(1 + s * s);
       const dy = s * dx;
       return { x1: px, y1: py, x2: px + dx, y2: py + dy };
     };
-    // zeroForOne = sell-side (USDC->WETH path moves down-right); oneForZero = buy-side
     const ask = tangent(spreadOneForZero, 1); // buy WETH direction
     const bid = tangent(spreadZeroForOne, -1); // sell WETH direction
     return { path: d.trim(), px, py, bid, ask };
@@ -71,7 +70,6 @@ export function BondingCurve({
   return (
     <div className="relative rounded-md overflow-hidden" style={{ background: "var(--scope-bg)", border: "1px solid var(--border)" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height, display: "block" }}>
-        {/* faint grid */}
         {[0.25, 0.5, 0.75].map((g) => (
           <g key={g}>
             <line x1={pad + g * (W - 2 * pad)} y1={pad} x2={pad + g * (W - 2 * pad)} y2={H - pad} stroke="var(--divider)" strokeWidth={1} />
@@ -79,14 +77,12 @@ export function BondingCurve({
           </g>
         ))}
 
-        {/* the invariant */}
         <path d={path} fill="none" stroke="var(--lav)" strokeWidth={2.5} strokeLinecap="round" opacity={0.85} />
 
-        {/* executable tangents (the seam). bid = soft/against, ask = hard/with-trend */}
+        {/* executable tangents: bid = soft/against-trend, ask = hard/with-trend */}
         <line x1={ask.x1} y1={ask.y1} x2={ask.x2} y2={ask.y2} stroke="var(--up)" strokeWidth={2} strokeLinecap="round" opacity={leaning ? 0.95 : 0.4} />
         <line x1={bid.x1} y1={bid.y1} x2={bid.x2} y2={bid.y2} stroke="var(--down)" strokeWidth={2} strokeLinecap="round" opacity={leaning ? 0.95 : 0.4} />
 
-        {/* current reserve point */}
         <circle cx={px} cy={py} r={9} fill={accent} opacity={0.18} />
         <circle cx={px} cy={py} r={4.5} fill={accent} />
       </svg>

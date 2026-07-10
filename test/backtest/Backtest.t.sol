@@ -13,26 +13,26 @@ import {ControlLaw} from "../../src/libraries/ControlLaw.sol";
 import {AsymmetricCurve} from "../../src/libraries/AsymmetricCurve.sol";
 import {PriceLib} from "../../src/libraries/PriceLib.sol";
 
-/// @title BacktestTest — the headline LVR / manipulation-cost study (CLAUDE.md §6, §7.6, §9.5)
+/// @title BacktestTest: the headline LVR / manipulation-cost study
 /// @notice Replays a price path through three pools and reports the deliverables the brief gates
 ///         "definition of done" on:
 ///           - LVR reduction vs constant-product AND vs a vol-fee baseline;
 ///           - detection-delay distribution and false-alarm rate;
-///           - the §4.2 manipulation-cost inequality (max_soft_gain < min_trigger_cost).
+///           - the manipulation-cost inequality (max_soft_gain < min_trigger_cost).
 ///
 /// @dev    FIDELITY. The detector + control law + curve run the SAME library code as the hook
-///         (`Cusum`, `DirectionalSignal`, `ControlLaw`, `AsymmetricCurve`, `PriceLib`) — the
+///         (`Cusum`, `DirectionalSignal`, `ControlLaw`, `AsymmetricCurve`, `PriceLib`): the
 ///         back-test cannot diverge from on-chain pricing or detection. The hook's v4 settlement
 ///         is covered separately in `PoincareHook.t.sol`; here we isolate the economics on an
 ///         in-memory pool to run long paths cheaply.
 ///
 /// @dev    HONESTY / DATA. There is no oracle and we ship no proprietary price file, so the path
-///         is a SEEDED REGIME-SWITCHING synthetic (alternating calm chop and drift episodes) —
+///         is a seeded regime-switching synthetic (alternating calm chop and drift episodes);
 ///         the controlled environment where a trend detector should earn its keep and where
 ///         false alarms are observable. The reported LVR-reduction number is on this synthetic
 ///         path: illustrative-but-reproducible, NOT a claim about a specific real pair. Drop a
 ///         real return series into `_pathReturn` to obtain calibrated production numbers with the
-///         SAME engine — the milestone-6 calibration step in `analysis/CALIBRATION.md`.
+///         SAME engine: the milestone-6 calibration step in `analysis/CALIBRATION.md`.
 ///
 /// @dev    LVR MODEL. Each pool is an independent AMM. Every block its arbitrageur does the
 ///         PROFIT-MAXIMISING swap through the ACTUAL curve (`AsymmetricCurve.swapExactInWithSpread`)
@@ -42,7 +42,7 @@ import {PriceLib} from "../../src/libraries/PriceLib.sol";
 ///         and (b) the pool lags the trend by ~the spread (a real cost). The optimal arb input
 ///         has a closed form (below), so no search is needed. LVR == realised arb profit at fair.
 ///         A separate stream of uninformed ("benign") flow is charged the spread it faces, to
-///         measure each design's collateral damage to honest users — the dimension on which the
+///         measure each design's collateral damage to honest users: the dimension on which the
 ///         asymmetric, trend-gated spread is meant to beat a symmetric vol-fee.
 contract BacktestTest is Test {
     using Cusum for Cusum.State;
@@ -77,7 +77,7 @@ contract BacktestTest is Test {
         //                                       tuned so the vol-fee's average spread ≈ Poincaré's
         //                                       (an apples-to-apples "same friction budget" baseline)
 
-    // --- v2 adaptive detector (README §9.2): thresholds in σ-units (WAD == 1σ̂) ---
+    // v2 adaptive detector (README 9.2): thresholds in σ-units (WAD == 1σ̂) ---
     int256 internal constant K_A = 5e17; //      slack 0.5σ
     int256 internal constant H_A = 3e18; //      threshold 3σ of evidence
     int256 internal constant SMAX_A = 12e18; //  saturation 12σ
@@ -157,18 +157,18 @@ contract BacktestTest is Test {
         if (delayCount > 0) console2.log("avg detection delay (steps)", delaySum / delayCount);
         console2.log("false-alarm steps (kappa>0 in calm)", falseAlarmSteps);
 
-        // ---- claims (definition of done, §9.5) ----
-        // 1. Poincaré reduces LVR vs raw constant-product — the headline result. The v2
+        // claims (definition of done)
+        // 1. Poincaré reduces LVR vs raw constant-product: the headline result. The v2
         //    adaptive detector, with NO absolute-scale calibration (thresholds purely in
-        //    σ-units), must reproduce the reduction — the self-calibration claim of §9.2.
+        //    σ-units), must reproduce the reduction: the self-calibration claim.
         assertLt(poin.lvr, cpmm.lvr, "Poincare must reduce LVR vs constant-product");
         assertLt(poinA.lvr, cpmm.lvr, "the adaptive (sigma-unit) detector must also reduce LVR");
 
         // 2. The edge on honest users: at comparable (here: <=) average friction, the asymmetric
-        //    trend-gated spread taxes uninformed flow far LESS than the symmetric vol-fee — it
+        //    trend-gated spread taxes uninformed flow far LESS than the symmetric vol-fee: it
         //    spends its spread on the toxic side/time, not uniformly. (We REPORT the LVR-vs-vol-fee
         //    comparison but do not assert a direction: a symmetric spread can win on raw LVR by
-        //    over-taxing everyone — that is exactly the collateral damage the benign-cost metric
+        //    over-taxing everyone: that is exactly the collateral damage the benign-cost metric
         //    captures. The honest claim is a better LVR / benign-cost frontier, not raw LVR.)
         assertLe(poin.sumNom, vol.sumNom, "Poincare avg spread must not exceed the vol-fee's (fair comparison)");
         assertLt(poin.benignCost, vol.benignCost, "Poincare must tax uninformed flow less than the symmetric vol-fee");
@@ -336,17 +336,17 @@ contract BacktestTest is Test {
     }
 
     // ------------------------------------------------------------------
-    // §4.2 manipulation-cost inequality:  max_soft_gain(κ_max) < min_trigger_cost(k,h)
+    // manipulation-cost inequality:  max_soft_gain(κ_max) < min_trigger_cost(k,h)
     // ------------------------------------------------------------------
 
-    /// @notice For the SPREAD lever the soft (against-trend) side trades at the base price — the
+    /// @notice For the SPREAD lever the soft (against-trend) side trades at the base price: the
     ///         spread is a one-sided, NON-NEGATIVE haircut, never a discount. So an attacker who
     ///         pays to fake a trend gets ZERO extractable advantage on the other side: the best
     ///         they can do post-trigger is trade at constant-product prices (no edge), having
     ///         already paid real price-impact to drive the CUSUM to `h`. Hence
     ///         `max_soft_gain ≡ 0 < min_trigger_cost`, with margin = the whole trigger cost.
     /// @dev    This is why the MVP ships the spread lever and DEFERS the depth/curvature lever
-    ///         (OPEN_ITEMS E1): a depth discount WOULD create a soft-side prize and require the
+    ///        : a depth discount WOULD create a soft-side prize and require the
     ///         quantitative sizing the inequality demands. Here we (a) prove the soft side equals
     ///         the constant-product output exactly, and (b) measure a strictly positive trigger
     ///         cost on a real price push.

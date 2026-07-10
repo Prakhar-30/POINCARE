@@ -1,14 +1,13 @@
 // Local float model of the on-chain pricing pipeline (a = b = 0 base):
-//   effIn   = amountIn * (1 - fee)            (vol-scaled base fee, charged on input)
+//   effIn   = amountIn * (1 - fee)     vol-scaled base fee, charged on input
 //   baseOut = constant-product(effIn)
-//   out     = baseOut * (1 - spread)          (directional spread, with-trend side only)
+//   out     = baseOut * (1 - spread)   directional spread, with-trend side only
 //
-// EXECUTABLE numbers should come from the PoincareLens (wei-exact; see useQuote) — this
-// model is the instant fallback and the source of the COMPARISON fields: what a 0-fee
-// constant-product pool and a conventional 0.3%-fee pool would have given for the same
-// trade. Those are counterfactuals, so a float model is the right tool for them.
+// Executable numbers come wei-exact from the PoincareLens (see useQuote); this model is
+// the instant fallback and the source of the comparison fields (what a 0-fee CP pool and
+// a 0.3%-fee pool would have given). Those are counterfactuals, so floats are fine.
 
-const NORMAL_FEE = 0.003; // 0.3% — the conventional Uniswap pool we compare against
+const NORMAL_FEE = 0.003; // the conventional pool we compare against
 
 export type Quote = {
   out: number; // what Poincaré gives (after vol fee + directional spread)
@@ -21,7 +20,7 @@ export type Quote = {
   withTrend: boolean; // did this trade pay the trend spread
   /** USDC value of the trade (the USDC leg). */
   notionalUsdc: number;
-  /** Value (USDC) the directional spread returned to LPs — LVR a normal pool would leak. */
+  /** USDC value the directional spread returned to LPs (LVR a normal pool would leak). */
   lvrToLps: number;
   /** Output-token savings vs a 0.3% fee pool (can be negative when with-trend). */
   savedVsFee: number;
@@ -46,12 +45,10 @@ export function quote(r0: number, r1: number, amountIn: number, zeroForOne: bool
   const out = cpOut(amountIn * (1 - fee)) * (1 - spread);
   const feeOut = baseOut * (1 - NORMAL_FEE);
 
-  // exec price in USDC/WETH
   const execPrice = zeroForOne ? amountIn / out : out / amountIn;
   const impact = mid > 0 ? Math.abs(execPrice - mid) / mid : 0;
 
   const notionalUsdc = zeroForOne ? amountIn : amountIn * mid;
-  // value the directional spread took (in USDC): output-token * spread, valued in USDC
   const lvrToLps = zeroForOne ? baseOut * spread * mid : baseOut * spread;
   const savedVsFeeOutTok = out - feeOut; // output-token units
   const savedVsFee = zeroForOne ? savedVsFeeOutTok * mid : savedVsFeeOutTok;

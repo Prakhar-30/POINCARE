@@ -14,10 +14,10 @@ export type LiquidityStatus = "idle" | "busy" | "success" | "error";
 
 const erc20 = (address: `0x${string}`) => ({ address, abi: ERC20_ABI } as const);
 
-/** Hook-owned add/remove liquidity. The HOOK executes the `transferFrom` inside its
- *  unlock callback (it pays the PoolManager itself), so the hook — NOT the PoolManager —
- *  is the approval target. Approving the manager leaves allowance[user][hook] at zero and
- *  the add reverts with an allowance underflow (verified on a live failed tx). */
+/** Hook-owned add/remove liquidity. The hook executes the `transferFrom` inside its
+ *  unlock callback (it pays the PoolManager itself), so the HOOK, not the PoolManager,
+ *  is the approval target. Approving the manager leaves allowance[user][hook] at zero
+ *  and the add reverts with an allowance underflow (verified on a live failed tx). */
 export function useLiquidity(onDone?: () => void) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -28,7 +28,7 @@ export function useLiquidity(onDone?: () => void) {
 
   const hook = CONTRACTS.hook as `0x${string}`;
 
-  /** Approve the EXACT amount the hook needs for this token (no infinite approvals). */
+  /** Approve exactly what the hook needs for this token, never infinite. */
   async function approveExact(stepKey: string, token: `0x${string}`, need: bigint) {
     if (!address || !walletClient || !publicClient) return;
     const allowance = (await publicClient.readContract({ ...erc20(token), functionName: "allowance", args: [address, hook] })) as bigint;

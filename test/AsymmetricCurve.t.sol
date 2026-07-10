@@ -5,10 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {AsymmetricCurve} from "../src/libraries/AsymmetricCurve.sol";
 
-/// @title AsymmetricCurveTest — offset-hyperbola swap core (CLAUDE.md §7.3)
+/// @title AsymmetricCurveTest: offset-hyperbola swap core
 /// @notice Proves the single-curve safety guarantees the asymmetry layer will build on:
 ///         - every swap leaves the virtual invariant K = X·Y non-decreasing (no value
-///           creation / the pool never loses) — for all 4 cases;
+///           creation / the pool never loses): for all 4 cases;
 ///         - a buy-then-sell round trip ON THE SAME CURVE cannot profit;
 ///         - exact-in / exact-out are mutually consistent;
 ///         - deeper (larger) proportional offsets reduce price impact (the depth lever);
@@ -185,7 +185,7 @@ contract AsymmetricCurveTest is Test {
 
     /// @notice THE core arb-safety gate: a buy-then-sell round trip across a SYMMETRIC-DEPTH
     ///         base with arbitrary non-negative directional spreads can never return more
-    ///         token0 than was put in — for any reserves, offsets, size, and spreads. Reserves
+    ///         token0 than was put in: for any reserves, offsets, size, and spreads. Reserves
     ///         are moved on the SAME curve between the two legs (real re-anchoring).
     function testFuzz_spreadRoundTrip_neverProfits(
         uint256 x,
@@ -204,7 +204,7 @@ contract AsymmetricCurveTest is Test {
         spreadBuy = bound(spreadBuy, 0, 9e17); // up to 0.9 spread
         spreadSell = bound(spreadSell, 0, 9e17);
 
-        // Leg 1 — buy token0 with `amountIn` token1 (oneForZero), hardened by spreadBuy.
+        // Leg 1: buy token0 with `amountIn` token1 (oneForZero), hardened by spreadBuy.
         uint256 got0 = AsymmetricCurve.swapExactInWithSpread(x, y, a, b, amountIn, false, spreadBuy);
         vm.assume(got0 > 0 && got0 < x); // feasible
 
@@ -212,7 +212,7 @@ contract AsymmetricCurveTest is Test {
         uint256 x1 = x - got0;
         uint256 y1 = y + amountIn;
 
-        // Leg 2 — sell that token0 back (zeroForOne), hardened by spreadSell.
+        // Leg 2: sell that token0 back (zeroForOne), hardened by spreadSell.
         vm.assume(y1 > 1e6);
         uint256 back1 = AsymmetricCurve.swapExactInWithSpread(x1, y1, a, b, got0, true, spreadSell);
 
@@ -238,14 +238,14 @@ contract AsymmetricCurveTest is Test {
         spreadSell = bound(spreadSell, 0, 9e17);
         spreadBuy = bound(spreadBuy, 0, 9e17);
 
-        // Leg 1 — sell `amountIn` token0 for token1 (zeroForOne), hardened by spreadSell.
+        // Leg 1: sell `amountIn` token0 for token1 (zeroForOne), hardened by spreadSell.
         uint256 got1 = AsymmetricCurve.swapExactInWithSpread(x, y, a, b, amountIn, true, spreadSell);
         vm.assume(got1 > 0 && got1 < y);
 
         uint256 x1 = x + amountIn;
         uint256 y1 = y - got1;
 
-        // Leg 2 — buy token0 back with that token1 (oneForZero), hardened by spreadBuy.
+        // Leg 2: buy token0 back with that token1 (oneForZero), hardened by spreadBuy.
         vm.assume(x1 > 1e6);
         uint256 back0 = AsymmetricCurve.swapExactInWithSpread(x1, y1, a, b, got1, false, spreadBuy);
 
@@ -280,7 +280,7 @@ contract AsymmetricCurveTest is Test {
 
     function test_priced_rejectsOutputBeyondRealReserve() public {
         // Deep base: virtual reserve 200 but the pool holds only 100 token1. The formula would
-        // quote outputs past 100 — the pipeline must reject them (A7 extended to exact-in).
+        // quote outputs past 100: the pipeline must reject them (A7 extended to exact-in).
         // (External self-calls so expectRevert can observe the library revert.)
         vm.expectRevert(bytes("AsymmetricCurve: output exceeds reserve"));
         this.pricedInExternal(100e18, 100e18, 100e18, 100e18, 500e18, true, 0, 0);
@@ -326,13 +326,13 @@ contract AsymmetricCurveTest is Test {
         spread = bound(spread, 0, 9e17);
         fee = bound(fee, 0, 1e17); // up to a 10% fee, far past any sane cap
 
-        // Leg 1 — sell token0 (fee + possible spread). Skip infeasible draws (deep-base
-        // trades whose output would exceed the real reserve — the guard's job, tested above).
+        // Leg 1: sell token0 (fee + possible spread). Skip infeasible draws (deep-base
+        // trades whose output would exceed the real reserve: the guard's job, tested above).
         (uint256 got1, bool ok1) = _feasiblePricedIn(x, y, a, b, amountIn, true, spread, fee);
         vm.assume(ok1 && got1 > 0);
 
         // The pool keeps the WHOLE input (fee included) and pays out got1.
-        // Leg 2 — buy back with everything received.
+        // Leg 2: buy back with everything received.
         (uint256 back0, bool ok2) = _feasiblePricedIn(x + amountIn, y - got1, a, b, got1, false, spread, fee);
         vm.assume(ok2);
 
@@ -341,7 +341,7 @@ contract AsymmetricCurveTest is Test {
 
     /// @dev Priced exact-in that reports infeasible trades instead of reverting, so the fuzz
     ///      explores only the trades the hook would accept. Feasibility is checked against the
-    ///      LARGEST possible output (no fee, no spread) — if that fits, the priced one does.
+    ///      LARGEST possible output (no fee, no spread): if that fits, the priced one does.
     function _feasiblePricedIn(uint256 x, uint256 y, uint256 a, uint256 b, uint256 amt, bool zfo, uint256 spread, uint256 fee)
         private
         pure

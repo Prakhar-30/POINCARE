@@ -18,7 +18,7 @@ import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCus
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {MintableERC20} from "./MintableERC20.sol";
 
-/// @title ForkSmokeTest — validate the Sepolia fork wiring before the full simulation.
+/// @title ForkSmokeTest - validate the Sepolia fork wiring before the full simulation.
 contract ForkSmokeTest is Test {
     uint256 constant SEPOLIA = 11155111;
 

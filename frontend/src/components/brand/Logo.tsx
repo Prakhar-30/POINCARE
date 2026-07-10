@@ -1,6 +1,5 @@
 import clsx from "clsx";
 
-/** The Poincaré mark: the looping geodesic glyph (public/Logo.png), the whole thesis in one mark. */
 export function Mark({ size = 34, className }: { size?: number; className?: string }) {
   return (
     <img

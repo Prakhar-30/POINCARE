@@ -30,9 +30,7 @@ export function Pool() {
     <>
     <TxSteps stepper={lp.stepper} title={mode === "add" ? "Adding liquidity" : "Removing liquidity"} />
     <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
-      {/* ---- left: add / remove ---- */}
       <div className="card p-5 sm:p-6 min-w-0">
-        {/* mode toggle */}
         <div className="flex gap-1 mb-5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 4 }}>
           {(["add", "remove"] as const).map((m) => (
             <button
@@ -56,9 +54,7 @@ export function Pool() {
           : <RemovePanel pos={pos} lp={lp} />}
       </div>
 
-      {/* ---- right: curve + position ---- */}
       <div className="flex flex-col gap-4.5 min-w-0" style={{ gap: 18 }}>
-        {/* bonding curve */}
         <div className="card grain overflow-hidden">
           <div className="flex items-center justify-between gap-2 flex-wrap px-5 sm:px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
             <div className="flex items-center gap-2.5">
@@ -77,7 +73,6 @@ export function Pool() {
           </div>
         </div>
 
-        {/* position + LP LVR */}
         <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
           <div className="card-quiet p-5">
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".3px", color: "var(--text-3)", marginBottom: 14 }}>Your position</div>
@@ -122,13 +117,11 @@ export function Pool() {
   );
 }
 
-/* ---------------- add ---------------- */
-
 function AddPanel({ price, bal, lp }: { price: number; bal: ReturnType<typeof useBalances>; lp: ReturnType<typeof useLiquidity> }) {
   const [usdc, setUsdc] = useState("3000");
   const [weth, setWeth] = useState(price > 0 ? (3000 / price).toFixed(4) : "1");
 
-  // edit one leg, auto-fill the other at the pool ratio
+  // Editing one leg auto-fills the other at the pool ratio.
   const onUsdc = (v: string) => {
     setUsdc(v);
     const n = Number(v);
@@ -177,8 +170,6 @@ function AddPanel({ price, bal, lp }: { price: number; bal: ReturnType<typeof us
   );
 }
 
-/* ---------------- remove ---------------- */
-
 function RemovePanel({ pos, lp }: { pos: ReturnType<typeof usePosition>; lp: ReturnType<typeof useLiquidity> }) {
   const [pct, setPct] = useState(50);
 
@@ -190,7 +181,7 @@ function RemovePanel({ pos, lp }: { pos: ReturnType<typeof usePosition>; lp: Ret
   const disabled = busy || pos.shares <= 0 || pct <= 0;
 
   async function onRemove() {
-    // burn shares in raw 18-dec units (guard against float drift on 100%)
+    // Burn in raw 18-dec units; the 100% branch avoids float drift leaving dust.
     const shares = pct >= 100 ? parseUnits(pos.shares.toFixed(18), 18) : parseUnits(sharesToBurn.toFixed(18), 18);
     await lp.remove({ shares, valueUsdc, amount0: out0, amount1: out1 });
     pos.refetch();
@@ -231,8 +222,6 @@ function RemovePanel({ pos, lp }: { pos: ReturnType<typeof usePosition>; lp: Ret
     </>
   );
 }
-
-/* ---------------- bits ---------------- */
 
 function ctaStyle(disabled: boolean, success: boolean, base = "var(--up-deep)", glow = "rgba(107,184,154,.3)"): CSSProperties {
   return {

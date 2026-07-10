@@ -13,12 +13,12 @@ export type TradeQuote = Quote & {
 };
 
 /**
- * The trade quote. Executable amounts come from the PoincareLens — the same
- * libraries and projection the hook's swap path runs, so the quote matches
- * execution to the wei. The local float model stays as (a) the instant value
- * while the Lens read is in flight, and (b) the source of the comparison fields
- * (vs 0-fee constant-product, vs a 0.3%-fee pool), which are counterfactuals the
- * chain cannot answer.
+ * The trade quote. Executable amounts come from the PoincareLens, which runs the
+ * same libraries and projection as the hook's swap path, so the quote matches
+ * execution to the wei. The local float model stays as the instant value while
+ * the Lens read is in flight and as the source of the comparison fields (vs
+ * 0-fee constant-product, vs a 0.3%-fee pool), counterfactuals the chain
+ * cannot answer.
  */
 export function useTradeQuote(s: PoolState, amountIn: string, zeroForOne: boolean): TradeQuote {
   const { inSym } = legsOf(zeroForOne);

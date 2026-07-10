@@ -26,7 +26,7 @@ export function Analytics() {
 
   return (
     <div className="px-4 sm:px-6 pb-10 pt-5 flex flex-col" style={{ gap: 18 }}>
-      {/* ---- the Brain deep-dive ---- */}
+      {/* the Brain deep-dive */}
       <div className="card grain overflow-hidden">
         <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
           <div className="flex items-center gap-2.5">
@@ -65,7 +65,7 @@ export function Analytics() {
       </div>
 
       <div className="grid gap-4.5" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1fr) minmax(0,1.1fr)", gap: 18 }}>
-        {/* ---- detector configuration ---- */}
+        {/* detector configuration */}
         <div className="card p-6">
           <div className="flex items-center gap-2.5 mb-1">
             <span style={{ color: "var(--lav)" }}><Icon name="target" size={18} /></span>
@@ -90,7 +90,7 @@ export function Analytics() {
           </div>
         </div>
 
-        {/* ---- manipulation-cost / moat ---- */}
+        {/* manipulation-cost / moat */}
         <div className="card p-6">
           <div className="flex items-center gap-2.5 mb-1">
             <span style={{ color: "var(--up)" }}><Icon name="shield" size={18} /></span>
@@ -118,7 +118,7 @@ export function Analytics() {
         </div>
       </div>
 
-      {/* ---- LVR headline ---- */}
+      {/* LVR headline */}
       <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
         <HeadStat label="LVR reduction vs x·y=k" value="14.3%" color="var(--up)" tinted sub="back-test, synthetic regime path" />
         <HeadStat label="with the adaptive detector" value="29.6%" color="var(--up)" tinted sub="σ-normalized thresholds, same path" />
@@ -127,7 +127,7 @@ export function Analytics() {
         <HeadStat label="Detection delay" value="≈ 6 blocks" color="var(--honey-deep)" sub="after a real trend onset" />
       </div>
 
-      {/* ---- usage ---- */}
+      {/* usage */}
       <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
         <HeadStat label="Wallets connected" value={users ? fmtNum(users.total_wallets, 0) : "—"} color="var(--text)" sub="all time" />
         <HeadStat label="New this week" value={users ? fmtNum(users.new_7d, 0) : "—"} color="var(--lav-deep)" sub="first connection in 7 days" />

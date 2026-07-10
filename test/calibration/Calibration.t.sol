@@ -6,21 +6,21 @@ import {Test} from "forge-std/Test.sol";
 import {Cusum} from "../../src/libraries/Cusum.sol";
 import {DirectionalSignal} from "../../src/libraries/DirectionalSignal.sol";
 
-/// @title CalibrationTest — measurement engine for detector parameters (CLAUDE.md §1.3, §4.3)
+/// @title CalibrationTest: measurement engine for detector parameters
 /// @notice This is the reusable harness referenced by analysis/CALIBRATION.md. It MEASURES
-///         the calibration quantities — Average Run Length to false alarm (ARL₀) and detection
-///         delay — rather than trusting a formula, and asserts the qualitative laws the design
+///         the calibration quantities: Average Run Length to false alarm (ARL₀) and detection
+///         delay: rather than trusting a formula, and asserts the qualitative laws the design
 ///         depends on:
 ///           * ARL₀ is monotone increasing in the threshold h  (=> h is set from a target
 ///             false-alarm rate by bisection, never as a fixed block count);
 ///           * stronger drift is detected with a shorter delay (the data-dependent stopping
-///             time at the heart of the manipulation argument, §4.2);
+///             time at the heart of the manipulation argument);
 ///           * the EWMA decay `lambda` maps exactly to an effective window of N steps.
 ///
 /// @dev ILLUSTRATIVE NOISE MODEL. The "no-trend" returns here are a seeded zero-mean *uniform*
 ///      noise. This is enough to validate the methodology and the monotonic relationships;
 ///      it is NOT the real return distribution. Absolute ARL₀ numbers are therefore
-///      illustrative — at milestone 6 the empirical (heavy-tailed) return distribution of the
+///      illustrative: at milestone 6 the empirical (heavy-tailed) return distribution of the
 ///      target pair replaces `_noise`, and the SAME harness yields production `h`.
 contract CalibrationTest is Test {
     using Cusum for Cusum.State;
@@ -34,7 +34,7 @@ contract CalibrationTest is Test {
 
     /// @dev Zero-mean uniform noise in [-sigma, sigma], deterministic in (seed, t).
     /// @dev Hashes in EVM scratch space (0x00..0x3f) so the free-memory pointer never
-    ///      advances — essential inside the long measurement loops, otherwise Solidity's
+    ///      advances: essential inside the long measurement loops, otherwise Solidity's
     ///      never-freed memory expands quadratically and the run hits MemoryOOG.
     function _noise(uint256 seed, uint256 t, uint256 sigma) internal pure returns (int256) {
         uint256 u;

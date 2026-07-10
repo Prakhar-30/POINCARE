@@ -5,19 +5,15 @@ import {PoincareHook} from "./PoincareHook.sol";
 import {AsymmetricCurve} from "./libraries/AsymmetricCurve.sol";
 import {Cusum} from "./libraries/Cusum.sol";
 
-/// @title PoincareLens — read-only quoter for the Poincaré hook (CLAUDE.md §5, milestone 7)
-/// @notice Prices swaps and exposes detector state for routers / front-ends. It quotes using
-///         the EXACT same inputs and code the hook's swap path uses:
-///           * reserves      — read from the hook (`hook.reserves()`, the ERC-6909 claims);
-///           * spread + fee  — `hook.previewSpread`, the hook's OWN projection of the values
-///                             the next swap of this block pays (including the once-per-block
-///                             detector sample it would take — no stale-across-blocks quotes);
-///           * base offsets  — `hook.baseOffsets()` (the E0 supply-scaled depth, live);
-///           * pricing       — `AsymmetricCurve.swapExact*Priced`, the SAME composed pipeline
-///                             (fee -> curve -> spread, same rounding, same feasibility guards)
-///                             the hook executes.
-///         So a quote matches on-chain execution to the wei, rounding included, even when the
-///         quote is taken in a fresh block before anyone has swapped.
+/// @title PoincareLens - read-only quoter for the Poincaré hook
+/// @notice Prices swaps and exposes detector state for routers and front-ends, using the
+///         exact inputs and code the hook's swap path uses: reserves from `hook.reserves()`,
+///         spread and fee from `hook.previewSpread` (the hook's own projection of what the
+///         next swap of this block pays, including the once-per-block detector sample it
+///         would take), offsets from `hook.baseOffsets()`, and pricing through the same
+///         `AsymmetricCurve.swapExact*Priced` pipeline with the same rounding and
+///         feasibility guards. A quote therefore matches on-chain execution to the wei,
+///         even when taken in a fresh block before anyone has swapped.
 contract PoincareLens {
     /// @notice The hook this Lens quotes for.
     PoincareHook public immutable hook;
@@ -28,9 +24,7 @@ contract PoincareLens {
         hook = _hook;
     }
 
-    // ------------------------------------------------------------------
-    // quoting (matches on-chain execution, same block or fresh block)
-    // ------------------------------------------------------------------
+    // quoting
 
     /// @notice Quote an exact-input swap: given `amountIn`, the `amountOut` the trader receives.
     /// @param zeroForOne True: token0 in, token1 out. False: token1 in, token0 out.
@@ -43,8 +37,8 @@ contract PoincareLens {
 
     /// @notice Quote an exact-output swap: given `amountOut`, the `amountIn` the trader must pay.
     /// @param zeroForOne True: token0 in, token1 out. False: token1 in, token0 out.
-    /// @dev Reverts if `amountOut` is not strictly below the real reserve on the output side —
-    ///      the same feasibility boundary the hook enforces (OPEN_ITEMS A7).
+    /// @dev Reverts unless `amountOut` is strictly below the real reserve on the output
+    ///      side, the same feasibility boundary the hook enforces.
     function quoteExactOutput(bool zeroForOne, uint256 amountOut) external view returns (uint256 amountIn) {
         (uint256 r0, uint256 r1) = hook.reserves();
         (uint256 spread, uint256 fee) = hook.previewSpread(zeroForOne);
@@ -52,11 +46,9 @@ contract PoincareLens {
         (amountIn,) = AsymmetricCurve.swapExactOutPriced(r0, r1, a, b, amountOut, zeroForOne, spread, fee);
     }
 
-    // ------------------------------------------------------------------
-    // market state (price, depth, trend, asymmetry)
-    // ------------------------------------------------------------------
+    // market state
 
-    /// @notice Marginal (mid) price of token0 in token1, WAD — the base curve slope at the
+    /// @notice Marginal (mid) price of token0 in token1, WAD: the base curve slope at the
     ///         current point, spread- and fee-free. The executable bid/ask straddle this.
     function midPriceWad() external view returns (uint256) {
         (uint256 r0, uint256 r1) = hook.reserves();
@@ -88,7 +80,7 @@ contract PoincareLens {
             : WAD * amountIn / out; // token1 in / token0 out
     }
 
-    /// @notice The full detector/curve snapshot a router or UI needs in one call — the STORED
+    /// @notice The full detector/curve snapshot a router or UI needs in one call: the STORED
     ///         state (as of the last sample; see `hook.previewDetector()` for the projection).
     /// @return reserve0 token0 reserves.
     /// @return reserve1 token1 reserves.

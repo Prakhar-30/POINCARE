@@ -1,7 +1,7 @@
-// Historical replay: drive the live Poincaré pool through the repo's 6 months of REAL
+// Historical replay: drive the live Poincaré pool through the repo's 6 months of real
 // Binance ETH/USDC closes (analysis/simulation/realdata/eth_usdc_4h.csv, downsampled to
-// daily), via real router swaps — one per block, so every step also produces an on-chain
-// DetectorSample. Each swap AND each detector sample is mirrored to Supabase so the app
+// daily), via real router swaps, one per block, so every step also produces an on-chain
+// DetectorSample. Each swap and each detector sample is mirrored to Supabase so the app
 // has deep history immediately.
 //
 //   PK=0x.. [DRY=1] [STRIDE=6] node replay.mjs
@@ -17,7 +17,7 @@ const DRY = process.env.DRY === "1";
 const STRIDE = Number(process.env.STRIDE || "6"); // 6 x 4h candles = daily
 const PK = process.env.PK?.startsWith("0x") ? process.env.PK : `0x${process.env.PK}`;
 
-// ---- config from repo files (never stale vs the deployment) ----
+// config from repo files, never stale vs the deployment
 const dep = JSON.parse(fs.readFileSync(new URL("../deployments/unichain-sepolia.json", import.meta.url), "utf8"));
 const env = Object.fromEntries(
   fs.readFileSync(new URL("./.env", import.meta.url), "utf8")
@@ -39,7 +39,7 @@ const C = {
 // The whole script (and the frontend) assumes currency0 = USDC. The deploy sorts by
 // address, so verify instead of hoping.
 if (C.currency0.toLowerCase() !== C.usdc.toLowerCase()) {
-  console.error("ABORT: currency0 != USDC in this deployment — orientation assumptions would be wrong.");
+  console.error("ABORT: currency0 != USDC in this deployment: orientation assumptions would be wrong.");
   process.exit(1);
 }
 const POOL_KEY = { currency0: C.currency0, currency1: C.currency1, fee: C.fee, tickSpacing: C.tickSpacing, hooks: C.hook };
@@ -106,7 +106,7 @@ async function sb(table, row) {
   try {
     let res = await post(row);
     // If migration_002 has not been run yet the `hook` column (or the detector_samples
-    // table) does not exist — degrade to the legacy shape rather than losing the row.
+    // table) does not exist; degrade to the legacy shape rather than losing the row.
     if (!res.ok && res.status !== 409 && "hook" in row) {
       const { hook: _hook, ...legacy } = row;
       res = await post(legacy);
@@ -150,7 +150,7 @@ async function waitNextBlock() {
 }
 
 async function main() {
-  console.log(`replay ${DRY ? "(DRY RUN)" : "(LIVE)"} — account ${account.address} — hook ${C.hook}`);
+  console.log(`replay ${DRY ? "(DRY RUN)" : "(LIVE)"}: account ${account.address}: hook ${C.hook}`);
   const nativeStart = await pub.getBalance({ address: account.address });
   console.log("native ETH:", formatEther(nativeStart));
 

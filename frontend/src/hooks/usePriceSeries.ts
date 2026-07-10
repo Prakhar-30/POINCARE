@@ -12,7 +12,7 @@ export type PriceWindowKey = (typeof PRICE_WINDOWS)[number]["key"];
 const MAX_POINTS = 400; // plotting resolution; stride-downsample anything denser
 
 /**
- * Windowed price history from the backend — the FULL recorded history for the selected
+ * Windowed price history from the backend: the full recorded history for the selected
  * window, independent of how much of the trade tape is loaded on screen. Keeps the
  * previous window's data while the next one loads so switching doesn't flash empty.
  */

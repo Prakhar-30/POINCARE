@@ -4,13 +4,13 @@ import type { PublicClient } from "viem";
  * Resolve a gas limit ourselves instead of letting the wallet estimate.
  *
  * Some public RPCs (Unichain Sepolia among them) have a flaky `eth_estimateGas`
- * for hook calls — the node mis-simulates the v4 unlock/settle path and reverts
+ * for hook calls: the node mis-simulates the v4 unlock/settle path and reverts
  * the estimate, so MetaMask refuses to send even though the tx itself is valid
- * (which is why entering a manual limit worked). We try a node estimate with a
- * buffer, and if that throws we fall back to a known-safe constant. Passing an
+ * (which is why entering a manual limit worked). Try a node estimate with a
+ * buffer; if that throws, fall back to a known-safe constant. Passing an
  * explicit `gas` to `writeContract` makes viem skip the wallet's own estimation.
  *
- * Note: gas limit is only a ceiling — the sender still pays for gas actually used,
+ * A gas limit is only a ceiling; the sender still pays for gas actually used,
  * so a generous fallback costs nothing extra when the call is cheap.
  */
 export async function resolveGas(
@@ -37,7 +37,7 @@ export const GAS = {
 } as const;
 
 /**
- * The account's next nonce, read from the node's PENDING state and passed explicitly
+ * The account's next nonce, read from the node's pending state and passed explicitly
  * to every write. MetaMask keeps its own nonce cache, and on Unichain Sepolia that
  * cache goes stale when transactions are sent back-to-back (approve -> swap, or the
  * two faucet mints): the wallet reuses a nonce, the node rejects it, and the user

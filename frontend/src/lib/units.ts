@@ -3,7 +3,7 @@ import { TOKENS, type TokenSym } from "@/config/contracts";
 
 /**
  * All token-amount conversions go through here so the token's actual decimals are
- * used everywhere. Never `parseUnits(x, 18)` or `Number(x) / 1e18` in feature code —
+ * used everywhere. Never `parseUnits(x, 18)` or `Number(x) / 1e18` in feature code:
  * the demo tokens happen to be 18-decimals, but real USDC is 6 and a hardcoded 18
  * fails silently (off by 1e12).
  */
@@ -21,7 +21,7 @@ export function toWei(amount: string | number, sym: TokenSym): bigint {
   }
 }
 
-/** Wei -> human number for a token (display only — keep bigint for tx math). */
+/** Wei -> human number for a token (display only; keep bigint for tx math). */
 export function fromWei(wei: bigint, sym: TokenSym): number {
   return Number(formatUnits(wei, TOKENS[sym].decimals));
 }

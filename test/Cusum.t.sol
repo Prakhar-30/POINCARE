@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Cusum} from "../src/libraries/Cusum.sol";
 
-/// @title CusumTest — unit + fuzz coverage for the two-sided CUSUM detector (CLAUDE.md §7.1)
+/// @title CusumTest: unit + fuzz coverage for the two-sided CUSUM detector
 /// @notice Verifies the properties the brief gates on:
 ///         - zero-drift / sub-slack noise -> never fires (low false-alarm side);
 ///         - a real drift -> fires with a bounded delay;
@@ -86,8 +86,8 @@ contract CusumTest is Test {
         assertEq(uint256(dir), uint256(Cusum.Trend.Down), "expected Down");
     }
 
-    /// @notice The core property: the stopping time is data-dependent — a stronger drift
-    ///         is detected sooner. (CLAUDE.md §1.3 / §7.1)
+    /// @notice The core property: the stopping time is data-dependent: a stronger drift
+    ///         is detected sooner.
     function test_firingDelayIsDataDependent() public pure {
         (uint256 slow,) = _stepsToAlarm(5e15, K, H, 100); // weaker drift
         (uint256 fast,) = _stepsToAlarm(9e15, K, H, 100); // stronger drift
@@ -145,7 +145,7 @@ contract CusumTest is Test {
     // ---------------------------------------------------------------------
 
     /// @notice Any per-step move strictly below the slack can never grow the statistics
-    ///         away from zero — k is a hard noise floor. (invariant for CLAUDE.md §1.2)
+    ///         away from zero: k is a hard noise floor. (invariant for )
     function testFuzz_subSlackMovesNeverAccumulate(int256 r) public pure {
         // r % K lands strictly inside (-K, K), i.e. |r| <= K - 1.
         int256 bounded = r % K;
@@ -173,7 +173,7 @@ contract CusumTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // updateCapped — bounded accumulation (never-revert + κ saturation)
+    // updateCapped: bounded accumulation (never-revert + κ saturation)
     // ---------------------------------------------------------------------
 
     function test_updateCapped_saturatesAtSMax() public pure {

@@ -24,7 +24,7 @@ export function Trade() {
   const tape = useOnchainTape();
   const narrow = useIsNarrow();
 
-  // show 18 at a time; reveal more on demand and page the chain when the buffer runs low
+  // Reveal 18 rows at a time; page the chain when the buffer runs low.
   const PAGE = 18;
   const [visible, setVisible] = useState(PAGE);
   const shownRows = tape.rows.slice(0, visible);
@@ -69,8 +69,8 @@ export function Trade() {
     <>
     <TxSteps stepper={stepper} title="Swapping" />
     <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
-      {/* ---- swap form (spacing tuned so its lower edge lines up with the tape +
-           comparison cards in the other columns) ---- */}
+      {/* Swap form; spacing tuned so its lower edge lines up with the tape and
+          comparison cards in the other columns. */}
       <div className="card p-4 sm:p-5 min-w-0">
         <div className="flex justify-between items-center mb-3">
           <span className="font-display" style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Swap</span>
@@ -91,13 +91,9 @@ export function Trade() {
         </div>
         <TokenRow label="You receive · est" sub="via the live curve" sym={buySym} value={q.out > 0 ? fmtNum(q.out, buySym === "WETH" ? 5 : 2) : "0"} />
 
-        {/* trend badge */}
         <TrendBadge withTrend={q.withTrend} trend={s.trend} spread={spread} />
-
-        {/* the comparison — the LVR story per trade */}
         <Comparison q={q} />
 
-        {/* details */}
         <div className="mt-3 flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
           <Detail label="Effective price" value={`${fmtUsd(q.execPrice)} / WETH`} />
           <Detail label="Directional spread" value={fmtPct(spread)} color={spread > 0 ? "var(--honey-deep)" : undefined} />
@@ -129,7 +125,6 @@ export function Trade() {
           </div>
         </div>
 
-        {/* CTA */}
         <button
           onClick={onSwap}
           disabled={disabled}
@@ -149,7 +144,6 @@ export function Trade() {
           {busy ? "Confirming…" : status === "success" ? "Swapped ✓" : insufficient ? `Insufficient ${sellSym}` : `Swap ${sellSym} → ${buySym}`}
         </button>
 
-        {/* faucet */}
         {sellBal < 1 && (
           <button onClick={() => faucet.mint()} disabled={faucet.minting} className="mt-3 w-full text-center font-bold" style={{ color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 14, padding: "11px", fontSize: 12.5 }}>
             {faucet.minting ? "Minting test tokens…" : "Get test tokens (50k USDC · 20 WETH)"}
@@ -157,7 +151,6 @@ export function Trade() {
         )}
       </div>
 
-      {/* ---- middle: price chart + explainer ---- */}
       <div className="flex flex-col min-w-0" style={{ gap: 14 }}>
       <div className="card p-5 sm:p-6 min-w-0">
         <PoolChart height={158} />
@@ -185,7 +178,6 @@ export function Trade() {
       </div>
       </div>
 
-      {/* ---- tape ---- */}
       <div className="min-w-0">
         <Tape rows={shownRows} onLoadMore={onTapeLoadMore} hasMore={tapeHasMore} loadingMore={tape.loadingMore} maxHeight={510} badge="on-chain · live" />
       </div>

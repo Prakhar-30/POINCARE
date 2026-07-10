@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
 
-// Signature illustration: a constant-product hyperbola (calm, grey) and the same curve
-// "leaning" on the with-trend side (honey), the directional spread drawn as the kink at
-// the operating point. This is the whole product in one picture.
+// Landing illustration: a constant-product hyperbola (calm, grey) and the same curve
+// leaning on the with-trend side (honey), the directional spread drawn as the kink at
+// the operating point.
 const W = 460;
 const H = 340;
 const P = 34;
 
-// chart domain. YMIN sits below the leaning curve's lowest point so it never clips the frame.
+// Chart domain; YMIN sits below the leaning curve's lowest point so it never clips.
 const XMIN = 0.2;
 const XMAX = 1.0;
 const YMIN = 0.1;
@@ -21,7 +21,7 @@ function hyperbola(k: number, lean = 0) {
   const pts: string[] = [];
   for (let i = 0; i <= 60; i++) {
     const x = XMIN + (i / 60) * (XMAX - XMIN);
-    // lean steepens the right (buy) side: y reduced as x grows past the midpoint
+    // lean steepens the right (buy) side past the midpoint
     const t = Math.max(0, (x - 0.55) / 0.45);
     const y = (k / x) * (1 - lean * t);
     pts.push(`${sx(x).toFixed(1)},${sy(y).toFixed(1)}`);
@@ -34,7 +34,6 @@ export function CurveVisual() {
   const calm = hyperbola(k, 0);
   const lean = hyperbola(k, LEAN);
 
-  // operating point ~ middle (on the calm curve)
   const ox = sx(0.55);
   const oy = sy(k / 0.55);
 

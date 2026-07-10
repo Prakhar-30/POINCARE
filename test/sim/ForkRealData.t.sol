@@ -20,12 +20,12 @@ import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCus
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {MintableERC20} from "./MintableERC20.sol";
 
-/// @title ForkRealDataTest — feed REAL 6-month ETH/USDC history to the hook on a Sepolia v4 fork
+/// @title ForkRealDataTest - feed real 6-month ETH/USDC history to the hook on a Sepolia v4 fork
 /// @notice Identical comparative engine to ForkSimulation, but `fair` is driven by the REAL
 ///         Binance ETHUSDC 4h closes (Dec 2025 -> Jun 2026, 1080 points) fetched by
 ///         analysis/simulation/fetch_realdata.py into realdata/prices_wad.txt. Two pools on the
-///         real Sepolia PoolManager — POINCARE (kappa_max 5%) vs CONTROL (kappa_max 0 = plain
-///         constant product) — see how the detector + curve behave against true market action.
+///         real Sepolia PoolManager: POINCARE (kappa_max 5%) vs CONTROL (kappa_max 0 = plain
+///         constant product), to see how the detector + curve behave against true market action.
 contract ForkRealDataTest is Test {
     using CurrencyLibrary for Currency;
 

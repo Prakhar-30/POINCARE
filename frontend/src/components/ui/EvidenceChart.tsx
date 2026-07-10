@@ -5,14 +5,14 @@ import type { DetectorPoint } from "@/lib/onchain";
  * The detector's state over time: both one-sided CUSUM statistics against the firing
  * threshold h, with the blocks where the curve was leaning (kappa > 0) shaded.
  *
- * Left of the seam: REAL on-chain DetectorSample points. Right of the seam: a short
- * PROJECTED continuation — each statistic extended along its recent drift with the
- * increment decaying toward the CUSUM's natural drain (-k per quiet block) — drawn
- * dashed and faded, and replaced by real samples as they arrive. The projection keeps
+ * Left of the seam: real on-chain DetectorSample points. Right of the seam: a short
+ * projected continuation, each statistic extended along its recent drift with the
+ * increment decaying toward the CUSUM's natural drain (-k per quiet block), drawn
+ * dashed and faded and replaced by real samples as they arrive. The projection keeps
  * the chart legible between trades without pretending to be data.
  *
- * Orientation note: the hook's internal price is WETH/USDC, the inverse of the UI's
- * USDC/WETH chart. s_pos (hook "up") is therefore evidence of a FALLING chart price
+ * Orientation: the hook's internal price is WETH/USDC, the inverse of the UI's
+ * USDC/WETH chart. s_pos (hook "up") is therefore evidence of a falling chart price
  * and s_neg of a rising one; the series are labelled by chart direction to match
  * everything else the user sees.
  */
@@ -36,7 +36,7 @@ export function EvidenceChart({
     const n = points.length;
     if (n < 2) return null;
 
-    // --- projected continuation: recent per-step drift, decaying 12%/step, floor 0 ---
+    // Projected continuation: recent per-step drift, decaying 12%/step, floored at 0.
     const drift = (get: (p: DetectorPoint) => number) => {
       const tail = points.slice(-6);
       let d = 0;
@@ -54,8 +54,8 @@ export function EvidenceChart({
       }
       return out;
     };
-    const projDown = extend((p) => p.s_pos); // hook s_pos = chart DOWN evidence
-    const projUp = extend((p) => p.s_neg); //   hook s_neg = chart UP evidence
+    const projDown = extend((p) => p.s_pos); // hook s_pos = chart down evidence
+    const projUp = extend((p) => p.s_neg); // hook s_neg = chart up evidence
 
     const total = n + PROJ;
     const top = Math.max(
@@ -70,7 +70,7 @@ export function EvidenceChart({
     const path = (vals: number[], startIdx: number) =>
       vals.map((v, i) => `${i === 0 ? "M" : "L"}${x(startIdx + i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
 
-    // contiguous kappa>0 stretches in the REAL region -> shaded lean bands
+    // Contiguous kappa > 0 stretches in the real region become shaded lean bands.
     const bands: { x0: number; x1: number }[] = [];
     let start = -1;
     points.forEach((p, i) => {
@@ -104,7 +104,7 @@ export function EvidenceChart({
       >
         {loading && <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />}
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--faint)" }}>
-          {loading ? "Loading detector history…" : "Waiting for detector samples — one is recorded per traded block."}
+          {loading ? "Loading detector history…" : "Waiting for detector samples (one is recorded per traded block)."}
         </span>
       </div>
     );

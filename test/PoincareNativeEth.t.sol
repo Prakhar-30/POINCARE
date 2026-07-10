@@ -12,7 +12,7 @@ import {PoincareHook} from "../src/PoincareHook.sol";
 import {PoincareLens} from "../src/PoincareLens.sol";
 import {PoincareTestBase} from "./utils/PoincareTestBase.sol";
 
-/// @title PoincareNativeEthTest — the hook on a native-ETH pair (OPEN_ITEMS F "not yet covered")
+/// @title PoincareNativeEthTest: the hook on a native-ETH pair
 /// @notice currency0 = native ETH (address(0)), currency1 = an ERC20. Exercises the full
 ///         lifecycle: seeding hook-owned liquidity with msg.value (the BaseCustomAccounting
 ///         native path, including the excess refund), swaps in both directions through the

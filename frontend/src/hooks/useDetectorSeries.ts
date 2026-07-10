@@ -34,7 +34,7 @@ async function scanChunked(client: PublicClient, from: bigint, to: bigint) {
  * from the hook's `DetectorSample` event. History comes from the backend mirror (which
  * outlives the RPC's log window); the live edge is read from the chain in chunked
  * windows and written back to the mirror, so whichever client is watching keeps the
- * shared history current — even after hours of idle gap.
+ * shared history current even after hours of idle gap.
  */
 export function useDetectorSeries() {
   const client = usePublicClient();
