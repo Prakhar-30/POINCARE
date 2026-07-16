@@ -479,7 +479,14 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
                 amount0 = FullMath.mulDiv(params.amount1Desired, r0, r1);
                 amount1 = params.amount1Desired;
             }
-            shares = FullMath.mulDiv(amount0, supply, r0);
+            // Price the mint off the SCARCER side, not just token0. When a counterpart
+            // amount floors down (extreme reserve ratios can floor it to zero), pricing
+            // shares off the full token0 would mint claims the token1 deposit never backed,
+            // letting a zero-/under-funded add skim the scarce reserve on withdrawal. The
+            // min ties shares to whichever side is actually funded and rounds against the
+            // depositor; requiring both sides positive rejects the zero-counterpart add.
+            require(amount0 > 0 && amount1 > 0, "insufficient");
+            shares = Math.min(FullMath.mulDiv(amount0, supply, r0), FullMath.mulDiv(amount1, supply, r1));
             require(shares > 0, "insufficient");
         }
     }
