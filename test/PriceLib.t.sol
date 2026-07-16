@@ -92,9 +92,19 @@ contract PriceLibTest is Test {
         harness.priceWad(0, 100e18);
     }
 
-    function test_logReturn_revertsOnZeroPrice() public {
-        // lnWad(0) is undefined; a zero price must not silently produce a bogus return.
-        vm.expectRevert();
-        harness.logReturnWad(WAD, 0);
+    /// @notice A price that rounds out of lnWad's domain must NOT revert (that would brick
+    ///         the first swap of a block); it clamps to an extreme return, which the hook's
+    ///         Huber clip caps anyway. See Olympix 4.2.2 / 4.2.4.
+    function test_logReturn_clampsOnZeroPrice() public view {
+        // ratio floors to 0 -> clamped to 1 -> lnWad(1) = ln(1e-18), a large negative return.
+        int256 r = harness.logReturnWad(WAD, 0);
+        assertLt(r, -40e18, "a collapse-to-zero price must clamp to a large negative return");
+    }
+
+    function test_logReturn_clampsOnOverflowRatio() public view {
+        // newPrice large enough that the ratio would exceed int256.max clamps instead of
+        // wrapping negative and reverting; the return is large-positive and finite.
+        int256 r = harness.logReturnWad(WAD, type(uint256).max);
+        assertGt(r, 40e18, "an astronomic up-move must clamp to a large positive return");
     }
 }
