@@ -8,6 +8,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -153,6 +154,19 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint128 private _b0;
     uint256 private _supply0; // post-seed LP share supply the offsets are anchored to
 
+    /// @dev Reentrancy lock held for the whole of an add/remove-liquidity call, including
+    ///      the inherited settlement. `_beforeSwap` reverts while it is set, so a payout
+    ///      recipient (native ETH or a callback-capable token) cannot reenter a swap
+    ///      mid-withdrawal and price against half-settled reserves or a stale supply.
+    ///      Transient: it only ever needs to live within a single transaction.
+    uint256 private transient _liquidityLock;
+
+    modifier lockLiquidity() {
+        _liquidityLock = 1;
+        _;
+        _liquidityLock = 0;
+    }
+
     /// @dev In-memory projection of one detector step; shared by the swap path and the
     ///      read-only previews so the two can never drift.
     struct DetectorSnap {
@@ -203,6 +217,42 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         feeGamma = cfg.feeGamma;
         feeCap = cfg.feeCap;
         alphaWad = cfg.alphaWad;
+    }
+
+    // reentrancy guard
+
+    /// @dev Hold the liquidity lock across the whole add, including the unlock/settlement
+    ///      that pulls tokens from the depositor, so nothing can reenter a swap in between.
+    function addLiquidity(AddLiquidityParams calldata params)
+        public
+        payable
+        override
+        lockLiquidity
+        returns (BalanceDelta delta)
+    {
+        return super.addLiquidity(params);
+    }
+
+    /// @dev Hold the liquidity lock across the whole removal, including the payout `take`s
+    ///      that transfer withdrawn assets to the caller. A native-ETH or callback-capable
+    ///      recipient therefore cannot reenter `_beforeSwap` before shares are burned.
+    function removeLiquidity(RemoveLiquidityParams calldata params)
+        public
+        override
+        lockLiquidity
+        returns (BalanceDelta delta)
+    {
+        return super.removeLiquidity(params);
+    }
+
+    /// @dev Block swaps while a liquidity modification is settling; see `_liquidityLock`.
+    function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
+        internal
+        override
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        require(_liquidityLock == 0, "reentrant swap");
+        return super._beforeSwap(sender, key, params, hookData);
     }
 
     // swap pricing
