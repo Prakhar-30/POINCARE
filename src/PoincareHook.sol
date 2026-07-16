@@ -465,6 +465,11 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
                 uint256 a0 = FullMath.mulDiv(alphaWad, amount0, WAD);
                 uint256 b0 = FullMath.mulDiv(alphaWad, amount1, WAD);
                 require(a0 <= type(uint128).max && b0 <= type(uint128).max, "offset overflow");
+                // Both offsets must be nonzero: the executable mid is (r1+b)/(r0+a), so a
+                // seed tiny enough on one side to floor its offset to zero (while the other
+                // stays positive) would anchor the curve away from the seeded ratio and open
+                // an arbitrage seam. Reject such a seed rather than anchor a skewed mid.
+                require(a0 > 0 && b0 > 0, "offset seed too small");
                 _a0 = uint128(a0);
                 _b0 = uint128(b0);
                 _supply0 = shares;
