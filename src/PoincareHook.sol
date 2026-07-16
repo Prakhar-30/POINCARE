@@ -458,8 +458,10 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         if (supply == 0) {
             // First deposit seeds the curve; shares = geometric mean of the deposit.
             // MINIMUM_LIQUIDITY is locked forever on the first mint (see `_mint`) so the
-            // share supply can never be driven to dust. Reserves are ERC-6909 claims, not
-            // raw balanceOf, so a token donation cannot skew them either.
+            // share supply can never be driven to dust. Reserves are ERC-6909 claims, so a
+            // raw ERC20 transfer to the hook is ignored — but ERC-6909 claims are themselves
+            // transferable, so a claim donation CAN move `_reserves()` (see the note on
+            // `_reserves`). It cannot mint shares for the donor and is bounded in cost.
             amount0 = params.amount0Desired;
             amount1 = params.amount1Desired;
             shares = Math.sqrt(amount0 * amount1);
@@ -532,6 +534,18 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     // views
 
     /// @notice Current reserves = the hook's ERC-6909 claim balances of each currency.
+    /// @dev Raw ERC20 transfers to the hook are NOT reserves (we read claim balances, not
+    ///      token balanceOf). ERC-6909 claims, however, are transferable, so anyone can
+    ///      credit claims to the hook and inflate `_reserves()` outside add-liquidity. This
+    ///      is economically bounded, not free: donated claims become pool reserves owned
+    ///      pro-rata by ALL LP shares, so the donor forfeits them (recovering only their own
+    ///      share fraction) — the same "manipulation must move real value at real cost" moat
+    ///      the detector relies on. Consequences are contained: shares price off the scarcer
+    ///      funded side (see `_getAmountIn`), and a donation that biases the once-per-block
+    ///      detector sample costs the donor real, gifted capital. Eliminating even this
+    ///      bounded surface would require shadow-accounted reserves — a core model change
+    ///      deferred to the full audit rather than rushed (divergence from real claims would
+    ///      be a worse, solvency-class bug).
     function _reserves() internal view returns (uint256 r0, uint256 r1) {
         PoolKey memory key = poolKey();
         r0 = poolManager.balanceOf(address(this), key.currency0.toId());

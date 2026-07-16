@@ -28,6 +28,19 @@ All contracts under `src/` — 7 files, ~685 source lines (cloc), Solidity 0.8.3
 5. **Bounded asymmetry.** The spread intensity kappa stays within `[kappaMin, kappaMax]` and moves at most `dMax` per block; the vol fee is capped at `feeCap`.
 6. **Quote fidelity.** `PoincareLens` quotes through the same libraries and per-block projection (`previewSpread` / `previewDetector`) as the swap path and must match execution exactly, including in a fresh block before the first swap.
 
+## Known, bounded residual (documented, not a fix)
+
+Reserves are the hook's ERC-6909 claim balances. Raw ERC20 transfers to the hook are
+ignored, but ERC-6909 claims are themselves transferable, so a claim donation *can* move
+`_reserves()` outside the add-liquidity path. This is bounded, not free: donated claims
+become pool reserves owned pro-rata by all LP shares, so the donor forfeits them and only
+recovers their own share fraction — the same "manipulation must move real value at real
+cost" property the detector relies on. Share pricing was hardened to price off the scarcer
+funded side (rejecting zero-counterpart adds). Fully removing this surface needs
+shadow-accounted reserves, a core-model change intentionally deferred to the paid audit
+(a shadow reserve diverging from real claims would be a worse, solvency-class bug).
+Reviewers should size the shadow-accounting trade-off explicitly.
+
 ## Existing coverage
 
 118 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation), fork simulations, and adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns).
