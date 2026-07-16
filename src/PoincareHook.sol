@@ -154,11 +154,9 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint128 private _b0;
     uint256 private _supply0; // post-seed LP share supply the offsets are anchored to
 
-    /// @dev Reentrancy lock held for the whole of an add/remove-liquidity call, including
-    ///      the inherited settlement. `_beforeSwap` reverts while it is set, so a payout
-    ///      recipient (native ETH or a callback-capable token) cannot reenter a swap
-    ///      mid-withdrawal and price against half-settled reserves or a stale supply.
-    ///      Transient: it only ever needs to live within a single transaction.
+    /// @dev Held across add/remove liquidity incl. settlement; `_beforeSwap` reverts while
+    ///      set, so a native/callback payout recipient cannot reenter a swap mid-withdrawal
+    ///      and price against half-settled reserves. Transient: lives within one tx.
     uint256 private transient _liquidityLock;
 
     modifier lockLiquidity() {
@@ -221,8 +219,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
     // reentrancy guard
 
-    /// @dev Hold the liquidity lock across the whole add, including the unlock/settlement
-    ///      that pulls tokens from the depositor, so nothing can reenter a swap in between.
+    /// @dev Lock the whole add so nothing can reenter a swap during settlement.
     function addLiquidity(AddLiquidityParams calldata params)
         public
         payable
@@ -233,9 +230,8 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         return super.addLiquidity(params);
     }
 
-    /// @dev Hold the liquidity lock across the whole removal, including the payout `take`s
-    ///      that transfer withdrawn assets to the caller. A native-ETH or callback-capable
-    ///      recipient therefore cannot reenter `_beforeSwap` before shares are burned.
+    /// @dev Lock the whole removal so a native/callback payout recipient cannot reenter
+    ///      `_beforeSwap` before shares are burned.
     function removeLiquidity(RemoveLiquidityParams calldata params)
         public
         override
@@ -339,10 +335,9 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         if (block.number == _lastSampledBlock || r0 == 0 || r1 == 0) return s;
 
-        // Nonzero reserves are not enough: at an extreme ratio the WAD marginal price can
-        // floor to 0. Skip the sample rather than persist a 0 baseline (which would blind
-        // the detector) or feed 0 into lnWad (which would revert the swap). Falling back to
-        // the stored state keeps the swap pricing — the detector just misses this block.
+        // Nonzero reserves are not enough: at an extreme ratio the marginal price can floor
+        // to 0. Skip the sample (no 0 baseline to blind the detector, no lnWad(0) revert)
+        // and fall back to stored state so the swap still prices.
         uint256 priceWad = AsymmetricCurve.marginalPriceWad(r0, r1, s.offsetA, s.offsetB);
         if (priceWad == 0) return s;
 
@@ -456,12 +451,8 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         uint256 supply = totalSupply();
 
         if (supply == 0) {
-            // First deposit seeds the curve; shares = geometric mean of the deposit.
-            // MINIMUM_LIQUIDITY is locked forever on the first mint (see `_mint`) so the
-            // share supply can never be driven to dust. Reserves are ERC-6909 claims, so a
-            // raw ERC20 transfer to the hook is ignored — but ERC-6909 claims are themselves
-            // transferable, so a claim donation CAN move `_reserves()` (see the note on
-            // `_reserves`). It cannot mint shares for the donor and is bounded in cost.
+            // First deposit seeds the curve; shares = geometric mean. MINIMUM_LIQUIDITY is
+            // locked on the first mint (see `_mint`) so supply can't be driven to dust.
             amount0 = params.amount0Desired;
             amount1 = params.amount1Desired;
             shares = Math.sqrt(amount0 * amount1);
@@ -474,10 +465,9 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
                 uint256 a0 = FullMath.mulDiv(alphaWad, amount0, WAD);
                 uint256 b0 = FullMath.mulDiv(alphaWad, amount1, WAD);
                 require(a0 <= type(uint128).max && b0 <= type(uint128).max, "offset overflow");
-                // Both offsets must be nonzero: the executable mid is (r1+b)/(r0+a), so a
-                // seed tiny enough on one side to floor its offset to zero (while the other
-                // stays positive) would anchor the curve away from the seeded ratio and open
-                // an arbitrage seam. Reject such a seed rather than anchor a skewed mid.
+                // Both offsets must be nonzero: the mid is (r1+b)/(r0+a), so a seed that
+                // floors one offset to 0 while the other stays positive anchors the curve
+                // off the seeded ratio, opening an arb seam. Reject it.
                 require(a0 > 0 && b0 > 0, "offset seed too small");
                 _a0 = uint128(a0);
                 _b0 = uint128(b0);
@@ -493,12 +483,10 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
                 amount0 = FullMath.mulDiv(params.amount1Desired, r0, r1);
                 amount1 = params.amount1Desired;
             }
-            // Price the mint off the SCARCER side, not just token0. When a counterpart
-            // amount floors down (extreme reserve ratios can floor it to zero), pricing
-            // shares off the full token0 would mint claims the token1 deposit never backed,
-            // letting a zero-/under-funded add skim the scarce reserve on withdrawal. The
-            // min ties shares to whichever side is actually funded and rounds against the
-            // depositor; requiring both sides positive rejects the zero-counterpart add.
+            // Price the mint off the scarcer funded side. Pricing off full token0 while the
+            // token1 counterpart floors down would mint claims token1 never backed, letting
+            // an under-funded add skim the scarce reserve on withdrawal. min() rounds against
+            // the depositor; both-sides-positive rejects the zero-counterpart add.
             require(amount0 > 0 && amount1 > 0, "insufficient");
             shares = Math.min(FullMath.mulDiv(amount0, supply, r0), FullMath.mulDiv(amount1, supply, r1));
             require(shares > 0, "insufficient");
@@ -534,18 +522,17 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     // views
 
     /// @notice Current reserves = the hook's ERC-6909 claim balances of each currency.
-    /// @dev Raw ERC20 transfers to the hook are NOT reserves (we read claim balances, not
-    ///      token balanceOf). ERC-6909 claims, however, are transferable, so anyone can
-    ///      credit claims to the hook and inflate `_reserves()` outside add-liquidity. This
-    ///      is economically bounded, not free: donated claims become pool reserves owned
-    ///      pro-rata by ALL LP shares, so the donor forfeits them (recovering only their own
-    ///      share fraction) — the same "manipulation must move real value at real cost" moat
-    ///      the detector relies on. Consequences are contained: shares price off the scarcer
-    ///      funded side (see `_getAmountIn`), and a donation that biases the once-per-block
-    ///      detector sample costs the donor real, gifted capital. Eliminating even this
-    ///      bounded surface would require shadow-accounted reserves — a core model change
-    ///      deferred to the full audit rather than rushed (divergence from real claims would
-    ///      be a worse, solvency-class bug).
+    /// @dev Reserves are live claim balances, so a raw ERC20 donation is ignored (we read
+    ///      claim balances, not token.balanceOf). Claim tokens are themselves transferable,
+    ///      though, so anyone can credit claims here and inflate reserves outside the hook's
+    ///      accounting. This is bounded, not free: donated claims mint no shares and accrue
+    ///      pro-rata to existing LPs, so the donor forfeits them. Biasing the once-per-block
+    ///      detector sample this way therefore costs real, gifted capital (the same
+    ///      manipulation-cost moat the design rests on) and is strictly worse for the
+    ///      attacker than a swap, which arbitrage can reverse. Share pricing is hardened off
+    ///      the scarcer side (see `_getAmountIn`). Fully closing it needs shadow-accounted
+    ///      reserves, deferred to the paid audit: a shadow value drifting from real claims
+    ///      would be a worse, solvency-class bug.
     function _reserves() internal view returns (uint256 r0, uint256 r1) {
         PoolKey memory key = poolKey();
         r0 = poolManager.balanceOf(address(this), key.currency0.toId());

@@ -7,7 +7,7 @@ import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 /// @notice Prices swaps on (x + a)·(y + b) = K, i.e. constant-product on virtual
 ///         reserves. Larger offsets flatten the curve (deeper, less impact); zero
 ///         offsets recover pure x·y. Offsets cancel in the swap amounts themselves
-///         (amountOut = (y+b) − (y'+b) = y − y'), so everything returned here is a
+///         (amountOut = (y+b) - (y'+b) = y - y'), so everything returned here is a
 ///         real token amount.
 ///
 /// @dev    Safety boundary: everything in this file operates on a SINGLE curve (one
@@ -75,7 +75,7 @@ library AsymmetricCurve {
     // the spread only reduces the trader's output / increases their input, for any
     // spreadWad, direction, or re-anchored reserves.
 
-    /// @notice Exact-in with spread: base output haircut by (WAD − spreadWad). Rounds DOWN.
+    /// @notice Exact-in with spread: base output haircut by (WAD - spreadWad). Rounds DOWN.
     function swapExactInWithSpread(
         uint256 x,
         uint256 y,
@@ -89,15 +89,13 @@ library AsymmetricCurve {
         amountOut = FullMath.mulDiv(baseOut, WAD - spreadWad, WAD);
     }
 
-    /// @notice Exact-out with spread: the exact inverse of the exact-in output haircut.
-    ///         Rounds against the trader (input UP).
-    /// @dev    To deliver `amountOut` net of a `spreadWad` haircut, the base curve must move
-    ///         the pre-haircut output grossOut = ceil(amountOut / (WAD − spreadWad)); the
-    ///         input is the base input for grossOut. Marking up only the input of the
-    ///         amountOut trade (the previous form) undercharges on the convex curve, letting
-    ///         a trader route exact-out to dodge part of the directional spread. The trader
-    ///         still receives exactly `amountOut`; the pool keeps (grossOut − amountOut) as
-    ///         spread revenue, so the real output reserve only has to cover `amountOut`.
+    /// @notice Exact-out with spread: the inverse of the exact-in output haircut. Input
+    ///         rounds UP (against the trader).
+    /// @dev    To deliver `amountOut` net of the haircut, the curve must move the pre-haircut
+    ///         output grossOut = ceil(amountOut / (WAD - spreadWad)); amountIn is the base
+    ///         input for grossOut. Marking up only the input (the old form) undercharges on
+    ///         the convex curve, letting exact-out routing dodge part of the spread. The
+    ///         trader still receives exactly `amountOut`; the pool keeps grossOut - amountOut.
     function swapExactOutWithSpread(
         uint256 x,
         uint256 y,

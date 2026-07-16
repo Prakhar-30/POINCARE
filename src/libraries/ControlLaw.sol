@@ -7,7 +7,7 @@ import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 /// @notice Maps the detector's capped evidence `S` to the asymmetry intensity κ with
 ///         three properties: it engages only past the detection threshold (κ = κ_min
 ///         while S <= h), it is hard-capped at κ_max (a security parameter, not a
-///         tuning one), and it is rate-limited (|κ_t − κ_{t-1}| <= dMax per step) so
+///         tuning one), and it is rate-limited (|κ_t - κ_{t-1}| <= dMax per step) so
 ///         the executable curve can only inch between blocks, bounding the bid-ask
 ///         seam and giving hysteresis.
 ///
