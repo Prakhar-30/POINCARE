@@ -339,8 +339,15 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         if (block.number == _lastSampledBlock || r0 == 0 || r1 == 0) return s;
 
+        // Nonzero reserves are not enough: at an extreme ratio the WAD marginal price can
+        // floor to 0. Skip the sample rather than persist a 0 baseline (which would blind
+        // the detector) or feed 0 into lnWad (which would revert the swap). Falling back to
+        // the stored state keeps the swap pricing — the detector just misses this block.
+        uint256 priceWad = AsymmetricCurve.marginalPriceWad(r0, r1, s.offsetA, s.offsetB);
+        if (priceWad == 0) return s;
+
         s.advanced = true;
-        s.priceWad = AsymmetricCurve.marginalPriceWad(r0, r1, s.offsetA, s.offsetB);
+        s.priceWad = priceWad;
         uint256 prev = _lastSampledPriceWad;
         if (prev == 0) return s; // first ever sample: establish the baseline, no return yet
 

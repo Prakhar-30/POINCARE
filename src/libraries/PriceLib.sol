@@ -28,8 +28,15 @@ library PriceLib {
 
     /// @notice Signed log-return between two WAD prices: ln(newPrice / prevPrice), WAD.
     ///         Both prices must be > 0.
+    /// @dev    `lnWad` needs a strictly-positive `int256`. An extreme single-block move can
+    ///         floor the ratio to 0 (would revert `lnWad`) or push it past `int256.max` (the
+    ///         cast would wrap negative and revert); clamp into the safe domain. The detector
+    ///         Huber-clips this increment immediately after, so clamping only touches moves
+    ///         already far beyond the clip and never alters a within-band return.
     function logReturnWad(uint256 prevPriceWad, uint256 newPriceWad) internal pure returns (int256 r) {
         uint256 ratioWad = FullMath.mulDiv(newPriceWad, WAD, prevPriceWad);
+        if (ratioWad == 0) ratioWad = 1;
+        else if (ratioWad > uint256(type(int256).max)) ratioWad = uint256(type(int256).max);
         r = FixedPointMathLib.lnWad(int256(ratioWad));
     }
 
