@@ -89,7 +89,15 @@ library AsymmetricCurve {
         amountOut = FullMath.mulDiv(baseOut, WAD - spreadWad, WAD);
     }
 
-    /// @notice Exact-out with spread: base input marked up by 1/(WAD − spreadWad). Rounds UP.
+    /// @notice Exact-out with spread: the exact inverse of the exact-in output haircut.
+    ///         Rounds against the trader (input UP).
+    /// @dev    To deliver `amountOut` net of a `spreadWad` haircut, the base curve must move
+    ///         the pre-haircut output grossOut = ceil(amountOut / (WAD − spreadWad)); the
+    ///         input is the base input for grossOut. Marking up only the input of the
+    ///         amountOut trade (the previous form) undercharges on the convex curve, letting
+    ///         a trader route exact-out to dodge part of the directional spread. The trader
+    ///         still receives exactly `amountOut`; the pool keeps (grossOut − amountOut) as
+    ///         spread revenue, so the real output reserve only has to cover `amountOut`.
     function swapExactOutWithSpread(
         uint256 x,
         uint256 y,
@@ -99,8 +107,9 @@ library AsymmetricCurve {
         bool zeroForOne,
         uint256 spreadWad
     ) internal pure returns (uint256 amountIn) {
-        uint256 baseIn = swapExactOut(x, y, a, b, amountOut, zeroForOne);
-        amountIn = FullMath.mulDivRoundingUp(baseIn, WAD, WAD - spreadWad);
+        uint256 grossOut = FullMath.mulDivRoundingUp(amountOut, WAD, WAD - spreadWad);
+        require(grossOut < (zeroForOne ? y + b : x + a), "AsymmetricCurve: spread output exceeds reserve");
+        amountIn = swapExactOut(x, y, a, b, grossOut, zeroForOne);
     }
 
     // Full pricing pipeline: vol fee -> curve -> spread. The single path both the hook's
