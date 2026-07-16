@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+
 import {PoincareHook} from "./PoincareHook.sol";
 import {AsymmetricCurve} from "./libraries/AsymmetricCurve.sol";
 import {Cusum} from "./libraries/Cusum.sol";
@@ -29,6 +31,10 @@ contract PoincareLens {
     /// @notice Quote an exact-input swap: given `amountIn`, the `amountOut` the trader receives.
     /// @param zeroForOne True: token0 in, token1 out. False: token1 in, token0 out.
     function quoteExactInput(bool zeroForOne, uint256 amountIn) external view returns (uint256 amountOut) {
+        // A real v4 swap reverts on a zero specified amount before the hook is even reached,
+        // so a "successful" zero quote would be a route that can never execute. Mirror the
+        // PoolManager guard here to keep quotes faithful to execution.
+        if (amountIn == 0) revert IPoolManager.SwapAmountCannotBeZero();
         (uint256 r0, uint256 r1) = hook.reserves();
         (uint256 spread, uint256 fee) = hook.previewSpread(zeroForOne);
         (uint256 a, uint256 b) = hook.baseOffsets();
@@ -40,6 +46,7 @@ contract PoincareLens {
     /// @dev Reverts unless `amountOut` is strictly below the real reserve on the output
     ///      side, the same feasibility boundary the hook enforces.
     function quoteExactOutput(bool zeroForOne, uint256 amountOut) external view returns (uint256 amountIn) {
+        if (amountOut == 0) revert IPoolManager.SwapAmountCannotBeZero();
         (uint256 r0, uint256 r1) = hook.reserves();
         (uint256 spread, uint256 fee) = hook.previewSpread(zeroForOne);
         (uint256 a, uint256 b) = hook.baseOffsets();
