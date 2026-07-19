@@ -1,24 +1,30 @@
-// Historical replay: drive the live Poincaré pool through the repo's 6 months of real
-// Binance ETH/USDC closes (analysis/simulation/realdata/eth_usdc_4h.csv, downsampled to
+// Historical replay: drive a live Poincaré pool through the repo's real Binance
+// ETH/USDC closes (analysis/simulation/realdata/eth_usdc_4h.csv, downsampled to
 // daily), via real router swaps, one per block, so every step also produces an on-chain
 // DetectorSample. Each swap and each detector sample is mirrored to Supabase so the app
 // has deep history immediately.
 //
-//   PK=0x.. [DRY=1] [STRIDE=6] node replay.mjs
+//   PK=0x.. [CHAIN=unichain|monad] [DRY=1] [STRIDE=6] node replay.mjs
 //
-// Addresses come from ../deployments/unichain-sepolia.json (the deploy script's output);
+// Addresses come from ../deployments/<chain>.json (the deploy scripts' output);
 // Supabase creds are read from ./.env (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
 import fs from "node:fs";
 import { createPublicClient, createWalletClient, http, parseUnits, formatEther, defineChain, decodeEventLog, parseAbiItem } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-const RPC = "https://sepolia.unichain.org";
+const CHAINS = {
+  unichain: { id: 1301, name: "Unichain Sepolia", rpc: "https://sepolia.unichain.org", symbol: "ETH", depFile: "unichain-sepolia.json", router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba" },
+  monad: { id: 10143, name: "Monad Testnet", rpc: "https://testnet-rpc.monad.xyz", symbol: "MON", depFile: "monad-testnet.json", router: null }, // router from deployment json
+};
+const CH = CHAINS[process.env.CHAIN || "unichain"];
+if (!CH) { console.error(`unknown CHAIN '${process.env.CHAIN}' (use unichain|monad)`); process.exit(1); }
+const RPC = process.env.RPC || CH.rpc;
 const DRY = process.env.DRY === "1";
 const STRIDE = Number(process.env.STRIDE || "6"); // 6 x 4h candles = daily
 const PK = process.env.PK?.startsWith("0x") ? process.env.PK : `0x${process.env.PK}`;
 
 // config from repo files, never stale vs the deployment
-const dep = JSON.parse(fs.readFileSync(new URL("../deployments/unichain-sepolia.json", import.meta.url), "utf8"));
+const dep = JSON.parse(fs.readFileSync(new URL(`../deployments/${CH.depFile}`, import.meta.url), "utf8"));
 const env = Object.fromEntries(
   fs.readFileSync(new URL("./.env", import.meta.url), "utf8")
     .split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
@@ -28,7 +34,7 @@ const SB_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 const C = {
   hook: dep.poincareHook,
-  router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba",
+  router: dep.router || CH.router,
   usdc: dep.usdc,
   weth: dep.weth,
   currency0: dep.currency0,
@@ -70,7 +76,7 @@ const DETECTOR_SAMPLE = parseAbiItem(
   "event DetectorSample(uint256 blockNumber, uint256 priceWad, int256 r, int256 sPos, int256 sNeg, uint256 dWad, uint256 sigmaWad, uint256 kappaWad, uint8 trend, uint256 feeWad)",
 );
 
-const chain = defineChain({ id: 1301, name: "Unichain Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
+const chain = defineChain({ id: CH.id, name: CH.name, nativeCurrency: { name: CH.symbol, symbol: CH.symbol, decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
 const account = privateKeyToAccount(PK);
 const pub = createPublicClient({ chain, transport: http(RPC) });
 const wallet = createWalletClient({ account, chain, transport: http(RPC) });
@@ -150,9 +156,10 @@ async function waitNextBlock() {
 }
 
 async function main() {
-  console.log(`replay ${DRY ? "(DRY RUN)" : "(LIVE)"}: account ${account.address}: hook ${C.hook}`);
+  if (!C.router) { console.error("no router for this chain (deployment json missing `router`)"); process.exit(1); }
+  console.log(`replay ${DRY ? "(DRY RUN)" : "(LIVE)"} on ${CH.name}: account ${account.address}: hook ${C.hook}`);
   const nativeStart = await pub.getBalance({ address: account.address });
-  console.log("native ETH:", formatEther(nativeStart));
+  console.log(`native ${CH.symbol}:`, formatEther(nativeStart));
 
   const daily = loadDaily();
   let [R0, R1] = await readReserves();
@@ -230,7 +237,7 @@ async function main() {
 
     if (swaps % 10 === 0) {
       const [nr0, nr1] = await readReserves();
-      console.log(`  ${swaps}/${targets.length - 1} · ${targets[i].day} · price ${(nr0 / nr1).toFixed(0)} · kappa ${(kappa * 100).toFixed(2)}% · gas ${formatEther(totalGasWei)} ETH · LVR $${lvrTotal.toFixed(2)}`);
+      console.log(`  ${swaps}/${targets.length - 1} · ${targets[i].day} · price ${(nr0 / nr1).toFixed(0)} · kappa ${(kappa * 100).toFixed(2)}% · gas ${formatEther(totalGasWei)} ${CH.symbol} · LVR $${lvrTotal.toFixed(2)}`);
     }
   }
 
@@ -242,7 +249,7 @@ async function main() {
   console.log(`swaps executed : ${swaps} (with-trend leans: ${fires})`);
   console.log(`total notional : $${volTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
   console.log(`LVR captured for LPs : $${lvrTotal.toFixed(2)}`);
-  console.log(`gas spent : ${formatEther(totalGasWei)} ETH (remaining ${formatEther(nativeEnd)})`);
+  console.log(`gas spent : ${formatEther(totalGasWei)} ${CH.symbol} (remaining ${formatEther(nativeEnd)})`);
   console.log(`final pool price : ${(fr0 / fr1).toFixed(2)} USDC/WETH`);
 }
 

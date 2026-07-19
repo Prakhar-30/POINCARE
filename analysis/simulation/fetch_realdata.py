@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fetch ~6 months of real ETH/USDC price history (Binance 4h klines) and write:
+Fetch real ETH/USDC price history (Binance 4h klines, DAYS env, default 365) and write:
   - realdata/eth_usdc_4h.csv   human-readable (iso_time, close_usd)
   - realdata/prices_wad.txt    one WAD-scaled integer per line (close_usd * 1e18),
                                consumed by test/sim/ForkRealData.t.sol
@@ -16,7 +16,7 @@ os.makedirs(OUT, exist_ok=True)
 SYMBOL = "ETHUSDC"
 INTERVAL = "4h"
 INTERVAL_MS = 4 * 3600 * 1000
-DAYS = 180
+DAYS = int(os.environ.get("DAYS", "365"))
 BASES = ["https://data-api.binance.vision", "https://api.binance.com"]
 
 
