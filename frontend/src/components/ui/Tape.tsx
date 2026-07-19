@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { priceOf, type SwapRow } from "@/lib/db";
 import { fmtNum, fmtUsd } from "@/lib/format";
+import { REPLAY_TRADER } from "@/config/contracts";
 
 /** Fresh trades get a relative age; anything older (e.g. replayed history, which
  *  carries its historical market date) shows that date instead of "9mo". */
@@ -61,6 +62,7 @@ export function Tape({
         <AnimatePresence initial={false}>
           {rows.map((t) => {
             const buy = t.side === "buy_weth";
+            const replay = t.trader?.toLowerCase() === REPLAY_TRADER;
             return (
               <motion.div
                 key={t.tx_hash}
@@ -73,12 +75,25 @@ export function Tape({
                 <span style={{ color: buy ? "var(--up)" : "var(--down)", fontWeight: 800 }}>{buy ? "buy" : "sell"}</span>
                 <span className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
                 <span className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
-                <span className="text-right" style={{ color: "var(--faint)", fontSize: 11 }}>{when(t.ts)}</span>
+                <span
+                  className="text-right"
+                  title={replay ? "Historical replay of real ETH/USDC market data; this is the original market date." : undefined}
+                  style={{ color: replay ? "var(--lav)" : "var(--faint)", fontSize: 11, fontWeight: replay ? 700 : undefined }}
+                >
+                  {replay ? "◦ " : ""}{when(t.ts)}
+                </span>
               </motion.div>
             );
           })}
         </AnimatePresence>
       </div>
+
+      {rows.some((t) => t.trader?.toLowerCase() === REPLAY_TRADER) && (
+        <div className="px-5 py-2" style={{ fontSize: 10, lineHeight: 1.5, color: "var(--faint)", borderTop: "1px solid var(--divider-2)" }}>
+          <span style={{ color: "var(--lav)", fontWeight: 700 }}>◦</span> replay of real ETH/USDC market
+          history; the date shown is the original market date. Your own swaps show their actual time.
+        </div>
+      )}
 
       {onLoadMore && rows.length > 0 && (hasMore || loadingMore) && (
         <button

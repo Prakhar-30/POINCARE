@@ -44,6 +44,10 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
   // Monad testnet was evaluated and dropped for now: no canonical Uniswap v4 there.
 };
 
+/** Wallet that seeded the pool and ran the historical market replay; its tape rows
+ *  carry the original market date of the candle they reproduce, not execution time. */
+export const REPLAY_TRADER = "0x49abe186a9b24f73e34ccae3d179299440c352ac";
+
 const isLive = (d: Deployment) => d.hook.length === 42;
 export const LIVE_CHAIN_IDS = Object.values(DEPLOYMENTS).filter(isLive).map((d) => d.chainId);
 
