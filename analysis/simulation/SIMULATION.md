@@ -103,34 +103,36 @@ Graphs: `sim_lpvalue.png` (headline), `sim_lvr.png`, `sim_price.png`, `sim_kappa
 
 ---
 
-## Real-data run: 6 months of actual ETH/USDC
+## Real-data run: 12 months of actual ETH/USDC
 
 The same comparative engine, but `fair` is driven by **real Binance ETHUSDC 4h closes** instead of
 a synthetic path. Test: `test/sim/ForkRealData.t.sol`. Reproduce:
 
 ```
-python analysis/simulation/fetch_realdata.py        # pulls ~6 months of ETHUSDC 4h candles
+python analysis/simulation/fetch_realdata.py        # pulls 12 months of ETHUSDC 4h candles (DAYS env)
 FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol -vv
 python analysis/simulation/plot_realdata.py          # -> public/sim/real/
 ```
 
-**Window:** 2025-12-30 → 2026-06-28, 1,080 candles. ETH fell **$2,987 → $1,568** (≈ −47%, with a
-$3,367 high), a genuine multi-leg bear market with rallies.
+**Window:** 2025-07-19 → 2026-07-19, 2,190 candles. ETH went **$3,554 → $1,868** through several
+distinct regimes: a rally to a **$4,833** peak, a multi-leg bear with the February crash, and a
+June leg-down.
 
 | metric | POINCARÉ | CONTROL | result |
 |---|---:|---:|---|
-| Cumulative LVR | 104,721 USDC | 114,807 USDC | **−8.8%** |
-| **Final LP value advantage** | | | **+14,697 USDC** |
-| Noise-flow tax (cost to with-trend benign flow) | | | 3,254 USDC |
+| Cumulative LVR | 312,815 USDC | 326,924 USDC | **−4.3%** |
+| **Final LP value advantage** | | | **+25,282 USDC** |
+| Noise-flow tax (cost to with-trend benign flow) | | | 8,982 USDC |
 
 ![Real ETH/USDC LP value](../../public/sim/real/real_lpvalue.png)
 
-**The honest read:** the advantage is **flat through the choppy January**, **jumps at the February
-crash**, holds through the chop, and **jumps again at the June leg-down**, as the detector engaged on
-the two real sustained downtrends and stayed neutral in chop, ending **+$15k** for Poincaré LPs on
-a ~$6M pool. The reduction (8.8%) is smaller than on the synthetic stress path (29.7%) precisely
-because real markets are noisier with fewer clean trends, so the conservative detector engages less,
-so it helps less, **but it never hurts** (LVR ≤ control held the whole way; assertion enforced).
+**The honest read:** the advantage is **flat through chop and jumps at the real sustained trends**
+(the February crash and the June leg-down), as the detector engaged there and stayed neutral
+otherwise, ending **+$25k** for Poincaré LPs on a ~$6M pool. The reduction (4.3% over the full
+year; 8.8% over the trend-heavy back half) is smaller than on the synthetic stress path (29.7%)
+precisely because real markets are noisier with fewer clean trends, so the conservative detector
+engages less, so it helps less, **but it never hurts** (LVR ≤ control held the whole way;
+assertion enforced).
 This is the expected, defensible behaviour: protection concentrated on the real directional moves
 that actually drain LPs, nothing during chop. Graphs in `public/sim/real/`: `real_lpvalue.png`,
 `real_lvr.png`, `real_price_kappa.png`, `real_months.png`.

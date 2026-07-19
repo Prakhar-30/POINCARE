@@ -347,25 +347,27 @@ bleed the most. Full methodology, per-scenario breakdown, the two order books, a
 `FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkSimulation.t.sol` then
 `python analysis/simulation/plot.py`.
 
-### 9.1 Against real market data: 6 months of ETH/USDC
+### 9.1 Against real market data: 12 months of ETH/USDC
 
-The same comparison, but driven by **real Binance ETHUSDC 4h closes** (2025-12-30 → 2026-06-28,
-1,080 candles) instead of a synthetic path. Over this window ETH fell **$2,987 → $1,568** (≈ −47%,
-a genuine multi-leg bear market with rallies).
+The same comparison, but driven by **real Binance ETHUSDC 4h closes** (2025-07-19 → 2026-07-19,
+2,190 candles) instead of a synthetic path. Over this window ETH went **$3,554 → $1,868** through
+several distinct regimes: a rally to a **$4,833** peak, a multi-leg bear with the February crash,
+and a June leg-down.
 
 ![Real ETH/USDC LP value: Poincaré vs constant-product](public/sim/real/real_lpvalue.png)
 
 | metric | POINCARÉ | CONTROL | result |
 |---|---:|---:|---|
-| Cumulative LVR | 104,721 USDC | 114,807 USDC | **−8.8%** |
-| **Final LP value advantage** | | | **+$14,697** |
+| Cumulative LVR | 312,815 USDC | 326,924 USDC | **−4.3%** |
+| **Final LP value advantage** | | | **+$25,282** |
 
-The advantage is **flat through choppy January, jumps at the February crash, and jumps again at the
-June leg-down**, as the detector engaged on the two real sustained downtrends and stayed neutral in
-chop. The reduction (8.8%) is smaller than on the synthetic stress path (29.7%) precisely because
-real markets are noisier with fewer clean trends, so the conservative detector helps less, **but it
-never hurts** (LVR ≤ control throughout, asserted). With params merely sensible-not-optimised for
-4h ETH; pair-specific calibration would raise the captured fraction. Reproduce:
+The advantage is **flat through chop and jumps at the real sustained trends** (the February crash
+and the June leg-down), as the detector engaged there and stayed neutral otherwise. The reduction
+(4.3% over the full year, 8.8% over the trend-heavy back half) is smaller than on the synthetic
+stress path (29.7%) precisely because real markets are noisier with fewer clean trends, so the
+conservative detector helps less, **but it never hurts** (LVR ≤ control throughout, asserted).
+With params merely sensible-not-optimised for 4h ETH; pair-specific calibration would raise the
+captured fraction. Reproduce:
 `python analysis/simulation/fetch_realdata.py` →
 `FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol` →
 `python analysis/simulation/plot_realdata.py`.
