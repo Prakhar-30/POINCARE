@@ -70,6 +70,16 @@ export function AppFooter() {
           <ExplorerLink label="Hook" address={CONTRACTS.hook} />
           <ExplorerLink label="Pool manager" address={CONTRACTS.poolManager} />
           <ExplorerLink label="Router" address={CONTRACTS.router} />
+          <a
+            href="https://x.com/Poincare_AMM"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-lav"
+            style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}
+          >
+            <Icon name="xSocial" size={13} />
+            @Poincare_AMM
+          </a>
         </div>
       </div>
 

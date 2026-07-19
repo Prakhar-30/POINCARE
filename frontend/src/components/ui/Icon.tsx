@@ -112,6 +112,13 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  xSocial: (
+    <path
+      d="M4 4h3.6l4.7 6.2L17.6 4H20l-6.5 7.6L20.5 20h-3.6l-5-6.6L6.2 20H3.8l7-8.1L4 4Z"
+      fill="currentColor"
+      stroke="none"
+    />
+  ),
   spinner: (
     <>
       <path d="M12 3a9 9 0 1 0 9 9" />
