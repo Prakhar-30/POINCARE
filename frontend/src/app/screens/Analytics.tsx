@@ -39,8 +39,8 @@ export function Analytics() {
           </div>
         </div>
 
-        <div className="grid gap-6 p-6" style={{ gridTemplateColumns: narrow ? "1fr" : "1.5fr 1fr" }}>
-          <div>
+        <div className="grid gap-6 p-4 sm:p-6" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1.5fr) minmax(0,1fr)" }}>
+          <div style={{ minWidth: 0 }}>
             <EvidenceChart points={series.points} thresholdH={cfg.h} height={210} loading={series.loading} />
             <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
               <Readout label="regime" value={regime.label} color={regime.color} />

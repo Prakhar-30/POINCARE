@@ -51,7 +51,7 @@ export function Dashboard() {
   const kappaMax = cfg.kappaMax || 0.1;
 
   return (
-    <div className="px-6 pb-8">
+    <div className="px-4 sm:px-6 pb-8">
       {/* stat bar */}
       <div className="grid gap-3.5 pt-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
         <Stat label="Total value locked" value={s.loading ? "—" : fmtUsd(tvl, { compact: true })} />
@@ -62,7 +62,7 @@ export function Dashboard() {
       </div>
 
       {/* brain + side */}
-      <div className="grid gap-4.5 mt-4" style={{ gridTemplateColumns: narrow ? "1fr" : "1fr 340px", gap: 18 }}>
+      <div className="grid gap-4.5 mt-4" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1fr) 340px", gap: 18 }}>
         {/* The Brain */}
         <div className="card grain relative overflow-hidden">
           <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
@@ -77,8 +77,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className="grid gap-5 p-6" style={{ gridTemplateColumns: mobile ? "1fr" : "1.45fr 1fr" }}>
-            <div>
+          <div className="grid gap-5 p-4 sm:p-6" style={{ gridTemplateColumns: mobile ? "minmax(0,1fr)" : "minmax(0,1.45fr) minmax(0,1fr)" }}>
+            <div style={{ minWidth: 0 }}>
               <div className="flex items-baseline gap-3">
                 <div className="font-display" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, color: regime.color }}>
                   {regime.label}
@@ -90,7 +90,7 @@ export function Dashboard() {
               <div className="mt-3.5">
                 <EvidenceChart points={series.points} thresholdH={cfg.h} loading={series.loading} />
               </div>
-              <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
                 <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
                 <Readout label="spread · buy WETH" value={fmtPct(s.spreadOneForZero)} color={s.spreadOneForZero > 0 ? "var(--up)" : "var(--text-2)"} />
                 <Readout label="volatility σ̂ · per block" value={fmtPct(s.sigma)} color="var(--text-2)" />
