@@ -144,7 +144,7 @@ async function main() {
     salt++;
   }
   console.log(`mined hook salt ${salt} -> ${hookAddr}`);
-  const hookRcpt = await send("deploy PoincareHook (CREATE2)", { to: CREATE2_FACTORY, data: concat([pad(toHex(salt), { size: 32 }), hookInit]) }, 6_000_000n);
+  const hookRcpt = await send("deploy PoincareHook (CREATE2)", { to: CREATE2_FACTORY, data: concat([pad(toHex(salt), { size: 32 }), hookInit]) }, 9_000_000n);
   const deployBlock = hookRcpt.blockNumber;
   // Public RPC is load-balanced; a replica can lag the just-mined block. Retry the code check.
   for (let tries = 0; ; tries++) {
