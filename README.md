@@ -428,3 +428,10 @@ validate it.
 3. **Depth / curvature lever** (the §3.1 offset design), *only* once the manipulation-cost sizing that keeps it arb-safe is derived; the spread lever ships first because it is safe by construction.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
+
+## 11. License
+
+Poincare is licensed under the **Business Source License 1.1** (`BUSL-1.1`) — see [LICENSE](./LICENSE).
+Production/commercial use of the hook, detector, curve, or any derivative requires a commercial
+license from the Licensor until the Change Date (2030-07-19), after which the code converts to MIT.
+Review, testing, and security research are permitted. Licensing contact: srivastavaprakhar3010@gmail.com.
