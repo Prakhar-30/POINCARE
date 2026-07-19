@@ -361,6 +361,14 @@ and a June leg-down.
 | Cumulative LVR | 312,815 USDC | 326,924 USDC | **−4.3%** |
 | **Final LP value advantage** | | | **+$25,282** |
 
+Where the detector actually engaged over the year, against the real price path (κ spikes cluster
+at the genuine sustained moves and stay quiet in chop), and how the LVR saving distributes by
+month:
+
+![Real ETH/USDC price with detector engagement](public/sim/real/real_price_kappa.png)
+
+![LVR by month, Poincaré vs control](public/sim/real/real_months.png)
+
 The advantage is **flat through chop and jumps at the real sustained trends** (the February crash
 and the June leg-down), as the detector engaged there and stayed neutral otherwise. The reduction
 (4.3% over the full year, 8.8% over the trend-heavy back half) is smaller than on the synthetic

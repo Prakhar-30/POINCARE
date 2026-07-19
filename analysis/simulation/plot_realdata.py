@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Plots for the REAL-DATA run (test/sim/ForkRealData.t.sol): 6 months of actual Binance ETHUSDC
+Plots for the REAL-DATA run (test/sim/ForkRealData.t.sol): 12 months of actual Binance ETHUSDC
 4h closes fed through the hook on a Sepolia v4 fork. Renders into ../../public/sim/real/.
 """
 import os
@@ -48,7 +48,7 @@ def fig_price_kappa(ts):
     ax.plot(ts.date, ts.fair, color=C_FAIR, lw=1.2, label="real ETH/USDC (Binance 4h)")
     ax.plot(ts.date, ts.price_on, color=C_POIN, lw=0.8, alpha=0.7, label="Poincaré pool")
     ax.set_ylabel("USDC per ETH"); ax.set_xlabel("date")
-    ax.set_title("Real 6-month ETH/USDC — price, with detector engagement")
+    ax.set_title("Real 12-month ETH/USDC: price, with detector engagement")
     ax.legend(loc="upper right", fontsize=8)
     axk = ax.twinx()
     axk.fill_between(ts.date, 0, ts.kappa * 100, color=C_POIN, alpha=0.25)
@@ -62,7 +62,7 @@ def fig_lpvalue(ts):
     ax.plot(ts.date, ts.lp_on, color=C_POIN, lw=1.5, label="Poincaré LP value")
     ax.plot(ts.date, ts.lp_off, color=C_CTRL, lw=1.3, label="control (x·y=k) LP value")
     ax.set_ylabel("LP value (USDC, marked at fair)"); ax.yaxis.set_major_formatter(FuncFormatter(usd))
-    ax.set_title("LP value on REAL ETH/USDC history — Poincaré vs constant-product")
+    ax.set_title("LP value on REAL ETH/USDC history: Poincaré vs constant-product")
     ax.legend(loc="upper right", fontsize=9)
     diff = ts.lp_on - ts.lp_off
     ax2.fill_between(ts.date, 0, diff, color=C_POIN, alpha=0.35); ax2.plot(ts.date, diff, color=C_POIN, lw=1.1)
@@ -81,7 +81,7 @@ def fig_lvr(ts):
     ax.fill_between(ts.date, ts.cum_lvr_on, ts.cum_lvr_off, color="green", alpha=0.12, label="LVR avoided")
     ax.set_ylabel("cumulative LVR (USDC)"); ax.yaxis.set_major_formatter(FuncFormatter(usd)); ax.set_xlabel("date")
     on, off = ts.cum_lvr_on.iloc[-1], ts.cum_lvr_off.iloc[-1]
-    ax.set_title(f"Cumulative LVR on real ETH/USDC — {(off-on)/off*100:.1f}% lower with Poincaré")
+    ax.set_title(f"Cumulative LVR on real ETH/USDC: {(off-on)/off*100:.1f}% lower with Poincaré")
     ax.legend(loc="upper left", fontsize=9)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
     fig.tight_layout(); fig.savefig(os.path.join(OUT, "real_lvr.png")); plt.close(fig)
@@ -96,7 +96,7 @@ def fig_months(summ):
     ax.bar(x + w/2, on, w, color=C_POIN, label="Poincaré LVR")
     ax.set_xticks(x); ax.set_xticklabels([f"month {i+1}" for i in range(len(summ))], fontsize=8)
     ax.set_ylabel("LVR (USDC)"); ax.yaxis.set_major_formatter(FuncFormatter(usd))
-    ax.set_title("LVR by month over the real 6-month window"); ax.legend(fontsize=9)
+    ax.set_title("LVR by month over the real 12-month window"); ax.legend(fontsize=9)
     for i in range(len(summ)):
         bps = int(summ.lvr_reduction_bps.iloc[i])
         if bps > 0:
