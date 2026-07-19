@@ -7,6 +7,7 @@ import { Trade } from "./screens/Trade";
 import { Pool } from "./screens/Pool";
 import { Analytics } from "./screens/Analytics";
 import { AppFooter } from "./AppFooter";
+import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 import { useWalletIdentity } from "@/hooks/useBackend";
 
 export function AppShell() {
@@ -18,6 +19,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
+      <AnnouncementMarquee />
       <TopNav tab={tab} setTab={setTab} />
       <div className="flex-1">
         {tab === "dashboard" && <Dashboard />}

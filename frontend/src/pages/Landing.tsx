@@ -4,6 +4,7 @@ import { Mark, Wordmark } from "@/components/brand/Logo";
 import { CurveVisual } from "@/components/brand/CurveVisual";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 16 },
@@ -40,6 +41,7 @@ function LaunchButton({ size = "md" }: { size?: "md" | "lg" }) {
 export function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
+      <AnnouncementMarquee />
       {/* nav */}
       <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
         <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
@@ -179,9 +181,21 @@ export function Landing() {
       <footer className="px-6 md:px-10 py-8" style={{ borderTop: "1px solid var(--border)" }}>
         <div className="mx-auto flex items-center justify-between flex-wrap gap-4" style={{ maxWidth: 1180 }}>
           <Wordmark size={28} />
-          <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--text-3)" }}>
-            <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-            Unichain Sepolia · testnet · research preview
+          <div className="flex items-center gap-4 flex-wrap">
+            <a
+              href="https://x.com/Poincare_AMM"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-bold transition-colors hover:text-lav"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name="xSocial" size={13} />
+              @Poincare_AMM
+            </a>
+            <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--text-3)" }}>
+              <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
+              Unichain Sepolia · testnet · research preview
+            </div>
           </div>
         </div>
       </footer>

@@ -146,6 +146,27 @@
   100% { background-position: 200% 0; }
 }
 .anim-pulse-dot { animation: pulseDot 1.8s infinite; }
+
+/* announcement marquee: two identical groups, track slides half its width and loops */
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex;
+  width: max-content;
+  animation: marqueeSlide 30s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+.marquee-group {
+  display: inline-flex;
+  align-items: center;
+}
+@keyframes marqueeSlide {
+  to { transform: translateX(-50%); }
+}
 .anim-floaty { animation: floaty 5s ease-in-out infinite; }
 .anim-blink { animation: blink 1.6s infinite; }
 
