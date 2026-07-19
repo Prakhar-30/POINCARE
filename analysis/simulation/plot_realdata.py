@@ -65,6 +65,27 @@ def fig_lpvalue(ts):
     ax.set_title("LP value on REAL ETH/USDC history: Poincaré vs constant-product")
     ax.legend(loc="upper right", fontsize=9)
     diff = ts.lp_on - ts.lp_off
+
+    # Zoom inset over the stretch where the advantage opens fastest (the crash):
+    # at full scale the two lines sit ~0.4% apart and coincide visually.
+    win = 48  # ~8 days of 4h candles
+    gains = (diff.shift(-win) - diff).fillna(0)
+    i0 = max(int(gains.values.argmax()) - 4, 0)
+    i1 = min(i0 + win + 8, len(ts) - 1)
+    axins = ax.inset_axes([0.055, 0.06, 0.30, 0.42])
+    axins.plot(ts.date, ts.lp_on, color=C_POIN, lw=1.5)
+    axins.plot(ts.date, ts.lp_off, color=C_CTRL, lw=1.3)
+    lo = min(ts.lp_on.iloc[i0:i1].min(), ts.lp_off.iloc[i0:i1].min())
+    hi = max(ts.lp_on.iloc[i0:i1].max(), ts.lp_off.iloc[i0:i1].max())
+    pad = (hi - lo) * 0.06
+    axins.set_xlim(ts.date.iloc[i0], ts.date.iloc[i1]); axins.set_ylim(lo - pad, hi + pad)
+    axins.tick_params(labelsize=7)
+    axins.yaxis.set_major_formatter(FuncFormatter(usd))
+    axins.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=3))
+    axins.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
+    axins.text(0.03, 0.92, "zoom: the crash, gap visible", transform=axins.transAxes,
+               fontsize=8, fontweight="bold", color="#555")
+    ax.indicate_inset_zoom(axins, edgecolor="#999")
     ax2.fill_between(ts.date, 0, diff, color=C_POIN, alpha=0.35); ax2.plot(ts.date, diff, color=C_POIN, lw=1.1)
     ax2.axhline(0, color="#888", lw=0.8); ax2.set_ylabel("Poincaré − control")
     ax2.yaxis.set_major_formatter(FuncFormatter(usd)); ax2.set_xlabel("date")
