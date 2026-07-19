@@ -4,7 +4,7 @@
 // DetectorSample. Each swap and each detector sample is mirrored to Supabase so the app
 // has deep history immediately.
 //
-//   PK=0x.. [CHAIN=unichain|monad] [DRY=1] [STRIDE=6] node replay.mjs
+//   PK=0x.. [CHAIN=unichain] [DRY=1] [STRIDE=6] node replay.mjs
 //
 // Addresses come from ../deployments/<chain>.json (the deploy scripts' output);
 // Supabase creds are read from ./.env (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
@@ -14,10 +14,9 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const CHAINS = {
   unichain: { id: 1301, name: "Unichain Sepolia", rpc: "https://sepolia.unichain.org", symbol: "ETH", depFile: "unichain-sepolia.json", router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba" },
-  monad: { id: 10143, name: "Monad Testnet", rpc: "https://testnet-rpc.monad.xyz", symbol: "MON", depFile: "monad-testnet.json", router: null }, // router from deployment json
 };
 const CH = CHAINS[process.env.CHAIN || "unichain"];
-if (!CH) { console.error(`unknown CHAIN '${process.env.CHAIN}' (use unichain|monad)`); process.exit(1); }
+if (!CH) { console.error(`unknown CHAIN '${process.env.CHAIN}'`); process.exit(1); }
 const RPC = process.env.RPC || CH.rpc;
 const DRY = process.env.DRY === "1";
 const STRIDE = Number(process.env.STRIDE || "6"); // 6 x 4h candles = daily

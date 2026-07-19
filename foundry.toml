@@ -18,6 +18,10 @@ skip = ["test/sim/**"]
 [profile.sim]
 via_ir = true
 skip = []
+# The 12-month replay (2190 points, two pools) outgrows the default 2^30 gas /
+# 128MB memory caps inside a single test; lift both for this profile only.
+gas_limit = "18446744073709551615"
+memory_limit = 1073741824
 
 # Profile for live deployment. The PoincareHook is 28KB unoptimized (over the 24.5KB EIP-170
 # limit — tests never hit this because deployCodeTo bypasses it). Optimizer + IR shrinks it to

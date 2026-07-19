@@ -40,21 +40,8 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
     weth: "0x642037396D62891302f06dDE0bc21071834A0260",
     deployBlock: 56191210n,
   },
-  10143: {
-    chainId: 10143,
-    name: "Monad Testnet",
-    nativeSymbol: "MON",
-    explorer: "https://testnet.monadexplorer.com",
-    // filled from deployments/monad-testnet.json once deployed; empty hook = hidden
-    poolManager: "",
-    hook: "",
-    lens: "",
-    faucet: "",
-    router: "",
-    usdc: "",
-    weth: "",
-    deployBlock: 0n,
-  },
+  // Additional chains slot in here once a deployment exists (entry shape above);
+  // Monad testnet was evaluated and dropped for now: no canonical Uniswap v4 there.
 };
 
 const isLive = (d: Deployment) => d.hook.length === 42;
