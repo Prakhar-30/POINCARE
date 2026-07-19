@@ -1,3 +1,5 @@
+import { CHAIN_NAME, CONTRACTS } from "@/config/contracts";
+
 /** Turn a raw viem/wallet error into a short, human sentence for a toast. */
 export function humanizeError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e ?? "Transaction failed");
@@ -6,7 +8,7 @@ export function humanizeError(e: unknown): string {
   if (m.includes("user rejected") || m.includes("user denied") || m.includes("rejected the request"))
     return "You rejected the request in your wallet.";
   if (m.includes("insufficient funds"))
-    return "Not enough ETH to cover gas for this transaction.";
+    return `Not enough ${CONTRACTS.nativeSymbol} to cover gas for this transaction.`;
   if (m.includes("transfer amount exceeds balance") || m.includes("exceeds balance"))
     return "Your token balance is too low for this amount.";
   if (m.includes("exceeds allowance") || m.includes("insufficient allowance"))
@@ -20,7 +22,7 @@ export function humanizeError(e: unknown): string {
   if (m.includes("intrinsic gas") || m.includes("gas required exceeds") || m.includes("out of gas"))
     return "Gas estimation failed. A manual limit was set, please retry.";
   if (m.includes("chain") && m.includes("mismatch"))
-    return "Wrong network. Switch your wallet to Unichain Sepolia.";
+    return `Wrong network. Switch your wallet to ${CHAIN_NAME}.`;
 
   // viem stuffs the useful bit in the first line
   const first = raw.split("\n")[0].replace(/^Error:\s*/i, "").trim();

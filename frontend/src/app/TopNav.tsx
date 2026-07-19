@@ -1,5 +1,6 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { motion } from "framer-motion";
+import { CHAIN_NAME } from "@/config/contracts";
 import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -66,10 +67,10 @@ export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
           style={{ color: "var(--text-3)", background: "var(--surface)", border: "1px solid var(--nav-border)" }}
         >
           <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-          Unichain Sepolia
+          {CHAIN_NAME}
         </div>
         <ThemeToggle />
-        <ConnectButton showBalance={false} accountStatus="avatar" chainStatus="none" />
+        <ConnectButton showBalance={false} accountStatus="avatar" chainStatus="icon" />
       </div>
     </div>
   );

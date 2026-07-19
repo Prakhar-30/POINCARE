@@ -2,7 +2,7 @@ import { Wordmark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useFaucet } from "@/hooks/useSwap";
-import { CONTRACTS, EXPLORER } from "@/config/contracts";
+import { CONTRACTS, EXPLORER, CHAIN_NAME } from "@/config/contracts";
 import { shorten } from "@/lib/format";
 
 function ExplorerLink({ label, address }: { label: string; address: string }) {
@@ -62,7 +62,7 @@ export function AppFooter() {
           <Wordmark size={26} />
           <span className="flex items-center gap-1.5" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-3)" }}>
             <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-            Unichain Sepolia · testnet · research preview
+            {CHAIN_NAME} · testnet · research preview
           </span>
         </div>
 

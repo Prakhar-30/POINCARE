@@ -1,5 +1,6 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Link } from "react-router-dom";
+import { CHAIN_NAME } from "@/config/contracts";
 import { Mark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
 
@@ -15,7 +16,7 @@ export function WalletGate() {
       </h1>
       <p className="mt-3 max-w-md" style={{ color: "var(--text-3)", fontSize: 15, lineHeight: 1.65 }}>
         The Poincaré dashboard, your positions and the live detector unlock once your wallet is connected
-        on <span style={{ color: "var(--text-2)", fontWeight: 700 }}>Unichain Sepolia</span>.
+        on <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{CHAIN_NAME}</span>.
       </p>
 
       <div className="mt-8">

@@ -1,28 +1,81 @@
-// Live Poincaré deployment on Unichain Sepolia (chain 1301).
-// Source of truth is deployments/unichain-sepolia.json at the repo root; after a redeploy,
-// update the DEPLOYMENT block below (and nothing else) from that file.
+// Live Poincaré deployments, one entry per chain.
+// Source of truth is deployments/<chain>.json at the repo root; after a redeploy,
+// update the matching DEPLOYMENTS entry below (and nothing else) from that file.
 // Public testnet addresses, safe to commit.
 
 /** `lens`/`faucet` may be empty on an older deployment; every feature that needs them
- *  checks `hasLens`/`hasFaucet` and degrades gracefully. */
-const DEPLOYMENT = {
-  chainId: 1301,
-  poolManager: "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
-  hook: "0xbd0FcA9CDD9a87a099F7772730D62B7C3014aa88",
-  lens: "0x1b20b7c253c7217dc83d87051d023bd3212f6f74",
-  faucet: "0xFB29449C95326A15495BAED5c2f6CC6885Bafe0F",
-  // currency0 < currency1 (v4 sort). In this pool currency0 = USDC, currency1 = WETH
+ *  checks `hasLens`/`hasFaucet` and degrades gracefully. An entry whose `hook` is empty
+ *  is treated as not-yet-live and excluded from the chain switcher. */
+type Deployment = {
+  chainId: number;
+  name: string;
+  nativeSymbol: string;
+  explorer: string;
+  poolManager: string;
+  hook: string;
+  lens: string;
+  faucet: string;
+  /** hookmate IUniswapV4Router04 the swap UI targets (canonical on Unichain, ours on Monad). */
+  router: string;
+  // currency0 < currency1 (v4 sort). In these pools currency0 = USDC, currency1 = WETH
   // (the deploy tooling picks the token creation order so this holds by construction).
-  usdc: "0x3Ab3D6986A1076E72d1f3Fb96D0739C0C4dd90E4",
-  weth: "0x642037396D62891302f06dDE0bc21071834A0260",
+  usdc: string;
+  weth: string;
   /** Block the hook was deployed at; the floor for on-chain log paging. */
-  deployBlock: 56191210n,
-} as const;
+  deployBlock: bigint;
+};
+
+export const DEPLOYMENTS: Record<number, Deployment> = {
+  1301: {
+    chainId: 1301,
+    name: "Unichain Sepolia",
+    nativeSymbol: "ETH",
+    explorer: "https://sepolia.uniscan.xyz",
+    poolManager: "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
+    hook: "0xbd0FcA9CDD9a87a099F7772730D62B7C3014aa88",
+    lens: "0x1b20b7c253c7217dc83d87051d023bd3212f6f74",
+    faucet: "0xFB29449C95326A15495BAED5c2f6CC6885Bafe0F",
+    router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba",
+    usdc: "0x3Ab3D6986A1076E72d1f3Fb96D0739C0C4dd90E4",
+    weth: "0x642037396D62891302f06dDE0bc21071834A0260",
+    deployBlock: 56191210n,
+  },
+  10143: {
+    chainId: 10143,
+    name: "Monad Testnet",
+    nativeSymbol: "MON",
+    explorer: "https://testnet.monadexplorer.com",
+    // filled from deployments/monad-testnet.json once deployed; empty hook = hidden
+    poolManager: "",
+    hook: "",
+    lens: "",
+    faucet: "",
+    router: "",
+    usdc: "",
+    weth: "",
+    deployBlock: 0n,
+  },
+};
+
+const isLive = (d: Deployment) => d.hook.length === 42;
+export const LIVE_CHAIN_IDS = Object.values(DEPLOYMENTS).filter(isLive).map((d) => d.chainId);
+
+/** The whole config layer (and several module-level captures downstream) is bound to one
+ *  chain per page load; switching chains persists the choice and reloads. */
+const STORAGE_KEY = "poincare.chainId";
+const stored = typeof localStorage !== "undefined" ? Number(localStorage.getItem(STORAGE_KEY)) : NaN;
+export const ACTIVE_CHAIN_ID = LIVE_CHAIN_IDS.includes(stored) ? stored : 1301;
+export function setActiveChain(chainId: number) {
+  if (!LIVE_CHAIN_IDS.includes(chainId) || chainId === ACTIVE_CHAIN_ID) return;
+  localStorage.setItem(STORAGE_KEY, String(chainId));
+  window.location.reload();
+}
+
+const DEPLOYMENT = DEPLOYMENTS[ACTIVE_CHAIN_ID];
+export const CHAIN_NAME = DEPLOYMENT.name;
 
 export const CONTRACTS = {
   ...DEPLOYMENT,
-  // v4 swap router on Unichain Sepolia (hookmate IUniswapV4Router04); canonical, survives redeploys.
-  router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba",
   currency0: DEPLOYMENT.usdc,
   currency1: DEPLOYMENT.weth,
   fee: 0x800000, // DYNAMIC_FEE_FLAG
@@ -80,7 +133,7 @@ export const TOKENS = {
 } as const;
 export type TokenSym = keyof typeof TOKENS;
 
-export const EXPLORER = "https://sepolia.uniscan.xyz";
+export const EXPLORER = DEPLOYMENT.explorer;
 
 // Cusum.Trend enum is 0=None, 1=Up, 2=Down, but it runs on the hook's internal price
 // (reserve1/reserve0 = WETH/USDC), the inverse of the UI's USDC/WETH chart price. The
