@@ -147,6 +147,24 @@
 }
 .anim-pulse-dot { animation: pulseDot 1.8s infinite; }
 
+/* bonding-curve motion: drifting dash current + one-shot trade ripple */
+@keyframes curveFlow {
+  to { stroke-dashoffset: -64; }
+}
+.curve-flow {
+  stroke-dasharray: 2 14;
+  animation: curveFlow 3.2s linear infinite;
+}
+@keyframes curveRipple {
+  from { transform: scale(0.4); opacity: 0.55; }
+  to { transform: scale(3); opacity: 0; }
+}
+.curve-ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: curveRipple 1.1s ease-out forwards;
+}
+
 /* announcement marquee: two identical groups, track slides half its width and loops */
 .marquee {
   overflow: hidden;
