@@ -93,7 +93,7 @@
   font-family: var(--font-display);
 }
 
-/* hide scrollbar but keep scroll — used by the trade tape */
+/* hide scrollbar but keep scroll (used by the trade tape) */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */

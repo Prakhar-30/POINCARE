@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchPriceSeries, type PricePoint } from "@/lib/db";
+import { fetchLatestTradeTs, fetchPriceSeries, type PricePoint } from "@/lib/db";
 
 export const PRICE_WINDOWS = [
   { key: "1H", ms: 3_600_000 },
@@ -12,8 +12,8 @@ export type PriceWindowKey = (typeof PRICE_WINDOWS)[number]["key"];
 const MAX_POINTS = 400; // plotting resolution; stride-downsample anything denser
 
 /**
- * Windowed price history from the backend: the full recorded history for the selected
- * window, independent of how much of the trade tape is loaded on screen. Keeps the
+ * Windowed price history from the backend, anchored at the newest recorded trade
+ * (not wall-clock now: replayed history carries historical timestamps). Keeps the
  * previous window's data while the next one loads so switching doesn't flash empty.
  */
 export function usePriceSeries(windowKey: PriceWindowKey) {
@@ -21,7 +21,12 @@ export function usePriceSeries(windowKey: PriceWindowKey) {
   const q = useQuery({
     queryKey: ["priceSeries", win.key],
     queryFn: async (): Promise<PricePoint[]> => {
-      const since = win.ms === Infinity ? null : new Date(Date.now() - win.ms).toISOString();
+      let since: string | null = null;
+      if (win.ms !== Infinity) {
+        const latest = await fetchLatestTradeTs();
+        const anchor = latest ? new Date(latest).getTime() : Date.now();
+        since = new Date(anchor - win.ms).toISOString();
+      }
       const rows = await fetchPriceSeries(since);
       if (rows.length <= MAX_POINTS) return rows;
       const stride = Math.ceil(rows.length / MAX_POINTS);

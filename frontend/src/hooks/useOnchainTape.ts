@@ -2,12 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePublicClient } from "wagmi";
 import type { PublicClient } from "viem";
 import { fetchHookSwaps, HOOK_DEPLOY_BLOCK, LOG_RANGE } from "@/lib/onchain";
-import type { SwapRow } from "@/lib/db";
+import { dedupeByTx, fetchTapePage, type SwapRow } from "@/lib/db";
 
-const dedupe = (list: SwapRow[]) => {
-  const seen = new Set<string>();
-  return list.filter((r) => (seen.has(r.tx_hash) ? false : (seen.add(r.tx_hash), true)));
-};
+const PAGE = 20;
 
 /** Estimate a block's timestamp from two anchors (avoids one RPC call per block). */
 async function makeTsOf(client: PublicClient, latest: bigint) {
@@ -19,10 +16,14 @@ async function makeTsOf(client: PublicClient, latest: bigint) {
   return (block: bigint) => new Date(latestTs - Number(latest - block) * msPerBlock).toISOString();
 }
 
+const byNewest = (a: SwapRow, b: SwapRow) =>
+  (b.block_number ?? 0) - (a.block_number ?? 0) || new Date(b.ts ?? 0).getTime() - new Date(a.ts ?? 0).getTime();
+
 /**
- * This pool's swap history, read directly from on-chain `HookSwap` logs and paged
- * back in <=10k-block windows ("Load more"), down to the hook's deploy block. Live
- * swaps are polled in from the chain head, so it needs no backend at all.
+ * Hybrid tape for this pool: history is paged from the backend index (which outlives
+ * RPC log retention), while the chain is only read over one bounded recent window
+ * (<= LOG_RANGE blocks) plus incremental head polling for the live edge. Backend rows
+ * win dedupe (they carry kappa/trend/spread the raw log doesn't).
  */
 export function useOnchainTape() {
   const client = usePublicClient();
@@ -30,11 +31,11 @@ export function useOnchainTape() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const cursor = useRef<bigint | null>(null); // next toBlock to page down from
-  const headRef = useRef<bigint>(0n); // highest block already shown
+  const offset = useRef(0);
+  const headRef = useRef<bigint>(0n); // highest block already scanned
   const tsOf = useRef<(b: bigint) => string>(() => new Date().toISOString());
 
-  // initial load: newest non-empty window
+  // initial load: backend page + the most recent on-chain window, merged
   useEffect(() => {
     if (!client) return;
     let alive = true;
@@ -42,20 +43,16 @@ export function useOnchainTape() {
     (async () => {
       const latest = await client.getBlockNumber();
       tsOf.current = await makeTsOf(client, latest);
-      let to = latest;
-      let acc: SwapRow[] = [];
-      let hops = 0;
-      while (alive && to >= HOOK_DEPLOY_BLOCK && acc.length === 0 && hops < 12) {
-        const from = to - LOG_RANGE + 1n > HOOK_DEPLOY_BLOCK ? to - LOG_RANGE + 1n : HOOK_DEPLOY_BLOCK;
-        acc = await fetchHookSwaps(client, from, to, tsOf.current);
-        to = from - 1n;
-        hops++;
-      }
+      const from = latest - LOG_RANGE + 1n > HOOK_DEPLOY_BLOCK ? latest - LOG_RANGE + 1n : HOOK_DEPLOY_BLOCK;
+      const [stored, recent] = await Promise.all([
+        fetchTapePage(PAGE, 0),
+        fetchHookSwaps(client, from, latest, tsOf.current).catch(() => [] as SwapRow[]),
+      ]);
       if (!alive) return;
-      setRows(acc);
+      setRows(dedupeByTx([...stored, ...recent]).sort(byNewest));
+      offset.current = stored.length;
       headRef.current = latest;
-      cursor.current = to;
-      setHasMore(to >= HOOK_DEPLOY_BLOCK);
+      setHasMore(stored.length === PAGE);
       setLoading(false);
     })();
     return () => {
@@ -63,35 +60,28 @@ export function useOnchainTape() {
     };
   }, [client]);
 
-  // page further back, skipping empty windows (bounded hops per click)
+  // deeper history comes from the backend only
   const loadMore = useCallback(async () => {
-    if (!client || loadingMore || !hasMore || cursor.current === null) return;
+    if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    let to = cursor.current;
-    let found: SwapRow[] = [];
-    let hops = 0;
-    while (to >= HOOK_DEPLOY_BLOCK && found.length === 0 && hops < 8) {
-      const from = to - LOG_RANGE + 1n > HOOK_DEPLOY_BLOCK ? to - LOG_RANGE + 1n : HOOK_DEPLOY_BLOCK;
-      found = await fetchHookSwaps(client, from, to, tsOf.current);
-      to = from - 1n;
-      hops++;
-    }
-    setRows((prev) => dedupe([...prev, ...found]));
-    cursor.current = to;
-    setHasMore(to >= HOOK_DEPLOY_BLOCK);
+    const page = await fetchTapePage(PAGE, offset.current);
+    offset.current += page.length;
+    setRows((prev) => dedupeByTx([...prev, ...page]).sort(byNewest));
+    setHasMore(page.length === PAGE);
     setLoadingMore(false);
-  }, [client, hasMore, loadingMore]);
+  }, [hasMore, loadingMore]);
 
-  // poll the chain head for new swaps and prepend them
+  // live edge: poll only the blocks since the last scan
   useEffect(() => {
     if (!client) return;
     let alive = true;
     const id = setInterval(async () => {
-      const latest = await client.getBlockNumber();
+      if (headRef.current === 0n) return;
+      const latest = await client.getBlockNumber().catch(() => 0n);
       if (!alive || latest <= headRef.current) return;
-      const fresh = await fetchHookSwaps(client, headRef.current + 1n, latest, tsOf.current);
+      const fresh = await fetchHookSwaps(client, headRef.current + 1n, latest, tsOf.current).catch(() => [] as SwapRow[]);
       headRef.current = latest;
-      if (fresh.length) setRows((prev) => dedupe([...fresh, ...prev]));
+      if (fresh.length) setRows((prev) => dedupeByTx([...fresh, ...prev]).sort(byNewest));
     }, 12000);
     return () => {
       alive = false;

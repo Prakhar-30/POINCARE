@@ -1,21 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { priceOf } from "@/lib/db";
 import { usePriceSeries, PRICE_WINDOWS, type PriceWindowKey } from "@/hooks/usePriceSeries";
+import { useWidth } from "@/hooks/useWidth";
 import { fmtNum, fmtUsd } from "@/lib/format";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    if (!ref.current) return;
-    const ro = new ResizeObserver((e) => setW(e[0].contentRect.width));
-    ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, w] as const;
-}
 
 type Pt = { t: number; p: number; buy: boolean; weth: number; usdc: number };
 
@@ -122,7 +111,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
         {!geom ? (
           <div className="flex items-center justify-center gap-2" style={{ height: H, fontSize: 12.5, color: "var(--faint)" }}>
             {loading && <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />}
-            {loading ? "Loading price history…" : `No trades in the last ${win === "All" ? "…ever" : win.toLowerCase()} — try a wider window.`}
+            {loading ? "Loading price history…" : `No trades in the last ${win === "All" ? "…ever" : win.toLowerCase()}. Try a wider window.`}
           </div>
         ) : (
           <svg

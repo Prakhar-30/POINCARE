@@ -32,8 +32,8 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
-      <AnnouncementMarquee />
       <TopNav tab={tab} setTab={setTab} />
+      <AnnouncementMarquee />
       <div className="flex-1">
         {tab === "dashboard" && <Dashboard />}
         {tab === "trade" && <Trade />}

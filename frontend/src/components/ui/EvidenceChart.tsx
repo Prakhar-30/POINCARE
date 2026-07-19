@@ -1,37 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { DetectorPoint } from "@/lib/onchain";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-
-function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    if (!ref.current) return;
-    const ro = new ResizeObserver((e) => setW(e[0].contentRect.width));
-    ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, w] as const;
-}
+import { useWidth } from "@/hooks/useWidth";
 
 /**
- * The detector's state over time: both one-sided CUSUM statistics against the firing
- * threshold h, with the blocks where the curve was leaning (kappa > 0) shaded.
- *
- * Left of the seam: real on-chain DetectorSample points. Right of the seam: a short
- * projected continuation, each statistic extended along its recent drift with the
- * increment decaying toward the CUSUM's natural drain (-k per quiet block), drawn
- * dashed and faded and replaced by real samples as they arrive. The projection keeps
- * the chart legible between trades without pretending to be data.
- *
- * Orientation: the hook's internal price is WETH/USDC, the inverse of the UI's
- * USDC/WETH chart. s_pos (hook "up") is therefore evidence of a falling chart price
- * and s_neg of a rising one; the series are labelled by chart direction to match
- * everything else the user sees.
- *
- * Rendering: geometry is computed in real pixels from the measured container width
- * (no preserveAspectRatio stretching), so strokes and dashes stay crisp at any size,
- * and the legend/captions live in normal flow so nothing overlaps on small screens.
+ * Both one-sided CUSUM statistics against the firing threshold h; kappa > 0 stretches
+ * shaded, a dashed drift projection right of the seam. Series are labelled in chart
+ * orientation (hook s_pos = chart down evidence, price is inverted). Geometry is in
+ * real pixels from the measured width; legend/captions sit in flow so nothing overlaps.
  */
 export function EvidenceChart({
   points,

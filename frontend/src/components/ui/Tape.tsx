@@ -2,18 +2,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import { priceOf, type SwapRow } from "@/lib/db";
 import { fmtNum, fmtUsd } from "@/lib/format";
 
-/** Compact relative age: seconds → minutes → hours → days → months. */
-function ago(ts?: string) {
+/** Fresh trades get a relative age; anything older (e.g. replayed history, which
+ *  carries its historical market date) shows that date instead of "9mo". */
+function when(ts?: string) {
   if (!ts) return "now";
-  const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
+  const d = new Date(ts);
+  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   if (s < 60) return `${Math.floor(s)}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 2592000) return `${Math.floor(s / 86400)}d`;
-  return `${Math.floor(s / 2592000)}mo`;
+  if (s < 172800) return `${Math.floor(s / 3600)}h`;
+  const opts: Intl.DateTimeFormatOptions =
+    d.getFullYear() === new Date().getFullYear()
+      ? { month: "short", day: "numeric" }
+      : { month: "short", year: "2-digit" };
+  return d.toLocaleDateString(undefined, opts);
 }
 
-const COLS = "44px minmax(0,1fr) minmax(0,1fr) 46px";
+const COLS = "44px minmax(0,1fr) minmax(0,1fr) 56px";
 
 export function Tape({
   rows,
@@ -45,7 +50,7 @@ export function Tape({
         <span>side</span>
         <span className="text-right">price</span>
         <span className="text-right">size · WETH</span>
-        <span className="text-right">ago</span>
+        <span className="text-right">when</span>
       </div>
       <div className={scroll ? "no-scrollbar" : undefined} style={scroll ? { maxHeight, overflowY: "auto" } : undefined}>
         {rows.length === 0 && (
@@ -68,7 +73,7 @@ export function Tape({
                 <span style={{ color: buy ? "var(--up)" : "var(--down)", fontWeight: 800 }}>{buy ? "buy" : "sell"}</span>
                 <span className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
                 <span className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
-                <span className="text-right" style={{ color: "var(--faint)", fontSize: 11 }}>{ago(t.ts)}</span>
+                <span className="text-right" style={{ color: "var(--faint)", fontSize: 11 }}>{when(t.ts)}</span>
               </motion.div>
             );
           })}

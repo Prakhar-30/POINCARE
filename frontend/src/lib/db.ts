@@ -116,7 +116,7 @@ export async function fetchDetectorSeries(limit = 240): Promise<DetectorPoint[]>
 
 export async function fetchTape(limit = 24): Promise<SwapRow[]> {
   if (!supabaseReady) return [];
-  const { data } = await supabase.from("swaps").select("*").order("ts", { ascending: false }).limit(limit);
+  const { data } = await supabase.from("swaps").select("*").eq("hook", HOOK).order("ts", { ascending: false }).limit(limit);
   return (data as SwapRow[]) ?? [];
 }
 
@@ -126,10 +126,25 @@ export async function fetchTapePage(limit: number, offset: number): Promise<Swap
   const { data } = await supabase
     .from("swaps")
     .select("*")
+    .eq("hook", HOOK)
     .order("ts", { ascending: false })
     .range(offset, offset + limit - 1);
   return (data as SwapRow[]) ?? [];
 }
+
+/** Timestamp of the newest recorded trade; the anchor for chart windows (replayed
+ *  history carries historical timestamps, so "now" is the wrong anchor). */
+export async function fetchLatestTradeTs(): Promise<string | null> {
+  if (!supabaseReady) return null;
+  const { data } = await supabase.from("swaps").select("ts").eq("hook", HOOK).order("ts", { ascending: false }).limit(1);
+  return data?.[0]?.ts ?? null;
+}
+
+/** Drop duplicate tx hashes, keeping the first occurrence. */
+export const dedupeByTx = (list: SwapRow[]) => {
+  const seen = new Set<string>();
+  return list.filter((r) => (seen.has(r.tx_hash) ? false : (seen.add(r.tx_hash), true)));
+};
 
 /** The fields the price chart needs from a swap (a projection of SwapRow). */
 export type PricePoint = Pick<SwapRow, "ts" | "side" | "amount_in" | "amount_out" | "price" | "notional_usdc">;
@@ -173,7 +188,7 @@ export function subscribeSwaps(cb: (row: SwapRow) => void): () => void {
   try {
     const channel = supabase
       .channel(`swaps-tape-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "swaps" }, (payload) => cb(payload.new as SwapRow))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "swaps", filter: `hook=eq.${HOOK}` }, (payload) => cb(payload.new as SwapRow))
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);

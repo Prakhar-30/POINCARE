@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  dedupeByTx,
   fetchPoolTotals,
   fetchTape,
   fetchTapePage,
@@ -61,11 +62,6 @@ export function usePagedTape(pageSize = 20) {
   const [hasMore, setHasMore] = useState(true);
   const offset = useRef(0);
 
-  const dedupe = (list: SwapRow[]) => {
-    const seen = new Set<string>();
-    return list.filter((r) => (seen.has(r.tx_hash) ? false : (seen.add(r.tx_hash), true)));
-  };
-
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -85,7 +81,7 @@ export function usePagedTape(pageSize = 20) {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     const d = await fetchTapePage(pageSize, offset.current);
-    setRows((prev) => dedupe([...prev, ...d]));
+    setRows((prev) => dedupeByTx([...prev, ...d]));
     offset.current += d.length;
     setHasMore(d.length === pageSize);
     setLoadingMore(false);

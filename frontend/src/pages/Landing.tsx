@@ -41,7 +41,6 @@ function LaunchButton({ size = "md" }: { size?: "md" | "lg" }) {
 export function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
-      <AnnouncementMarquee />
       {/* nav */}
       <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
         <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
@@ -56,6 +55,7 @@ export function Landing() {
           <LaunchButton />
         </div>
       </nav>
+      <AnnouncementMarquee />
 
       {/* hero */}
       <header className="px-6 md:px-10 pt-14 md:pt-20 pb-10">
