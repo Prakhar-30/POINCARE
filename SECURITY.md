@@ -41,13 +41,35 @@ shadow-accounted reserves, a core-model change intentionally deferred to the pai
 (a shadow reserve diverging from real claims would be a worse, solvency-class bug).
 Reviewers should size the shadow-accounting trade-off explicitly.
 
+## Prior review
+
+The contracts were scanned by **Olympix BugPoCer** (automated pre-audit) before the current
+deployment. Every reported finding was fixed, and each fix carries a regression test that fails
+on the pre-fix code and passes now:
+
+| Finding | Fix | Test |
+|---|---|---|
+| M-1 reentrancy: a native-ETH payout recipient reentering a swap mid-withdrawal | transient `_liquidityLock`; `_beforeSwap` reverts while a liquidity op is settling | `OlympixReentrancyTest::test_M1_reentrantSwapDuringRemove_isBlocked` |
+| M-2 LP mint priced off an under-funded side | price shares off the scarcer funded side (`min`), reject zero-counterpart adds | `test_M2_zeroCounterpartAdd_reverts`, `test_M2_balancedAdd_stillWorks` |
+| L-1 Lens quoted zero amounts the PoolManager would reject | Lens mirrors the `SwapAmountCannotBeZero` guard | `test_L1_lensZeroAmountQuote_reverts` |
+| L-2 / L-4 log-return domain: an extreme move could revert the swap | clamp the ratio into the `lnWad` domain; skip the sample when the mid floors to zero | `PriceLib.t.sol` |
+| L-3 / L-6 claim-donation resistance overstated in the docs | corrected the claim and documented the bounded residual (below) | `test_L3_claimDonation_isForfeitedToLPs` |
+| L-5 first-deposit seed flooring a virtual offset to zero | reject seeds where either anchored offset rounds to zero | `test_L5_offsetSeedFloorsToZero_reverts` |
+| L-7 exact-out routing dodging part of the spread | exact-out spread made the exact inverse of the exact-in haircut | `test_L7_exactOutSpread_notCheaperThanExactInInverse` |
+
+An automated scan is not a substitute for the external human audit, which remains required
+before mainnet.
+
 ## Existing coverage
 
-118 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation), fork simulations, and adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns).
+126 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 3 invariants x 128k randomized calls, 0 reverts), fork simulations, adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
 
 ## Deployment
 
-Testnet only (Unichain Sepolia, since 3 July 2026). Not on mainnet; no live funds at risk.
+Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
+`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`, Lens `0x1ca28a5de680109513ce26c861e049116a2643c2`,
+from block 57598397 (19 July 2026, the Olympix-fixed build; an earlier build ran there from
+3 July 2026). Not on mainnet; no live funds at risk.
 
 ## Contact
 

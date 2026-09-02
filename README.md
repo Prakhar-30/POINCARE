@@ -422,12 +422,25 @@ validate it.
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 118 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 126 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
-> end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas). The items below
-> are what remains to go from MVP to production.
+> end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
+> regression test per finding from the **Olympix BugPoCer pre-audit scan**, all fixed). The
+> items below are what remains to go from MVP to production.
 
-**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; and the full Foundry suite.
+**Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
+`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`, Lens `0x1ca28a5de680109513ce26c861e049116a2643c2`,
+deployed at block 57598397 against the canonical v4 `PoolManager`
+`0x00B036B58a818B1BC34d502D3fE730Db729e62AC`, with a demo WETH/USDC pool, a faucet, and a
+web app (`frontend/`) that trades, provides liquidity, and charts the detector's real
+`DetectorSample` trace block by block. Addresses of record: `deployments/unichain-sepolia.json`.
+
+**Pre-audit:** the contracts were scanned by **Olympix BugPoCer** before deployment. Every
+reported finding was fixed and each has a regression test that fails on the pre-fix code and
+passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain cases in
+`PriceLib.t.sol`). An external human audit is still required before mainnet (item 5 below).
+
+**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix pre-audit fixes with their regression suite; and the full Foundry suite.
 
 **Next, to production:**
 

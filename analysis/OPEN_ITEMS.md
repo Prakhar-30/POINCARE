@@ -5,9 +5,10 @@ none is lost before MVP done (CLAUDE.md §11). Reviewed across all libraries bui
 Status keys: 🔴 blocking-for-MVP · 🟠 must-resolve-before-deploy · 🟡 track / calibrate · ✅ done.
 
 Last full review: through M8 (hardening) + fork simulations (synthetic + real ETH/USDC) + an
-item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 kept for external audit).
+item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 kept for external
+audit) + the Olympix BugPoCer pre-audit scan (all findings fixed, see H below).
 
-**2026-07 feature pass** (suite now 118 tests, 0 failures; invariants run in TWO flavors —
+**2026-07 feature pass** (suite now 126 tests, 0 failures; invariants run in TWO flavors —
 plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k calls each, 0 reverts):
 - **E0 shipped**: deep symmetric base via SUPPLY-SCALED virtual offsets (see E0 below for why the
   two obvious parameterisations are unsafe). Output-feasibility guards added for both swap kinds.
@@ -139,3 +140,21 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 - ✅ Back-test (LVR reduction vs CPMM and vs vol-fee) via `test/backtest/Backtest.t.sol` (M6 done on
   synthetic path; real-data calibration pending a price series).
 - ✅ Integration via PoolManager + gas profiling (`test/Gas.t.sol`; ~120k/block detector overhead, see G8).
+
+## H. Olympix BugPoCer pre-audit scan (2026-07, all findings fixed)
+
+Automated pre-audit scan run before the current Unichain Sepolia deployment. Every finding is
+fixed and carries a regression test that fails on the pre-fix code and passes now
+(`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceLib.t.sol`).
+
+| # | Finding | Status | Fix |
+|---|---------|--------|-----|
+| M-1 | Reentrancy: a native-ETH payout recipient can reenter a swap mid-withdrawal and price against half-settled reserves. | ✅ | Transient `_liquidityLock` set across the whole add/remove incl. settlement; `_beforeSwap` reverts while it is set. |
+| M-2 | LP mint priced off token0 while the token1 counterpart floored down, minting claims token1 never backed. | ✅ | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected. |
+| L-1 | Lens returned a quote for a zero amount that a real swap would revert on. | ✅ | Lens mirrors the PoolManager `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful. |
+| L-2 / L-4 | Log-return domain: an extreme move could make `lnWad` revert, i.e. the detector could revert a swap (violating §4.5). | ✅ | Ratio clamped into the safe domain; a mid that floors to zero skips the sample instead of reverting. |
+| L-3 / L-6 | Docs claimed full donation-resistance; ERC-6909 claims are transferable, so a claim donation can move `_reserves()`. | ✅ (documented) | Claim corrected; the residual is bounded (donated claims accrue pro-rata to all LPs, so the donor forfeits them) and recorded in `SECURITY.md`. Shadow accounting deferred to the paid audit. |
+| L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
+| L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
+
+Scope note: an automated scan is not an external audit. A9 (human audit before mainnet) stays open.
