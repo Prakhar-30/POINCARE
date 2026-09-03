@@ -20,7 +20,7 @@ node_modules/
 # Local build brief — kept local, never tracked
 CLAUDE.md
 
-# One-off local chain drivers (historical replay / trend demo) — dev tools, no secrets
-frontend/replay.mjs
-frontend/trend.mjs
+# Local probes only. The replay/trend drivers ARE tracked: they are how the live demo
+# pool is driven and how the detector is made to fire on chain, so a reviewer needs them.
+# Both read the key from $PK and Supabase creds from frontend/.env — never hardcoded.
 frontend/probe*.mjs
