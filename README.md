@@ -1,5 +1,7 @@
 # POINCARÉ
 
+[![Test Suite](https://github.com/Prakhar-30/POINCARE/actions/workflows/test.yml/badge.svg)](https://github.com/Prakhar-30/POINCARE/actions/workflows/test.yml)
+
 ### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them, protecting liquidity providers from the losses that trends cause, without an oracle.
 
 ---
