@@ -76,6 +76,26 @@ detector's κ engages only on confirmed trends and returns to zero in calm.
 Poincaré helps **most in exactly the high-LVR regimes** (strong trends, flash crashes) where LPs
 bleed the most, and is neutral in calm.
 
+### Across seeds, not one lucky path
+
+The table above is a single seed. `test_multiSeed_poincareNeverTrailsControl` re-runs the whole
+schedule on **5 independent seeds** — a fresh market, a fresh order book and fresh pools each time
+— and asserts `LVR ≤ control` on every one:
+
+| seed | LVR reduction |
+|---|---:|
+| `0xBEEF` (the headline run) | 29.7% |
+| `0xC0FFEE` | 22.7% |
+| `0xDECAF` | 19.3% |
+| `0xFEED` | 21.6% |
+| `0x1234` | 21.2% |
+| **mean** | **22.9%** |
+
+So the honest synthetic figure is **22.9% mean, range 19.3–29.7%**, and the 29.7% this study
+originally quoted was the top of that range rather than a typical draw. Quote the mean. The
+qualitative result is seed-independent: every path shows a reduction (asserted), and the ranking
+never inverts.
+
 Graphs: `sim_lpvalue.png` (headline), `sim_lvr.png`, `sim_price.png`, `sim_kappa.png`,
 `sim_scenarios.png`, `sim_orderbook.png` (the two order books), `sim_dashboard.png` (combined).
 
@@ -96,7 +116,8 @@ Graphs: `sim_lpvalue.png` (headline), `sim_lvr.png`, `sim_price.png`, `sim_kappa
 - **The benign-flow trade-off is real and shown**: with-trend noise orders pay the spread on the
   live pool (a cost to those traders, revenue to LPs); against-trend and calm flow are untaxed.
 - **18-decimal mock USDC** (not the real 6-decimal token), immaterial to the detector/curve.
-- **Single seed / single path** for the headline; a production report should average many seeds.
+- **The price path is synthetic and trend-dense by construction**, which flatters a design that
+  only acts on trends. The real-data study below is the counterweight and should be read with it.
 - This complements, not replaces, the in-repo proofs: the in-memory back-test
   (`analysis/backtest/`), the 384k-op invariant suite, and the end-to-end manipulation sims
   (`test/manipulation/`).

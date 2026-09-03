@@ -45,7 +45,15 @@ contract ForkSimulationTest is Test {
     uint256 constant LEN = 130; //          blocks per scenario
     uint256 constant NSCEN = 8;
     uint256 constant T = LEN * NSCEN; //    total blocks (1040)
-    uint256 constant SEED = 0xBEEF;
+    uint256 constant SEED = 0xBEEF; //      the headline run seed (the one that writes the CSVs)
+
+    /// @dev Seed of the run in progress; `test_multiSeed_*` sweeps it. Everything stochastic in
+    ///      the harness (the fair-price path and the uninformed order flow) derives from it, so
+    ///      a different seed is a genuinely different market and order book.
+    uint256 seed = SEED;
+    /// @dev Only the headline run writes the CSVs the plots are built from; the sweep would
+    ///      otherwise overwrite them once per seed, and pay the I/O for nothing.
+    bool recording = true;
 
     // detector / curve config for the live pool
     int256 constant K = 3e15;
@@ -151,6 +159,82 @@ contract ForkSimulationTest is Test {
         vm.writeFile(TS, "block,scenario,fair,price_on,price_off,kappa,trend,d,lp_on,lp_off,cum_lvr_on,cum_lvr_off,cum_noise_on\n");
         vm.writeFile(OB, "id,block,scenario,pool,kind,zeroForOne,amount_in,amount_out\n");
 
+        _runPath();
+
+        _writeSummary();
+        console2.log("simulation done; blocks:", T);
+        console2.log("cum LVR  POINCARE (USDC wei):", cumLvrOn);
+        console2.log("cum LVR  CONTROL  (USDC wei):", cumLvrOff);
+        if (cumLvrOff > 0) {
+            console2.log("LVR reduction (bps):", (cumLvrOff - cumLvrOn) * 10000 / cumLvrOff);
+        }
+        // Sanity: the live pool must not LOSE more to arb than a plain constant-product pool.
+        assertLe(cumLvrOn, cumLvrOff, "Poincare must not increase LVR vs the constant-product control");
+    }
+
+    /// @notice The headline run above is ONE price path from ONE seed, which the write-up has
+    ///         always flagged as its weakest point. This sweeps the seed: a fresh pair of pools
+    ///         and a fresh market per seed, same regime schedule, and asserts the result holds
+    ///         on EVERY path rather than on a lucky one.
+    /// @dev    Reports the distribution (min/mean/max) so the write-up can quote a range rather
+    ///         than a point estimate. Runs without file I/O; the CSVs stay the headline run's.
+    function test_multiSeed_poincareNeverTrailsControl() public {
+        uint256[5] memory seeds =
+            [uint256(0xBEEF), uint256(0xC0FFEE), uint256(0xDECAF), uint256(0xFEED), uint256(0x1234)];
+
+        uint256 sumBps;
+        uint256 minBps = type(uint256).max;
+        uint256 maxBps;
+
+        for (uint256 i = 0; i < seeds.length; i++) {
+            _resetRun(seeds[i], uint160(0x1000 + i * 2));
+            _runPath();
+
+            // The floor claim, on every single path: leaning never costs LPs more than not
+            // leaning. This is the assertion that must not be seed-dependent.
+            assertLe(cumLvrOn, cumLvrOff, "Poincare must not increase LVR on any seed");
+
+            uint256 bps = cumLvrOff > 0 ? (cumLvrOff - cumLvrOn) * 10000 / cumLvrOff : 0;
+            sumBps += bps;
+            if (bps < minBps) minBps = bps;
+            if (bps > maxBps) maxBps = bps;
+            console2.log("seed index / LVR reduction (bps) / cost to uninformed flow:", i, bps, cumNoiseOn);
+        }
+
+        console2.log("--- across independent paths:", seeds.length);
+        console2.log("mean LVR reduction (bps):", sumBps / seeds.length);
+        console2.log("min  LVR reduction (bps):", minBps);
+        console2.log("max  LVR reduction (bps):", maxBps);
+        assertGt(minBps, 0, "every path must show a reduction, not just the average");
+    }
+
+    /// @dev Fresh pools and zeroed accounting for a new seed. The hooks need a new address each
+    ///      time (the permission flags live in the low bits, `ns` varies the rest), or
+    ///      `deployCodeTo` would land on top of the previous run's state.
+    function _resetRun(uint256 newSeed, uint160 ns) internal {
+        seed = newSeed;
+        recording = false;
+
+        hookOn = _deployHook(KAPPA_MAX, ns);
+        hookOff = _deployHook(0, ns + 1);
+        keyOn = _initPool(hookOn);
+        keyOff = _initPool(hookOff);
+        _seed(hookOn);
+        _seed(hookOff);
+
+        fair = 3000 * WAD;
+        cumLvrOn = 0;
+        cumLvrOff = 0;
+        cumNoiseOn = 0;
+        for (uint256 i = 0; i < NSCEN; i++) {
+            lvrOnByScen[i] = 0;
+            lvrOffByScen[i] = 0;
+            noiseCostByScen[i] = 0;
+        }
+    }
+
+    /// @dev The simulation loop itself, shared by the headline run and the seed sweep.
+    function _runPath() internal {
         for (uint256 blk = 1; blk <= T; blk++) {
             vm.roll(block.number + 1);
             (int256 drift, uint256 sigma, uint8 scen) = _regime(blk);
@@ -166,16 +250,6 @@ contract ForkSimulationTest is Test {
             _noise(blk, scen);
             _record(blk, scen);
         }
-
-        _writeSummary();
-        console2.log("simulation done; blocks:", T);
-        console2.log("cum LVR  POINCARE (USDC wei):", cumLvrOn);
-        console2.log("cum LVR  CONTROL  (USDC wei):", cumLvrOff);
-        if (cumLvrOff > 0) {
-            console2.log("LVR reduction (bps):", (cumLvrOff - cumLvrOn) * 10000 / cumLvrOff);
-        }
-        // Sanity: the live pool must not LOSE more to arb than a plain constant-product pool.
-        assertLe(cumLvrOn, cumLvrOff, "Poincare must not increase LVR vs the constant-product control");
     }
 
     // ------------------------------------------------------------------
@@ -206,7 +280,7 @@ contract ForkSimulationTest is Test {
     }
 
     function _advanceFair(int256 drift, uint256 sigma, uint256 blk) internal {
-        uint256 h = uint256(keccak256(abi.encode(SEED, blk)));
+        uint256 h = uint256(keccak256(abi.encode(seed, blk)));
         int256 noise = int256(h % (2 * sigma + 1)) - int256(sigma);
         int256 step = drift + noise; // log-ish step; apply multiplicatively
         if (step >= 0) {
@@ -251,7 +325,7 @@ contract ForkSimulationTest is Test {
     // ------------------------------------------------------------------
 
     function _noise(uint256 blk, uint8 scen) internal {
-        uint256 h = uint256(keccak256(abi.encode(SEED, blk, "noise")));
+        uint256 h = uint256(keccak256(abi.encode(seed, blk, "noise")));
         bool zeroForOne = (h & 1) == 0;
         uint256 wethSize = 5e16 + (h % 3e18); // 0.05 .. ~3 WETH notional
         uint256 amtOn;
@@ -299,6 +373,7 @@ contract ForkSimulationTest is Test {
     }
 
     function _logOrder(uint8 scen, bool isOn, string memory kind, bool z, uint256 amtIn, uint256 amtOut) internal {
+        if (!recording) return;
         string memory r = string.concat(vm.toString(orderId), ",", vm.toString(block.number), ",", vm.toString(uint256(scen)));
         r = string.concat(r, ",", isOn ? "poincare" : "control", ",", kind);
         r = string.concat(r, ",", z ? "1" : "0", ",", vm.toString(amtIn), ",", vm.toString(amtOut));
@@ -310,6 +385,7 @@ contract ForkSimulationTest is Test {
     // ------------------------------------------------------------------
 
     function _record(uint256 blk, uint8 scen) internal {
+        if (!recording) return;
         string memory pOnS;
         string memory pOffS;
         string memory lpOnS;

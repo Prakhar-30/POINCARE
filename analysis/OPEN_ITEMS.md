@@ -8,7 +8,7 @@ Last full review: through M8 (hardening) + fork simulations (synthetic + real ET
 item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 kept for external
 audit) + the Olympix BugPoCer pre-audit scan (all findings fixed, see H below).
 
-**2026-07 feature pass** (suite now 126 tests, 0 failures; invariants run in TWO flavors —
+**2026-07 feature pass** (suite now 131 tests, 0 failures; invariants run in TWO flavors —
 plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k calls each, 0 reverts):
 - **E0 shipped**: deep symmetric base via SUPPLY-SCALED virtual offsets (see E0 below for why the
   two obvious parameterisations are unsafe). Output-feasibility guards added for both swap kinds.

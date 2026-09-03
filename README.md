@@ -339,6 +339,12 @@ stress regimes** (calm, trends, a flash crash, whipsaw) over **1,040 blocks / 3,
 | Cumulative LVR (arbitrageur extraction) | 155,443 USDC | 221,227 USDC | **−29.7%** |
 | **LP value retained** (marked at fair) | **10,186,959 USDC** | 9,685,443 USDC | **+$501,516** |
 
+That row is one seed. Re-running the whole schedule on **5 independent seeds** (fresh market,
+fresh order book, fresh pools each time) gives **19.3% - 29.7%, mean 22.9%**, with every path
+showing a reduction - asserted, not just averaged, in
+`test_multiSeed_poincareNeverTrailsControl`. **22.9% is the number to quote**; the 29.7% above
+is the top of the range.
+
 The LP-value advantage is **flat in calm** (the detector correctly does not engage, nothing to
 protect), **grows through the trends**, and **jumps during the flash-crash + whipsaw**, where Poincaré
 helps most in exactly the high-LVR regimes (strong_up **−54%**, flash_crash **−83%**) where LPs
@@ -391,8 +397,8 @@ wanted.
 
 In the trending half the detector-gated lever wins; in chop it is dead weight while an always-on
 fee keeps collecting. A full year of ETH/USDC contains enough chop to wash the two out. The
-synthetic stress path in §9 (−29.7%) is trend-dense by construction, which is precisely why it
-flatters the design — this run is the honest counterweight to it.
+synthetic stress path in §9 (-22.9% mean over 5 seeds) is trend-dense by construction, which is
+precisely why it flatters the design — this run is the honest counterweight to it.
 
 Two things do survive everywhere. **LVR ≤ control throughout** (asserted in the test): leaning
 against detected trends never costs LPs more than doing nothing. And the qualitative property no
@@ -451,7 +457,7 @@ validate it.
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 126 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 131 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
 > regression test per finding from the **Olympix BugPoCer pre-audit scan**, all fixed). The
