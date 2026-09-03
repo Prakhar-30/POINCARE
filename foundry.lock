@@ -5,6 +5,9 @@
   "lib/hookmate": {
     "rev": "33408fbc15e083eb0bc4205fa37cb6ba0a926f44"
   },
+  "lib/solady": {
+    "rev": "ab96a830e705de13e0f58cfaefadab4ac8257655"
+  },
   "lib/uniswap-hooks": {
     "rev": "e59fe72c110c3862eec9b332530dce49ca506bbb"
   }
