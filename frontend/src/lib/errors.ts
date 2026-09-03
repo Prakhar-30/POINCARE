@@ -21,6 +21,8 @@ export function humanizeError(e: unknown): string {
     return "Wallet nonce is out of sync. Reset the account in your wallet and retry.";
   if (m.includes("intrinsic gas") || m.includes("gas required exceeds") || m.includes("out of gas"))
     return "Gas estimation failed. A manual limit was set, please retry.";
+  if (m.includes("reverted on chain"))
+    return "The transaction reverted on chain. Nothing was executed; you were only charged gas.";
   if (m.includes("chain") && m.includes("mismatch"))
     return `Wrong network. Switch your wallet to ${CHAIN_NAME}.`;
 

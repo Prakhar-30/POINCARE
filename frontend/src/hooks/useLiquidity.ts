@@ -4,7 +4,7 @@ import { zeroHash } from "viem";
 import { CONTRACTS, ERC20_ABI, EXPLORER, HOOK_LP_ABI } from "@/config/contracts";
 import { fromWei, toWei } from "@/lib/units";
 import { recordLpEvent } from "@/lib/db";
-import { resolveGas, GAS, nextNonce } from "@/lib/gas";
+import { resolveGas, GAS, nextNonce, waitForSuccess } from "@/lib/gas";
 import { humanizeError } from "@/lib/errors";
 import { useStepper } from "@/hooks/useStepper";
 import { useToast } from "@/components/ui/Toast";
@@ -39,7 +39,7 @@ export function useLiquidity(onDone?: () => void) {
     stepper.activate(stepKey);
     const gas = await resolveGas(publicClient, { ...erc20(token), functionName: "approve", args: [hook, need], account: address }, GAS.approve);
     const h = await walletClient.writeContract({ ...erc20(token), functionName: "approve", args: [hook, need], gas, nonce: await nextNonce(publicClient, address) });
-    await publicClient.waitForTransactionReceipt({ hash: h });
+    await waitForSuccess(publicClient, h);
     stepper.complete(stepKey);
   }
 
@@ -71,7 +71,7 @@ export function useLiquidity(onDone?: () => void) {
       const lpArgs = [{ amount0Desired: a0, amount1Desired: a1, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, account: address }, GAS.addLiquidity);
       const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, gas, nonce: await nextNonce(publicClient, address) });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await waitForSuccess(publicClient, hash);
       stepper.complete("add");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 
@@ -97,7 +97,7 @@ export function useLiquidity(onDone?: () => void) {
       const rmArgs = [{ liquidity: params.shares, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, account: address }, GAS.removeLiquidity);
       const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, gas, nonce: await nextNonce(publicClient, address) });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await waitForSuccess(publicClient, hash);
       stepper.complete("remove");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 

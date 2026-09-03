@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, EXPLORER, FAUCET_ABI, POOL_KEY, ROUTER_ABI, hasFaucet } from "@/config/contracts";
 import { recordSwap } from "@/lib/db";
-import { resolveGas, GAS, nextNonce } from "@/lib/gas";
+import { resolveGas, GAS, nextNonce, waitForSuccess } from "@/lib/gas";
 import { humanizeError } from "@/lib/errors";
 import { fromWei, legsOf, toWei } from "@/lib/units";
 import { useStepper } from "@/hooks/useStepper";
@@ -51,7 +51,7 @@ export function useSwap() {
         stepper.activate("approve");
         const gas = await resolveGas(publicClient, { ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], account: address }, GAS.approve);
         const aHash = await walletClient.writeContract({ ...erc20(tokenIn), functionName: "approve", args: [router, amountInWei], gas, nonce: await nextNonce(publicClient, address) });
-        await publicClient.waitForTransactionReceipt({ hash: aHash });
+        await waitForSuccess(publicClient, aHash);
         stepper.complete("approve");
       }
 
@@ -68,7 +68,7 @@ export function useSwap() {
         GAS.swap,
       );
       const hash = await walletClient.writeContract({ address: router, abi: ROUTER_ABI, functionName: "swapExactTokensForTokens", args: swapArgs, gas, nonce: await nextNonce(publicClient, address) });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await waitForSuccess(publicClient, hash);
       stepper.complete("swap");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 
@@ -140,7 +140,7 @@ export function useFaucet() {
         const faucet = CONTRACTS.faucet as `0x${string}`;
         const gas = await resolveGas(publicClient, { address: faucet, abi: FAUCET_ABI, functionName: "drip", args: [address], account: address }, GAS.mint * 2n);
         const hash = await walletClient.writeContract({ address: faucet, abi: FAUCET_ABI, functionName: "drip", args: [address], gas, nonce: await nextNonce(publicClient, address) });
-        await publicClient.waitForTransactionReceipt({ hash });
+        await waitForSuccess(publicClient, hash);
       } else {
         // Older deployment: two mints, strictly sequential, each with the pending nonce
         // pinned from the node. MetaMask's own nonce cache goes stale on this chain and
@@ -152,11 +152,11 @@ export function useFaucet() {
 
         const g1 = await resolveGas(publicClient, { ...usdc, functionName: "mint", args: [address, usdcWei], account: address }, GAS.mint);
         const h1 = await walletClient.writeContract({ ...usdc, functionName: "mint", args: [address, usdcWei], gas: g1, nonce: await nextNonce(publicClient, address) });
-        await publicClient.waitForTransactionReceipt({ hash: h1 });
+        await waitForSuccess(publicClient, h1);
 
         const g2 = await resolveGas(publicClient, { ...weth, functionName: "mint", args: [address, wethWei], account: address }, GAS.mint);
         const h2 = await walletClient.writeContract({ ...weth, functionName: "mint", args: [address, wethWei], gas: g2, nonce: await nextNonce(publicClient, address) });
-        await publicClient.waitForTransactionReceipt({ hash: h2 });
+        await waitForSuccess(publicClient, h2);
       }
       toast.success("Test tokens received", `${fmtNum(Number(USDC_AMT))} USDC and ${fmtNum(Number(WETH_AMT))} WETH added to your wallet`);
     } catch (e) {

@@ -1,4 +1,23 @@
-import type { PublicClient } from "viem";
+import type { Hash, PublicClient, TransactionReceipt } from "viem";
+
+/**
+ * Wait for a transaction and REJECT it if it reverted.
+ *
+ * `waitForTransactionReceipt` resolves for any mined transaction, successful or
+ * not, so awaiting it alone treats a revert as a success. That matters more here
+ * than on most chains: we deliberately pass an explicit `gas` to every write (see
+ * `resolveGas`), which skips the wallet simulation that would normally catch a
+ * failing call before it is ever sent. A reverted swap therefore reaches the chain,
+ * and without this check the app would report it as confirmed, invent an execution
+ * price from a zero balance change, and write the phantom trade to the shared tape.
+ */
+export async function waitForSuccess(publicClient: PublicClient, hash: Hash): Promise<TransactionReceipt> {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") {
+    throw new Error("Transaction reverted on chain. Nothing was executed; you were only charged gas.");
+  }
+  return receipt;
+}
 
 /**
  * Resolve a gas limit ourselves instead of letting the wallet estimate.
