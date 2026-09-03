@@ -141,6 +141,30 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
   synthetic path; real-data calibration pending a price series).
 - ✅ Integration via PoolManager + gas profiling (`test/Gas.t.sol`; ~120k/block detector overhead, see G8).
 
+## I. Real-data calibration and the baseline it exposed (2026-09)
+
+The detector's `k` and `h` are now **derived from the target pair's own return distribution**
+rather than hand-set, and the real-data replay gained the baseline that makes its number
+interpretable. Both changed the honest reading of the result, so it is recorded here in full.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| I1 | **Empirical calibration harness.** CALIBRATION.md's stated milestone-6 gap ("still pending: a real return series"). | ✅ | `test/calibration/RealDataCalibration.t.sol` measures ARL₀ and detection delay by bootstrapping the **demeaned real returns** (drift removed, kurtosis ≈ 7 kept), on the **first half** of the series only. Derives `k = μ₁/2 = 0.25σ` and finds `h = 6.25σ` by search against a target ARL₀ ≥ 120 bars. Achieved: ARL₀ = 124 bars (≈20 days), delay 23 bars. |
+| I2 | **The previous replay config was firing every 2½ days.** | ✅ (recorded) | `k = 0.005, h = 0.03` measures ARL₀ = **15 bars** on this distribution. A detector that re-arms inside chop turns the directional lever into an indiscriminate spread. `test_preCalibrationConfig_wasFiringFarTooOften` keeps it on record. |
+| I3 | **Symmetric vol-fee baseline added to the real-data replay.** | ✅ | Third pool, `min(γ·σ̂, cap)` both ways, γ sized to match the cost to uninformed flow. Any spread cuts LVR, so the old "beats `x·y=k`" comparison could not separate the detector's contribution from the mere presence of friction. |
+| I4 | **The measured result: over a full year the symmetric fee edges the directional one.** | 🟠 **open finding** | LVR −2.37% (Poincaré) vs −3.27% (vol-fee) vs control; LP value within 1.5%; Poincaré spends ~27% more of its traders' money. **In the trend-heavy, out-of-sample second half the directional lever wins** (−4.09% vs −3.28%). The thesis holds where it claims to (trends) and is dead weight in chop; a year of ETH/USDC has enough chop to wash it out against an always-on fee. Reported as-is in README §9.1 and SIMULATION.md. |
+| I5 | **Captive uninformed flow biases I4 against Poincaré.** | 🟠 next | The harness forces the same noise order through every pool, so a benign trader pushing with the trend pays the full `κ` (up to 5%) instead of routing away from it, which is what README §8 says routers should do. This inflates Poincaré's measured cost to benign flow and so understates its advantage per unit of *real* trader cost. A routing-aware flow model (uninformed order skips a pool quoting beyond a tolerance) is the single change most likely to move I4. Not attempted yet; note it cuts in our favour, which is exactly why it needs doing carefully rather than assumed. |
+| I6 | **Friction budgets matched only approximately.** | 🟡 | Realised: 3,925 (Poincaré) vs 3,100 (vol-fee) USDC. The test asserts within 25% and prints both. The direction matters: the baseline did better on a *smaller* budget, so closing the gap would favour the baseline, not us. `FEE_GAMMA` can be retuned if the flow model changes. |
+| I7 | **Synthetic study is now seed-swept.** | ✅ | `test_multiSeed_poincareNeverTrailsControl` runs the 8-regime path on 5 independent seeds with fresh pools each, asserting `LVR ≤ control` on **every** path and reporting min/mean/max, retiring the "single seed" caveat the write-up carried. |
+
+**What this means for the claims.** The synthetic stress path (−29.7%) is trend-dense by
+construction and should be quoted as what it is: a stress test, not a forecast. The defensible
+real-data claims are (a) LVR ≤ constant product always, asserted; (b) the advantage concentrates
+in genuine trends, shown by the half-window split; and (c) against-trend and calm-market flow pays
+**nothing**, which no LVR aggregate captures but a symmetric fee can never match.
+
+---
+
 ## H. Olympix BugPoCer pre-audit scan (2026-07, all findings fixed)
 
 Automated pre-audit scan run before the current Unichain Sepolia deployment. Every finding is
