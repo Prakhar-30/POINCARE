@@ -120,9 +120,9 @@ export function Analytics() {
 
       {/* LVR headline */}
       <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
-        <HeadStat label="LVR reduction vs x·y=k" value="14.3%" color="var(--up)" tinted sub="back-test, synthetic regime path" />
-        <HeadStat label="with the adaptive detector" value="29.6%" color="var(--up)" tinted sub="σ-normalized thresholds, same path" />
-        <HeadStat label="vs equal-spread vol fee" value="11.5%" color="var(--lav)" sub="same average spread, symmetric" />
+        <HeadStat label="LVR reduction vs x·y=k" value="22.9%" color="var(--up)" tinted sub="synthetic stress path, mean of 5 seeds" />
+        <HeadStat label="on 12 months of real ETH/USDC" value="2.4%" color="var(--lav)" sub="calibrated detector; 4.1% in the trending half" />
+        <HeadStat label="vs equal-spread vol fee" value="11.5%" color="var(--lav)" sub="same average spread, synthetic path" />
         <HeadStat label="LVR avoided · live" value={totals && totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} color="var(--green-label)" sub={`${totals?.swap_count ?? 0} swaps tracked`} />
         <HeadStat label="Detection delay" value="≈ 6 blocks" color="var(--honey-deep)" sub="after a real trend onset" />
       </div>

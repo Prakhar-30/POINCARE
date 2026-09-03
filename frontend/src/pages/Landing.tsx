@@ -85,7 +85,7 @@ export function Landing() {
 
             <motion.div {...fade(0.24)} className="mt-9 flex items-center gap-5 flex-wrap" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-3)" }}>
               <Trust icon="shield" text="Manipulation-bounded by design" />
-              <Trust icon="check" text="118 tests · 256k-op invariant suite" />
+              <Trust icon="check" text="131 tests · 384k-op invariant suite" />
               <Trust icon="target" text="No oracle, no AVS" />
             </motion.div>
           </div>
@@ -99,9 +99,9 @@ export function Landing() {
       {/* numbers */}
       <section className="px-6 md:px-10 py-4">
         <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
-          <NumberCard kpi="−14.3%" label="LVR vs constant-product" sub="−29.6% with the adaptive detector" />
-          <NumberCard kpi="6 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
-          <NumberCard kpi="~2×" label="less tax on benign flow" sub="vs a symmetric vol-fee" />
+          <NumberCard kpi="−22.9%" label="LVR on the stress path" sub="mean of 5 seeded runs (19–30%)" />
+          <NumberCard kpi="12 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
+          <NumberCard kpi="0%" label="spread on the stabilising side" sub="counter-trend and calm flow, always" />
           <NumberCard kpi="0" label="external dependencies" sub="prices off its own reserves" />
         </motion.div>
       </section>
