@@ -489,7 +489,24 @@ passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain cases i
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
 
-## 11. License
+## 11. Partner integrations
+
+**None.** Poincaré integrates no hookathon partner technology, and that is a design
+constraint rather than an omission: the detector is built to work with **no oracle, no AVS,
+no keeper, no relayer and no cross-chain dependency**. Its only input is the pool's own
+reserve-implied price, sampled once per block inside `beforeSwap` (§10 scope guardrails).
+Adding an external price feed would reintroduce exactly the trust and latency assumptions the
+quickest-change detector exists to avoid.
+
+What it does build on is standard, public infrastructure: Uniswap v4 (`v4-core`,
+`v4-periphery`), OpenZeppelin's `uniswap-hooks` `BaseCustomCurve` for settlement, `hookmate`
+for router/address constants, and Solady for fixed-point math. The contracts were scanned
+pre-deployment by **Olympix** (automated pre-audit); every finding was fixed and each carries a
+regression test (see [`SECURITY.md`](./SECURITY.md)).
+
+---
+
+## 12. License
 
 Poincare is licensed under the **Business Source License 1.1** (`BUSL-1.1`) — see [LICENSE](./LICENSE).
 Production/commercial use of the hook, detector, curve, or any derivative requires a commercial
