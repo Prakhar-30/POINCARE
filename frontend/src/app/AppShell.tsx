@@ -9,6 +9,7 @@ import { Pool } from "./screens/Pool";
 import { Analytics } from "./screens/Analytics";
 import { AppFooter } from "./AppFooter";
 import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
+import { WrongNetworkBanner } from "@/components/ui/WrongNetworkBanner";
 import { useWalletIdentity } from "@/hooks/useBackend";
 
 /** The config layer binds to one chain per page load; when the wallet lands on another
@@ -33,6 +34,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
       <TopNav tab={tab} setTab={setTab} />
+      <WrongNetworkBanner />
       <AnnouncementMarquee />
       <div className="flex-1">
         {tab === "dashboard" && <Dashboard />}
