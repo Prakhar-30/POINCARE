@@ -8,10 +8,12 @@ here is the *method*, so that calibration is reproducible rather than guessed.
 
 > Status (current): no calibrated numbers are baked into any contract. Parameters are
 > constructor/governable inputs, validated by `Cusum.isValidConfig` and
-> `DirectionalSignal.isValidConfig`. The measurement engine that pins `h` from data lives in
-> `test/calibration/Calibration.t.sol`; it currently runs on an **illustrative zero-mean
-> noise model** to validate the methodology and the qualitative laws. Swap in the empirical
-> return distribution at milestone 6 to obtain production values.
+> `DirectionalSignal.isValidConfig`. The measurement engine lives in two files:
+> `test/calibration/Calibration.t.sol` validates the calibration *laws* on an illustrative
+> zero-mean noise model, and `test/calibration/RealDataCalibration.t.sol` runs the same
+> measurements on the **real, heavy-tailed ETH/USDC return distribution** and derives the
+> numbers the fork replay deploys. The "pending a real return series" gap below is closed;
+> see *Applied calibration* at the end.
 
 All quantities are signed WAD (1e18 = 1.0). Returns `r_t` are **log-returns** of the
 reserve-implied price (see `PriceLib`), so parameters are scale-stable across price levels.
@@ -134,7 +136,51 @@ Two principled calibration facts surfaced and are now baked into the methodology
   gain, so κ_max trades off (a) retained-spread benefit against (b) lag cost. The back-test is the
   tool that locates that optimum on real data.
 
-**Still pending (the only missing piece): a real return series.** Drop it into the harness's
-`_pathReturn` and the SAME engine yields production `k, h (via ARL₀), window, κ_max` and the
-real-pair LVR-reduction headline. No contract changes are needed, because every parameter is already an
-injected constructor argument.
+---
+
+## Applied calibration: ETH/USDC 4h *(done; this is what the replay deploys)*
+
+The method above, run end to end on real data by
+[`test/calibration/RealDataCalibration.t.sol`](../test/calibration/RealDataCalibration.t.sol).
+
+**The sample.** 2,190 Binance ETHUSDC 4h closes (`analysis/simulation/realdata/prices_wad.txt`),
+turned into log-returns by the same `PriceLib` the hook uses. Only the **first half** is used to
+calibrate; the second half is never touched by the harness, so the replay's report on it is a
+genuine hold-out.
+
+**The no-trend surrogate.** ARL₀ is a property of the *no-trend* distribution, so the calibration
+returns are **demeaned** — the drift is removed, the heavy tails, skew and clustering are kept —
+and the harness bootstraps from those residuals. This is the point of doing it on real data: the
+sample has excess kurtosis ≈ 7, which a Gaussian ARL₀ approximation (Siegmund) does not capture,
+so the *measurement* is authoritative and Siegmund is only a sanity check.
+
+**The derivation.**
+
+| Parameter | Value | Where it comes from |
+|---|---|---|
+| σ (calibration half) | 0.013677 per 4h bar | measured |
+| μ₁ (smallest drift worth leaning against) | 0.5 σ | read off the data: the strongest sustained 30-bar drifts in the window run 0.5–0.75 σ/bar |
+| `k` | 0.25 σ = 0.003419 | the classic `k = μ₁/2` |
+| `h` | 6.25 σ = 0.085483 | **search**: the smallest `h` on a σ/4 grid whose *measured* ARL₀ ≥ 120 bars |
+| `sMax` | 2 h | κ saturates at twice the detection threshold |
+| `κ_min`, `κ_max`, `Δκ_max` | 0, 0.05, 0.015 | security/seam parameters — **not** calibrated from data, by design |
+
+**The achieved operating point.** At that `(k, h)` the harness measures **ARL₀ = 124 bars** (≈20
+days between false alarms at 6 bars/day) and a **detection delay of 23 bars** at the design drift,
+so true detections dominate false alarms by ~5×.
+
+**Why the target is 120 bars.** A real trend episode in this window lasts ~30–60 bars. False
+alarms must be rarer than that by a clear margin, or the detector re-arms inside chop and the
+directional lever degenerates into an indiscriminate spread — charged to whoever happens to be
+trading with the noise. This is not a cosmetic concern: at equal cost to uninformed traders, a
+*selective* detector beats a symmetric vol-fee baseline while an over-eager one loses to it, which
+is precisely why the threshold has to be derived rather than picked.
+
+**What the previous configuration was.** The replay formerly ran `k = 0.005, h = 0.03`, described
+in the code as "illustrative, not optimised". Measured on this distribution that is an **ARL₀ of
+15 bars** — a false alarm every 2½ days. `test_preCalibrationConfig_wasFiringFarTooOften` keeps
+that on record so nobody restores it believing it was calibrated.
+
+**Transfer to other pairs.** Nothing here is ETH-specific except the input series. Point
+`PRICES` at another pair's closes and the same harness re-derives `σ, k, h`; the contracts need no
+change, because every parameter is already an injected constructor argument.
