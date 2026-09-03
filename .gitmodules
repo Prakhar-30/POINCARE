@@ -7,3 +7,6 @@
 [submodule "lib/hookmate"]
 	path = lib/hookmate
 	url = https://github.com/akshatmittal/hookmate
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/Vectorized/solady

@@ -1,12 +1,10 @@
 name: Test Suite
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
-  # push:
-  # pull_request:
-
-env:
-  FOUNDRY_PROFILE: ci
 
 jobs:
   test:
@@ -22,13 +20,19 @@ jobs:
         with:
           version: stable
 
+      # The default profile skips test/sim (the fork replays need an archive RPC), so this is
+      # the whole offline suite: unit, fuzz, invariant, manipulation, calibration, regression.
       - name: Build
         run: |
           forge --version
-          forge build --sizes
+          forge build
         id: build
 
       - name: Test
-        run: |
-          forge test -vvv
+        run: forge test -vv
         id: test
+
+      # The hook is over EIP-170 unoptimized (tests bypass the limit via deployCodeTo), so the
+      # size that matters is the one we actually deploy: optimizer + IR, the `deploy` profile.
+      - name: Contract sizes (deploy profile)
+        run: FOUNDRY_PROFILE=deploy forge build --sizes
