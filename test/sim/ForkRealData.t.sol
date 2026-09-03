@@ -20,12 +20,23 @@ import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCus
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
 import {MintableERC20} from "./MintableERC20.sol";
 
-/// @title ForkRealDataTest - feed real 6-month ETH/USDC history to the hook on a Sepolia v4 fork
+/// @title ForkRealDataTest - feed real 12-month ETH/USDC history to the hook on a Sepolia v4 fork
 /// @notice Identical comparative engine to ForkSimulation, but `fair` is driven by the REAL
-///         Binance ETHUSDC 4h closes (Dec 2025 -> Jun 2026, 1080 points) fetched by
-///         analysis/simulation/fetch_realdata.py into realdata/prices_wad.txt. Two pools on the
-///         real Sepolia PoolManager: POINCARE (kappa_max 5%) vs CONTROL (kappa_max 0 = plain
-///         constant product), to see how the detector + curve behave against true market action.
+///         Binance ETHUSDC 4h closes fetched by analysis/simulation/fetch_realdata.py into
+///         realdata/prices_wad.txt. THREE pools on the real Sepolia PoolManager, seeded
+///         identically and fed the same fair path and the same order flow:
+///
+///           * POINCARE - detector-gated DIRECTIONAL spread, kappa_max 5%, no vol fee;
+///           * CONTROL  - kappa_max 0 and no fee, i.e. plain constant product (the LVR floor);
+///           * VOLFEE   - no directional spread, a SYMMETRIC vol-scaled fee min(gamma*sigma, cap)
+///                        charged to both sides, with gamma set so its cost to uninformed flow
+///                        matches POINCARE's. The same-friction-budget baseline.
+///
+///         The vol-fee pool is the baseline that makes the result mean something: any spread
+///         reduces LVR, so "LVR below constant product" alone proves nothing. The question is
+///         whether spending a friction budget DIRECTIONALLY (only on the toxic side, only when
+///         the detector is confident) beats spending it symmetrically. That comparison exists
+///         on the synthetic path in test/backtest/Backtest.t.sol; this brings it to real data.
 contract ForkRealDataTest is Test {
     using CurrencyLibrary for Currency;
 
@@ -34,15 +45,29 @@ contract ForkRealDataTest is Test {
     uint256 constant SEED = 0xA11CE;
     uint256 constant PHASES = 6; // monthly buckets for the summary
 
-    // detector config tuned for 4h ETH returns (illustrative, not optimised)
-    int256 constant K = 5e15; //      0.5% slack
-    int256 constant H = 3e16; //      3% threshold
-    int256 constant S_MAX = 1e17; //  10% cap
+    // Detector config CALIBRATED on this pair's own return distribution by
+    // test/calibration/RealDataCalibration.t.sol, which measures ARL0 and detection delay on
+    // the real (heavy-tailed) returns of the FIRST HALF of this series only - so the second
+    // half is out-of-sample for these numbers. See analysis/CALIBRATION.md.
+    //   sigma (calibration half)  = 0.013677 per 4h bar
+    //   k = mu1/2 = 0.25 sigma     (mu1 = 0.5 sigma, the smallest drift worth leaning against)
+    //   h = 6.25 sigma             (the smallest h whose measured ARL0 >= 120 bars ~ 20 days)
+    //   measured at that h: ARL0 = 124 bars, detection delay at mu1 = 23 bars
+    int256 constant K = 3419317141238437; //      0.25 sigma
+    int256 constant H = 85482928530960943; //     6.25 sigma  (ARL0 = 124 bars)
+    int256 constant S_MAX = 170965857061921886; // 2h: kappa saturates at twice the threshold
     uint256 constant KAPPA_MIN = 0;
-    uint256 constant KAPPA_MAX = 5e16; // 5%
+    uint256 constant KAPPA_MAX = 5e16; // 5% - a security cap, NOT calibrated from data
     uint256 constant D_MAX = 15e15; // 1.5%/block
     uint256 constant LAMBDA = 85e16; // ~1-day memory
     uint256 constant D_FLOOR = 55e16; // 0.55
+
+    // Symmetric vol-fee baseline: fee = min(FEE_GAMMA * sigma, FEE_CAP), charged both ways.
+    // FEE_GAMMA is chosen so this pool's cost to uninformed flow matches POINCARE's over the
+    // window (the equal-friction-budget condition); the run reports both realized costs so the
+    // match can be checked rather than trusted.
+    uint256 constant FEE_GAMMA = 315e14; // 0.0315 -> ~2.8bp at this pair's realized vol
+    uint256 constant FEE_CAP = 1e17;
 
     IPoolManager pm;
     IUniswapV4Router04 router;
@@ -50,19 +75,29 @@ contract ForkRealDataTest is Test {
     Currency c1; // USDC
     PoincareHook hookOn;
     PoincareHook hookOff;
+    PoincareHook hookVf;
     PoolKey keyOn;
     PoolKey keyOff;
+    PoolKey keyVf;
 
     uint256[] prices; //   real ETH/USDC closes, WAD
     uint256 fair;
     uint256 cumLvrOn;
     uint256 cumLvrOff;
-    uint256 cumNoiseOn;
+    uint256 cumLvrVf;
+    uint256 cumNoiseOn; // cost of the spread to uninformed flow, POINCARE
+    uint256 cumNoiseVf; // ... and VOLFEE: the friction budgets being matched
     uint256 orderId;
     uint256 nPts;
 
     uint256[PHASES] lvrOnByPhase;
     uint256[PHASES] lvrOffByPhase;
+    uint256[PHASES] lvrVfByPhase;
+
+    // half-window split: the first half calibrated the detector, the second is out-of-sample
+    uint256 lvrOnH1;
+    uint256 lvrOffH1;
+    uint256 lvrVfH1;
 
     string constant PRICES = "analysis/simulation/realdata/prices_wad.txt";
     string constant TS = "analysis/simulation/realdata/timeseries.csv";
@@ -90,10 +125,12 @@ contract ForkRealDataTest is Test {
         MintableERC20(Currency.unwrap(c0)).mint(address(this), 1e33);
         MintableERC20(Currency.unwrap(c1)).mint(address(this), 1e33);
 
-        hookOn = _deployHook(KAPPA_MAX, 0x6666);
-        hookOff = _deployHook(0, 0x7777);
+        hookOn = _deployHook(KAPPA_MAX, 0, 0x6666);
+        hookOff = _deployHook(0, 0, 0x7777);
+        hookVf = _deployHook(0, FEE_GAMMA, 0x8888);
         keyOn = _initPool(hookOn);
         keyOff = _initPool(hookOff);
+        keyVf = _initPool(hookVf);
 
         IERC20Minimal(Currency.unwrap(c0)).approve(address(router), type(uint256).max);
         IERC20Minimal(Currency.unwrap(c1)).approve(address(router), type(uint256).max);
@@ -101,9 +138,10 @@ contract ForkRealDataTest is Test {
         fair = prices[0];
         _seed(hookOn);
         _seed(hookOff);
+        _seed(hookVf);
     }
 
-    function _deployHook(uint256 kappaMax, uint160 ns) internal returns (PoincareHook h) {
+    function _deployHook(uint256 kappaMax, uint256 feeGamma, uint160 ns) internal returns (PoincareHook h) {
         address flags = address(
             uint160(
                 Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
@@ -120,6 +158,8 @@ contract ForkRealDataTest is Test {
         cfg.kappaMin = KAPPA_MIN;
         cfg.kappaMax = kappaMax;
         cfg.dMax = D_MAX;
+        cfg.feeGamma = feeGamma;
+        cfg.feeCap = feeGamma == 0 ? 0 : FEE_CAP;
         deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, cfg), flags);
         h = PoincareHook(payable(flags));
     }
@@ -142,7 +182,7 @@ contract ForkRealDataTest is Test {
     // ------------------------------------------------------------------
 
     function test_runRealData() public {
-        vm.writeFile(TS, "block,phase,fair,price_on,price_off,kappa,trend,d,lp_on,lp_off,cum_lvr_on,cum_lvr_off,cum_noise_on\n");
+        vm.writeFile(TS, "block,phase,fair,price_on,price_off,kappa,trend,d,lp_on,lp_off,cum_lvr_on,cum_lvr_off,cum_noise_on,lp_vf,cum_lvr_vf,cum_noise_vf\n");
         vm.writeFile(OB, "id,block,pool,kind,zeroForOne,amount_in,amount_out\n");
 
         uint256 per = nPts / PHASES + 1;
@@ -152,63 +192,123 @@ contract ForkRealDataTest is Test {
             uint8 phase = uint8(t / per);
             if (phase >= PHASES) phase = uint8(PHASES - 1);
 
-            uint256 lOn = _arb(hookOn, keyOn, true);
-            uint256 lOff = _arb(hookOff, keyOff, false);
+            uint256 lOn = _arb(hookOn, keyOn, "poincare");
+            uint256 lOff = _arb(hookOff, keyOff, "control");
+            uint256 lVf = _arb(hookVf, keyVf, "volfee");
             cumLvrOn += lOn;
             cumLvrOff += lOff;
+            cumLvrVf += lVf;
             lvrOnByPhase[phase] += lOn;
             lvrOffByPhase[phase] += lOff;
+            lvrVfByPhase[phase] += lVf;
+            if (t <= nPts / 2) {
+                lvrOnH1 += lOn;
+                lvrOffH1 += lOff;
+                lvrVfH1 += lVf;
+            }
 
             _noise(t);
             _record(t, phase);
         }
 
         _writeSummary(per);
-        console2.log("real-data run done; points:", nPts);
-        console2.log("cum LVR POINCARE (USDC wei):", cumLvrOn);
-        console2.log("cum LVR CONTROL  (USDC wei):", cumLvrOff);
-        if (cumLvrOff > 0) console2.log("LVR reduction (bps):", (cumLvrOff - cumLvrOn) * 10000 / cumLvrOff);
+        _report();
+
+        // The floor claim: leaning against detected trends never costs LPs more than doing
+        // nothing. Everything else is reported, not asserted, because it depends on the window.
         assertLe(cumLvrOn, cumLvrOff, "Poincare must not increase LVR vs the constant-product control");
+        // Equal-friction check: the baseline is only fair if it really did cost uninformed flow
+        // about the same. If this trips, retune FEE_GAMMA rather than trusting the comparison.
+        assertApproxEqRel(cumNoiseVf, cumNoiseOn, 0.25e18, "vol-fee baseline must match Poincare's cost to benign flow");
     }
 
     // ------------------------------------------------------------------
 
-    function _arb(PoincareHook h, PoolKey memory k, bool isOn) internal returns (uint256 lvrUsdc) {
+    /// @dev Everything the write-up quotes, printed from one place.
+    function _report() internal view {
+        uint256 lpOn = _lpValue(hookOn);
+        uint256 lpOff = _lpValue(hookOff);
+        uint256 lpVf = _lpValue(hookVf);
+
+        console2.log("=== real-data replay; 4h ETH/USDC points:", nPts);
+        console2.log("--- cumulative LVR (USDC wei), lower is better ---");
+        console2.log("POINCARE :", cumLvrOn);
+        console2.log("CONTROL  :", cumLvrOff);
+        console2.log("VOLFEE   :", cumLvrVf);
+        console2.log("LVR reduction vs control, POINCARE (bps):", _bps(cumLvrOn, cumLvrOff));
+        console2.log("LVR reduction vs control, VOLFEE   (bps):", _bps(cumLvrVf, cumLvrOff));
+
+        console2.log("--- cost to uninformed flow (USDC wei); the matched friction budget ---");
+        console2.log("POINCARE :", cumNoiseOn);
+        console2.log("VOLFEE   :", cumNoiseVf);
+
+        console2.log("--- LP value marked at fair (USDC wei), the ground truth ---");
+        console2.log("POINCARE :", lpOn);
+        console2.log("CONTROL  :", lpOff);
+        console2.log("VOLFEE   :", lpVf);
+        if (lpOn > lpOff) console2.log("LP advantage vs control, POINCARE:", lpOn - lpOff);
+        if (lpVf > lpOff) console2.log("LP advantage vs control, VOLFEE  :", lpVf - lpOff);
+
+        // The out-of-sample split: the detector's k and h were calibrated on the first half
+        // only (test/calibration/RealDataCalibration.t.sol), so H2 is a genuine hold-out.
+        console2.log("--- LVR by half: H1 = calibration sample, H2 = out-of-sample ---");
+        console2.log("H1 POINCARE / CONTROL / VOLFEE:", lvrOnH1, lvrOffH1, lvrVfH1);
+        console2.log("H2 POINCARE:", cumLvrOn - lvrOnH1);
+        console2.log("H2 CONTROL :", cumLvrOff - lvrOffH1);
+        console2.log("H2 VOLFEE  :", cumLvrVf - lvrVfH1);
+        console2.log("H1 LVR reduction, POINCARE (bps):", _bps(lvrOnH1, lvrOffH1));
+        console2.log("H2 LVR reduction, POINCARE (bps):", _bps(cumLvrOn - lvrOnH1, cumLvrOff - lvrOffH1));
+        console2.log("H2 LVR reduction, VOLFEE   (bps):", _bps(cumLvrVf - lvrVfH1, cumLvrOff - lvrOffH1));
+    }
+
+    /// @dev The arbitrageur only trades when the mispricing clears the pool's total friction,
+    ///      so the no-arb band is the directional spread PLUS the symmetric vol fee. Charging
+    ///      the band on the spread alone would make the vol-fee pool's arb trade at a loss,
+    ///      flattering it: the fee would be paid to LPs without the arb ever declining.
+    function _arb(PoincareHook h, PoolKey memory k, string memory pool) internal returns (uint256 lvrUsdc) {
         (uint256 r0, uint256 r1) = h.reserves();
         uint256 p = FullMath.mulDiv(r1, WAD, r0);
         uint256 kk = r0 * r1;
+        uint256 fee = h.currentFeeWad();
         if (fair > p) {
-            uint256 s = h.effectiveSpread(false);
+            uint256 s = h.effectiveSpread(false) + fee;
             if (FullMath.mulDiv(fair - p, WAD, p) <= s) return 0;
             uint256 r1t = Math.sqrt(FullMath.mulDiv(kk, fair, WAD));
             if (r1t <= r1) return 0;
-            (uint256 spent, uint256 got) = _swap(k, false, r1t - r1, isOn, "arb");
+            (uint256 spent, uint256 got) = _swap(k, false, r1t - r1, pool, "arb");
             uint256 vOut = FullMath.mulDiv(got, fair, WAD);
             if (vOut > spent) lvrUsdc = vOut - spent;
         } else if (fair < p) {
-            uint256 s = h.effectiveSpread(true);
+            uint256 s = h.effectiveSpread(true) + fee;
             if (FullMath.mulDiv(p - fair, WAD, p) <= s) return 0;
             uint256 r0t = Math.sqrt(FullMath.mulDiv(kk, WAD, fair));
             if (r0t <= r0) return 0;
-            (uint256 spent, uint256 got) = _swap(k, true, r0t - r0, isOn, "arb");
+            (uint256 spent, uint256 got) = _swap(k, true, r0t - r0, pool, "arb");
             uint256 vIn = FullMath.mulDiv(spent, fair, WAD);
             if (got > vIn) lvrUsdc = got - vIn;
         }
     }
 
+    /// @dev One identical uninformed order into all three pools. What it receives LESS than the
+    ///      frictionless control is that pool's cost to benign flow: the friction budget the
+    ///      equal-cost comparison is built on.
     function _noise(uint256 t) internal {
         uint256 hh = uint256(keccak256(abi.encode(SEED, t, "noise")));
         bool zeroForOne = (hh & 1) == 0;
         uint256 wethSize = 5e16 + (hh % 3e18);
         uint256 amt = zeroForOne ? wethSize : FullMath.mulDiv(wethSize, fair, WAD);
-        (, uint256 gotOn) = _swap(keyOn, zeroForOne, amt, true, "noise");
-        (, uint256 gotOff) = _swap(keyOff, zeroForOne, amt, false, "noise");
+        (, uint256 gotOn) = _swap(keyOn, zeroForOne, amt, "poincare", "noise");
+        (, uint256 gotOff) = _swap(keyOff, zeroForOne, amt, "control", "noise");
+        (, uint256 gotVf) = _swap(keyVf, zeroForOne, amt, "volfee", "noise");
         if (gotOff > gotOn) {
             cumNoiseOn += zeroForOne ? (gotOff - gotOn) : FullMath.mulDiv(gotOff - gotOn, fair, WAD);
         }
+        if (gotOff > gotVf) {
+            cumNoiseVf += zeroForOne ? (gotOff - gotVf) : FullMath.mulDiv(gotOff - gotVf, fair, WAD);
+        }
     }
 
-    function _swap(PoolKey memory k, bool zeroForOne, uint256 amtIn, bool isOn, string memory kind)
+    function _swap(PoolKey memory k, bool zeroForOne, uint256 amtIn, string memory pool, string memory kind)
         internal
         returns (uint256 spent, uint256 got)
     {
@@ -220,7 +320,7 @@ contract ForkRealDataTest is Test {
             spent = inB - inA;
             got = outA - outB;
             orderId++;
-            _logOrder(isOn, kind, zeroForOne, spent, got);
+            _logOrder(pool, kind, zeroForOne, spent, got);
         } catch {}
     }
 
@@ -231,9 +331,9 @@ contract ForkRealDataTest is Test {
         outB = outC.balanceOf(address(this));
     }
 
-    function _logOrder(bool isOn, string memory kind, bool z, uint256 amtIn, uint256 amtOut) internal {
+    function _logOrder(string memory pool, string memory kind, bool z, uint256 amtIn, uint256 amtOut) internal {
         string memory r = string.concat(vm.toString(orderId), ",", vm.toString(block.number));
-        r = string.concat(r, ",", isOn ? "poincare" : "control", ",", kind, ",", z ? "1" : "0");
+        r = string.concat(r, ",", pool, ",", kind, ",", z ? "1" : "0");
         r = string.concat(r, ",", vm.toString(amtIn), ",", vm.toString(amtOut));
         vm.writeLine(OB, r);
     }
@@ -243,6 +343,7 @@ contract ForkRealDataTest is Test {
         string memory pOffS;
         string memory lpOnS;
         string memory lpOffS;
+        string memory lpVfS;
         {
             (uint256 a, uint256 b) = hookOn.reserves();
             pOnS = vm.toString(FullMath.mulDiv(b, WAD, a));
@@ -253,22 +354,40 @@ contract ForkRealDataTest is Test {
             pOffS = vm.toString(FullMath.mulDiv(b, WAD, a));
             lpOffS = vm.toString(FullMath.mulDiv(a, fair, WAD) + b);
         }
+        {
+            (uint256 a, uint256 b) = hookVf.reserves();
+            lpVfS = vm.toString(FullMath.mulDiv(a, fair, WAD) + b);
+        }
         string memory row = string.concat(vm.toString(t), ",", vm.toString(uint256(phase)), ",", vm.toString(fair), ",", pOnS);
         row = string.concat(row, ",", pOffS, ",", vm.toString(hookOn.kappa()), ",", vm.toString(uint256(hookOn.trend())));
         row = string.concat(row, ",", vm.toString(hookOn.directionalEfficiency()), ",", lpOnS, ",", lpOffS);
         row = string.concat(row, ",", vm.toString(cumLvrOn), ",", vm.toString(cumLvrOff), ",", vm.toString(cumNoiseOn));
+        row = string.concat(row, ",", lpVfS, ",", vm.toString(cumLvrVf), ",", vm.toString(cumNoiseVf));
         vm.writeLine(TS, row);
     }
 
     function _writeSummary(uint256 per) internal {
-        vm.writeFile(SUM, "phase,blocks,lvr_poincare,lvr_control,lvr_reduction_bps\n");
+        vm.writeFile(SUM, "phase,blocks,lvr_poincare,lvr_control,lvr_reduction_bps,lvr_volfee\n");
         for (uint256 i = 0; i < PHASES; i++) {
             uint256 bps = lvrOffByPhase[i] > 0 && lvrOffByPhase[i] >= lvrOnByPhase[i]
                 ? (lvrOffByPhase[i] - lvrOnByPhase[i]) * 10000 / lvrOffByPhase[i]
                 : 0;
             string memory r = string.concat("month_", vm.toString(i + 1), ",", vm.toString(per));
             r = string.concat(r, ",", vm.toString(lvrOnByPhase[i]), ",", vm.toString(lvrOffByPhase[i]), ",", vm.toString(bps));
+            r = string.concat(r, ",", vm.toString(lvrVfByPhase[i]));
             vm.writeLine(SUM, r);
         }
+    }
+
+    /// @dev LP value marked at the fair price: the ground-truth metric. Cumulative arb
+    ///      extraction alone understates the harm to a pool that simply sits mispriced,
+    ///      which is exactly what a wide symmetric fee causes.
+    function _lpValue(PoincareHook h) internal view returns (uint256) {
+        (uint256 a, uint256 b) = h.reserves();
+        return FullMath.mulDiv(a, fair, WAD) + b;
+    }
+
+    function _bps(uint256 lo, uint256 hi) internal pure returns (uint256) {
+        return hi > lo && hi > 0 ? (hi - lo) * 10000 / hi : 0;
     }
 }

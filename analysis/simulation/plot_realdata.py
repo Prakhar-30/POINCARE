@@ -17,7 +17,7 @@ RD = os.path.join(HERE, "realdata")
 OUT = os.path.normpath(os.path.join(HERE, "..", "..", "public", "sim", "real"))
 os.makedirs(OUT, exist_ok=True)
 WAD = 1e18
-C_POIN, C_CTRL, C_FAIR = "#1f77b4", "#d62728", "#444444"
+C_POIN, C_CTRL, C_FAIR, C_VF = "#1f77b4", "#d62728", "#444444", "#ff7f0e"
 
 plt.rcParams.update({"figure.dpi": 120, "font.size": 10, "axes.grid": True,
                      "grid.alpha": 0.25, "axes.spines.top": False, "axes.spines.right": False})
@@ -31,8 +31,11 @@ def usd(x, _):
 
 def load():
     ts = pd.read_csv(os.path.join(RD, "timeseries.csv"), dtype=str)
-    for c in ["fair", "price_on", "price_off", "kappa", "d", "lp_on", "lp_off",
-              "cum_lvr_on", "cum_lvr_off", "cum_noise_on"]:
+    cols = ["fair", "price_on", "price_off", "kappa", "d", "lp_on", "lp_off",
+            "cum_lvr_on", "cum_lvr_off", "cum_noise_on"]
+    # the vol-fee baseline pool; absent from runs made before it was added
+    cols += [c for c in ["lp_vf", "cum_lvr_vf", "cum_noise_vf"] if c in ts.columns]
+    for c in cols:
         ts[c] = ts[c].astype(float) / WAD
     for c in ["block", "phase", "trend"]:
         ts[c] = ts[c].astype(int)
@@ -61,8 +64,11 @@ def fig_lpvalue(ts):
     fig, (ax, ax2) = plt.subplots(2, 1, figsize=(12, 6.5), sharex=True, gridspec_kw={"height_ratios": [2, 1]})
     ax.plot(ts.date, ts.lp_on, color=C_POIN, lw=1.5, label="Poincaré LP value")
     ax.plot(ts.date, ts.lp_off, color=C_CTRL, lw=1.3, label="control (x·y=k) LP value")
+    if "lp_vf" in ts.columns:
+        ax.plot(ts.date, ts.lp_vf, color=C_VF, lw=1.3, ls="--",
+                label="symmetric vol-fee, same cost to traders")
     ax.set_ylabel("LP value (USDC, marked at fair)"); ax.yaxis.set_major_formatter(FuncFormatter(usd))
-    ax.set_title("LP value on REAL ETH/USDC history: Poincaré vs constant-product")
+    ax.set_title("LP value on REAL ETH/USDC history: directional vs symmetric friction")
     ax.legend(loc="upper right", fontsize=9)
     diff = ts.lp_on - ts.lp_off
 
@@ -75,6 +81,8 @@ def fig_lpvalue(ts):
     axins = ax.inset_axes([0.055, 0.06, 0.30, 0.42])
     axins.plot(ts.date, ts.lp_on, color=C_POIN, lw=1.5)
     axins.plot(ts.date, ts.lp_off, color=C_CTRL, lw=1.3)
+    if "lp_vf" in ts.columns:
+        axins.plot(ts.date, ts.lp_vf, color=C_VF, lw=1.3, ls="--")
     lo = min(ts.lp_on.iloc[i0:i1].min(), ts.lp_off.iloc[i0:i1].min())
     hi = max(ts.lp_on.iloc[i0:i1].max(), ts.lp_off.iloc[i0:i1].max())
     pad = (hi - lo) * 0.06
@@ -99,6 +107,9 @@ def fig_lvr(ts):
     fig, ax = plt.subplots(figsize=(12, 4.5))
     ax.plot(ts.date, ts.cum_lvr_on, color=C_POIN, lw=1.5, label="Poincaré cumulative LVR")
     ax.plot(ts.date, ts.cum_lvr_off, color=C_CTRL, lw=1.3, label="control cumulative LVR")
+    if "cum_lvr_vf" in ts.columns:
+        ax.plot(ts.date, ts.cum_lvr_vf, color=C_VF, lw=1.2, ls="--",
+                label="symmetric vol-fee (matched cost)")
     ax.fill_between(ts.date, ts.cum_lvr_on, ts.cum_lvr_off, color="green", alpha=0.12, label="LVR avoided")
     ax.set_ylabel("cumulative LVR (USDC)"); ax.yaxis.set_major_formatter(FuncFormatter(usd)); ax.set_xlabel("date")
     on, off = ts.cum_lvr_on.iloc[-1], ts.cum_lvr_off.iloc[-1]
@@ -133,7 +144,13 @@ def main():
     adv = ts.lp_on.iloc[-1] - ts.lp_off.iloc[-1]
     print(f"points={len(ts)+1}  ETH {ts.fair.iloc[0]:.0f}->{ts.fair.iloc[-1]:.0f}")
     print(f"cum LVR poincare={on:,.0f} control={off:,.0f} reduction={(off-on)/off*100:.2f}%")
-    print(f"final LP advantage = {adv:,.0f} USDC ; cumulative noise tax = {ts.cum_noise_on.iloc[-1]:,.0f} USDC")
+    print(f"final LP advantage = {adv:,.0f} USDC ; cost to uninformed flow = {ts.cum_noise_on.iloc[-1]:,.0f} USDC")
+    if "lp_vf" in ts.columns:
+        advv = ts.lp_vf.iloc[-1] - ts.lp_off.iloc[-1]
+        taxp, taxv = ts.cum_noise_on.iloc[-1], ts.cum_noise_vf.iloc[-1]
+        print(f"vol-fee baseline : LP advantage = {advv:,.0f} USDC ; cost to uninformed flow = {taxv:,.0f} USDC")
+        if taxp > 0 and taxv > 0:
+            print(f"LP value per unit of trader cost: poincare {adv/taxp:.2f}  vs  vol-fee {advv/taxv:.2f}")
     print(f"wrote graphs to {OUT}")
 
 

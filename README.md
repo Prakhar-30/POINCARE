@@ -354,28 +354,57 @@ The same comparison, but driven by **real Binance ETHUSDC 4h closes** (2025-07-1
 several distinct regimes: a rally to a **$4,833** peak, a multi-leg bear with the February crash,
 and a June leg-down.
 
-![Real ETH/USDC LP value: Poincaré vs constant-product](public/sim/real/real_lpvalue.png)
+Two things changed in this study relative to the synthetic one, both of which make it harsher and
+more informative:
 
-| metric | POINCARÉ | CONTROL | result |
-|---|---:|---:|---|
-| Cumulative LVR | 312,815 USDC | 326,924 USDC | **−4.3%** |
-| **Final LP value advantage** | | | **+$25,282** |
+1. **The detector is calibrated on this pair's own returns.** `k` and `h` are no longer chosen;
+   `test/calibration/RealDataCalibration.t.sol` measures ARL₀ and detection delay on the real,
+   heavy-tailed return distribution of the **first half** of the series and derives `k = 0.25σ`,
+   `h = 6.25σ` — ARL₀ = 124 bars (≈20 days between false alarms), detection delay 23 bars. The
+   second half is therefore genuinely **out-of-sample**. (The configuration this study used
+   before, labelled "illustrative" in the code, measures an ARL₀ of **15 bars** — it was firing
+   every 2½ days.) Method: [`analysis/CALIBRATION.md`](analysis/CALIBRATION.md).
+2. **A third pool: a symmetric vol-scaled fee at a matched friction budget.** Any spread reduces
+   LVR, so beating plain `x·y=k` proves nothing on its own. The question is whether spending a
+   friction budget **directionally** beats spending it **symmetrically**.
 
-Where the detector actually engaged over the year, against the real price path (κ spikes cluster
-at the genuine sustained moves and stay quiet in chop), and how the LVR saving distributes by
-month:
+![Real ETH/USDC LP value: Poincaré vs vol-fee vs constant-product](public/sim/real/real_lpvalue.png)
 
-![Real ETH/USDC price with detector engagement](public/sim/real/real_price_kappa.png)
+| metric | POINCARÉ | CONTROL | VOLFEE (matched) |
+|---|---:|---:|---:|
+| Cumulative LVR | 319,186 | 326,924 | 316,236 |
+| LVR vs control | **−2.37%** | — | −3.27% |
+| Cost to uninformed flow | 3,925 | 0 | 3,100 |
+| LP value advantage | **+11,141** | — | +11,314 |
 
-![LVR by month, Poincaré vs control](public/sim/real/real_months.png)
+**Over the full year, the directional lever does not beat the symmetric one.** The two finish
+within 1.5% of each other on LP value, and Poincaré spends ~27% more of its traders' money getting
+there. That is the number the harness produced, and we report it rather than the one the thesis
+wanted.
 
-The advantage is **flat through chop and jumps at the real sustained trends** (the February crash
-and the June leg-down), as the detector engaged there and stayed neutral otherwise. The reduction
-(4.3% over the full year, 8.8% over the trend-heavy back half) is smaller than on the synthetic
-stress path (29.7%) precisely because real markets are noisier with fewer clean trends, so the
-conservative detector helps less, **but it never hurts** (LVR ≤ control throughout, asserted).
-With params merely sensible-not-optimised for 4h ETH; pair-specific calibration would raise the
-captured fraction. Reproduce:
+**Where the thesis does hold is exactly where it predicts it will — in trends:**
+
+| half of the window | POINCARÉ vs control | VOLFEE vs control |
+|---|---:|---:|
+| H1 — the 2025 rally, chop-heavy (calibration sample) | −1.30% | −3.26% |
+| **H2 — the February crash and June leg-down (out-of-sample)** | **−4.09%** | −3.28% |
+
+In the trending half the detector-gated lever wins; in chop it is dead weight while an always-on
+fee keeps collecting. A full year of ETH/USDC contains enough chop to wash the two out. The
+synthetic stress path in §9 (−29.7%) is trend-dense by construction, which is precisely why it
+flatters the design — this run is the honest counterweight to it.
+
+Two things do survive everywhere. **LVR ≤ control throughout** (asserted in the test): leaning
+against detected trends never costs LPs more than doing nothing. And the qualitative property no
+LVR number captures — flow trading *against* the drift, and all flow in calm markets, pays
+**nothing**, ever, while a symmetric fee taxes it on every block.
+
+One caveat materially favours Poincaré and is not yet modelled: the harness forces the same
+uninformed order through every pool, so a benign trader pushing with the trend pays the full `κ`.
+In reality they would route elsewhere (§8) and never pay it, so Poincaré's measured cost to benign
+flow is an overstatement. A routing-aware flow model is the next refinement and the change most
+likely to move this result. Full methodology, per-half breakdown and caveats:
+[`analysis/simulation/SIMULATION.md`](analysis/simulation/SIMULATION.md). Reproduce:
 `python analysis/simulation/fetch_realdata.py` →
 `FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol` →
 `python analysis/simulation/plot_realdata.py`.
