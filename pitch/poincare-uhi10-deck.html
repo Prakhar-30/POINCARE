@@ -1,479 +1,683 @@
-<meta charset="utf-8">
-<title>Poincaré Hookathon Deck</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Quicksand:wght@500;600;700&display=swap">
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Poincaré — UHI10 Pitch Deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
 <style>
-/* ─────────────────────────────────────────────────────────────────────────
-   Poincaré — UHI10 deck.
-   The app's own soft palette (lavender / sage / rose on near-white,
-   Quicksand + Nunito) on a strict 1280x720 stage.
+  /* ═══════════════════════════════════════════════════════════════════════
+     Poincaré — UHI10 deck.
 
-   LAYOUT CONTRACT — nothing may overflow:
-   every slide is `grid-template-rows: auto minmax(0,1fr)`, and every chart
-   sits in a `min-height:0` flex chain ending in `.chart{flex:1}`. Charts are
-   therefore sized by what is LEFT OVER, never by a fixed pixel height, so a
-   long title or an extra caption line shrinks the plot instead of pushing it
-   off the slide.
-   ───────────────────────────────────────────────────────────────────────── */
-:root{
-  --ground:#F7F6FB; --surface:#FFFFFF; --surface-2:#F1EFFA;
-  --line:#E7E4F3; --grid:#E9E6F4;
-  --ink:#262A45; --ink-2:#5C5B78; --ink-3:#918FAC;
-  /* categorical set, validated against this light surface (all six checks pass) */
-  --lav:#7C6FCB; --rose:#D45C77; --honey:#C98A2E; --sage:#3E9B72; --lav-deep:#5F52B0;
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;background:var(--ground);color:var(--ink);
-  font-family:Nunito,system-ui,-apple-system,sans-serif;overflow:hidden;
-}
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:linear-gradient(#8E88D8 1px,transparent 1px),linear-gradient(90deg,#8E88D8 1px,transparent 1px);
-  background-size:72px 72px;opacity:.05;
-}
-#fit{position:fixed;inset:0;display:grid;place-items:center;z-index:1}
-#stage{width:1280px;height:720px;position:relative;transform-origin:center center}
+     Design tokens are lifted verbatim from the project's own pitch deck and
+     frontend (frontend/src/styles/tokens.css): soft lavender page, white
+     cards at 22px radius, Quicksand display over Nunito body, sage / rose /
+     honey accents. The difference from the reference deck is that the charts
+     are live ECharts that GROW on slide entry rather than flat PNGs.
 
-.slide{
-  position:absolute;inset:0;padding:36px 58px 44px;
-  display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:16px;
-  opacity:0;visibility:hidden;transition:opacity .34s ease;
-}
-.slide.on{opacity:1;visibility:visible}
+     LAYOUT CONTRACT — nothing may overflow the 1280x720 card:
+     every .slide is a flex column; any chart sits in a min-height:0 chain
+     ending at .chart{flex:1}. Charts are therefore sized by what is LEFT
+     OVER, so an extra line of copy shrinks the plot instead of pushing it
+     off the slide.
+     ═══════════════════════════════════════════════════════════════════════ */
+  :root{
+    --page:#f4f1f9; --surface:#ffffff; --surface-2:#faf8fd; --surface-3:#f3effa;
+    --border:#eeeaf4; --border-strong:#e3ddee; --divider:#f1edf7;
+    --text:#3f3a56; --text-2:#5c5775; --text-3:#8a85a0; --muted:#a39db8; --faint:#b6b1c8;
+    --up:#6bb89a; --up-deep:#4e9c7e; --down:#e58ca0; --down-deep:#c96a82;
+    --lav:#8e88d8; --lav-deep:#6f68c8; --lav-dim:#c5c1ed; --lav-soft:#eeebfa;
+    --honey:#e6b25f; --honey-deep:#d49a45;
+    --green-border:#d6ebe0; --green-label:#4e9c7e;
+    --warn-border:#f0e2c8; --warn-label:#c99a3e;
+    --shadow-sm:0 2px 14px rgba(123,113,158,.07); --shadow-card:0 4px 20px rgba(123,113,158,.08);
+    --r-sm:12px; --r-md:16px; --r-card:22px;
+    --green-bg:linear-gradient(150deg,#eaf6f0,#f4fbf7);
+    --warn-bg:linear-gradient(150deg,#fbf4e5,#fdf9f0);
+    --rose-bg:linear-gradient(150deg,#fdeef2,#fef7f9);
+    --app-bg:radial-gradient(900px 500px at 85% -10%, rgba(142,136,216,.10), transparent 60%),
+             radial-gradient(720px 460px at 4% 6%, rgba(107,184,154,.08), transparent 55%), #f4f1f9;
+  }
+  *{box-sizing:border-box; margin:0}
+  html,body{height:100%}
+  body{background:#dcd7e6; font-family:"Nunito",ui-sans-serif,system-ui,sans-serif; color:var(--text);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; overflow:hidden}
+  .display{font-family:"Quicksand","Nunito",sans-serif}
 
-/* ── slide furniture ── */
-.eyebrow{
-  font-family:Quicksand,sans-serif;font-weight:600;font-size:11.5px;
-  letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3);
-  display:block;margin-bottom:11px;
-}
-.pageno{position:absolute;right:58px;bottom:22px;font-family:Quicksand,sans-serif;font-size:12.5px;color:#C4C1D6}
-.footrule{position:absolute;left:58px;bottom:30px;width:200px;height:1px;background:var(--line)}
+  /* ── the stage: one 1280x720 card, scaled to whatever screen it is shown on ── */
+  #fit{position:fixed; inset:0; display:grid; place-items:center}
+  #stage{width:1280px; height:720px; position:relative; transform-origin:center center}
 
-h1{font-family:Quicksand,sans-serif;font-weight:700;font-size:54px;line-height:1.07;
-   letter-spacing:-.015em;margin:0;text-wrap:balance;color:var(--ink)}
-h2{font-family:Quicksand,sans-serif;font-weight:700;font-size:34px;line-height:1.14;
-   letter-spacing:-.012em;margin:0;text-wrap:balance;color:var(--ink);max-width:32ch}
-h2.wide{max-width:42ch}
-.uline{width:70px;height:3px;background:var(--lav);border-radius:2px;margin-top:12px}
-.sub{font-size:14.5px;line-height:1.5;color:var(--ink-3);margin:11px 0 0;max-width:88ch}
-.lede{font-size:16.5px;line-height:1.6;color:var(--ink-2);margin:0}
-.small{font-size:13px;line-height:1.5;color:var(--ink-3);margin:0}
-.mono{font-variant-numeric:tabular-nums;font-weight:600}
-strong{color:var(--ink);font-weight:700}
-em{color:var(--lav-deep);font-style:normal;font-weight:700}
+  .slide{position:absolute; inset:0; overflow:hidden;
+    background:var(--app-bg); border-radius:18px; box-shadow:0 18px 50px rgba(123,113,158,.16);
+    padding:52px 66px 62px; display:flex; flex-direction:column;
+    opacity:0; visibility:hidden; transition:opacity .32s ease}
+  .slide.on{opacity:1; visibility:visible}
 
-.body{min-height:0;display:flex;flex-direction:column;gap:14px}
-.cols{display:grid;gap:26px;min-height:0;flex:1}
-.col{display:flex;flex-direction:column;gap:12px;min-height:0}
+  /* ── shared furniture, straight from the reference deck ── */
+  .eyebrow{font-size:12.5px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--lav)}
+  h1{font-size:29px; font-weight:700; color:var(--text); margin-top:7px; line-height:1.22; text-wrap:balance}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-card); padding:22px 24px}
+  .quiet{background:var(--surface-2); box-shadow:none}
+  .pill{display:inline-flex; align-items:center; gap:7px; background:var(--lav-soft); color:var(--lav-deep);
+    font-size:12.5px; font-weight:800; border-radius:20px; padding:6px 14px}
+  .pill.green{background:var(--green-bg); border:1px solid var(--green-border); color:var(--green-label)}
+  .pill.warn{background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-label)}
+  .dot{width:7px; height:7px; border-radius:99px; background:var(--lav); flex:none}
+  .dot.g{background:var(--up-deep)}
+  .dot.live{animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){.dot.live{animation:none}}
+  .grid{display:grid; gap:18px}
+  .footer{position:absolute; left:66px; right:66px; bottom:22px; display:flex; justify-content:space-between;
+    font-size:11.5px; font-weight:700; color:var(--faint)}
 
-/* ── cards ── */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
-      box-shadow:0 1px 2px rgba(38,42,69,.03),0 5px 16px rgba(38,42,69,.04)}
-.card h3{font-family:Quicksand,sans-serif;margin:0 0 6px;font-size:15px;font-weight:700;color:var(--ink)}
-.card p{margin:0;font-size:13.8px;line-height:1.55;color:var(--ink-2)}
-.card.lav{border-left:3px solid var(--lav)}
-.card.sage{border-left:3px solid var(--sage)}
-.card.rose{border-left:3px solid var(--rose)}
-.card.honey{border-left:3px solid var(--honey)}
+  .kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-sm); padding:16px 18px}
+  .kpi .n{font-family:"Quicksand"; font-size:30px; font-weight:700; color:var(--lav-deep); line-height:1;
+    font-variant-numeric:tabular-nums}
+  .kpi .n.sm{font-size:24px}
+  .kpi .l{font-size:12.5px; font-weight:700; color:var(--text-2); margin-top:7px; line-height:1.35}
+  .kpi .s{font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.4}
+  .kpi.tint{background:var(--green-bg); border-color:var(--green-border)} .kpi.tint .n{color:var(--green-label)}
+  .kpi.honeytint{background:var(--warn-bg); border-color:var(--warn-border)} .kpi.honeytint .n{color:var(--warn-label)}
 
-/* a card that hosts a chart: header stays, plot takes the rest */
-.chartcard{display:flex;flex-direction:column;min-height:0;flex:1;
-  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px 10px;
-  box-shadow:0 1px 2px rgba(38,42,69,.03),0 5px 16px rgba(38,42,69,.04)}
-.chart{flex:1;min-height:0;width:100%}
-.cap{font-size:12.5px;color:var(--ink-3);line-height:1.5;margin:8px 2px 0;flex:none}
+  h3{font-family:"Quicksand"; font-size:17px; font-weight:700; color:var(--text)}
+  p.body{font-size:14.5px; line-height:1.62; color:var(--text-2)}
+  p.small{font-size:12.8px; line-height:1.58; color:var(--text-3)}
+  .tag-up{color:var(--up-deep); font-weight:800} .tag-down{color:var(--down-deep); font-weight:800}
+  .tag-lav{color:var(--lav-deep); font-weight:800} .tag-honey{color:var(--honey-deep); font-weight:800}
+  b{font-weight:800; color:var(--text)}
+  .mono{font-variant-numeric:tabular-nums}
 
-/* ── stat row ── */
-.stats{display:flex;gap:44px;flex-wrap:wrap;flex:none}
-.stat .n{font-family:Quicksand,sans-serif;font-weight:700;font-size:44px;line-height:1;
-         letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--lav-deep)}
-.stat .n.sage{color:var(--sage)} .stat .n.honey{color:var(--honey)} .stat .n.rose{color:var(--rose)}
-.stat .n.sm{font-size:31px}
-.stat .c{font-size:12.8px;color:var(--ink-3);margin-top:7px;line-height:1.4;max-width:23ch}
+  /* ── a card that hosts a live chart: header stays, plot takes the remainder ── */
+  .chartcard{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    box-shadow:var(--shadow-card); padding:14px 16px 10px; display:flex; flex-direction:column;
+    min-height:0; flex:1}
+  .chart{flex:1; min-height:0; width:100%}
 
-/* ── numbered steps ── */
-.steps{display:flex;flex-direction:column;gap:11px;flex:1;min-height:0;justify-content:center}
-.step{display:grid;grid-template-columns:30px 1fr;gap:14px;align-items:start}
-.step .b{width:30px;height:30px;border-radius:99px;display:grid;place-items:center;
-         font-family:Quicksand,sans-serif;font-weight:700;font-size:13px;color:#fff;background:var(--lav)}
-.step.sage .b{background:var(--sage)}
-.step h3{font-family:Quicksand,sans-serif;margin:3px 0 3px;font-size:15.5px;font-weight:700;color:var(--ink)}
-.step p{margin:0;font-size:13.8px;line-height:1.5;color:var(--ink-2)}
+  .check{color:var(--up-deep); font-weight:800}
+  ul.checks{list-style:none; display:flex; flex-direction:column; gap:9px}
+  ul.checks li{display:grid; grid-template-columns:16px 1fr; gap:10px; align-items:baseline;
+    font-size:13.2px; line-height:1.5; color:var(--text-2)}
+  .addr{display:flex; justify-content:space-between; gap:14px; font-size:12.5px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm);
+    padding:9px 14px; font-weight:700; color:var(--text-2)}
+  .addr span:first-child{color:var(--muted); font-weight:700}
 
-.checks{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
-.checks li{display:grid;grid-template-columns:18px 1fr;gap:11px;align-items:baseline;
-           font-size:14px;line-height:1.5;color:var(--ink-2)}
-.checks .tick{color:var(--sage);font-weight:700}
+  /* ── the finding ledger on the security slide ── */
+  .led{display:grid; grid-template-columns:52px 1fr auto; gap:12px; align-items:center;
+    padding:6.5px 2px; border-bottom:1px solid var(--divider)}
+  .led:last-child{border-bottom:0}
+  .led .sev{font-family:"Quicksand"; font-weight:700; font-size:9.5px; letter-spacing:.04em;
+    text-align:center; border-radius:6px; padding:3.5px 0; color:#fff; background:var(--honey-deep)}
+  .led .sev.lo{background:var(--muted)}
+  .led .t{font-size:12.4px; line-height:1.4; color:var(--text-3)}
+  .led .t b{color:var(--text); font-weight:800}
+  .led .st{font-family:"Quicksand"; font-size:11.5px; font-weight:700; color:var(--up-deep); white-space:nowrap}
 
-.addr{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums;
-      background:var(--surface);border:1px solid var(--line);border-radius:10px;
-      padding:9px 13px;display:flex;justify-content:space-between;gap:14px}
-.addr span:first-child{color:var(--ink-3)}
+  .hint{position:fixed; left:16px; bottom:12px; font-size:11px; color:#b6b1c8; z-index:5;
+    transition:opacity .8s ease 4s}
+  body.started .hint{opacity:0}
+  kbd{font-size:10.5px; background:#fff; border:1px solid var(--border-strong); border-radius:4px;
+    padding:2px 6px; color:var(--text-3); font-weight:700}
 
-.badge{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;
-  font-family:Quicksand,sans-serif;font-weight:600;font-size:11.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--sage);background:#EAF6F0;border:1px solid #C7E6D8;
-  border-radius:99px;padding:7px 14px}
-.pulse{width:7px;height:7px;border-radius:99px;background:var(--sage);animation:pulse 2.4s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
-
-.eq{font-family:Quicksand,sans-serif;font-weight:600;font-size:29px;color:var(--ink);
-    background:var(--surface-2);border:1px solid var(--line);border-radius:14px;
-    padding:24px 28px;display:inline-flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-
-.title-wrap{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0}
-.hairline{height:1px;background:var(--line);width:100%}
-.title-meta{display:flex;gap:26px;flex-wrap:wrap;font-size:13px;color:var(--ink-3)}
-.title-meta b{color:var(--ink-2);font-weight:700}
-kbd{font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--ink-3)}
-.hint{position:fixed;left:14px;bottom:10px;font-size:11px;color:#C4C1D6;z-index:2;opacity:.9;transition:opacity 1s ease 4s}
-body.started .hint{opacity:0;pointer-events:none}
+  /* ── print: unstack into one slide per page, exactly like the reference deck ── */
+  @media print{
+    @page{size:1280px 720px; margin:0}
+    html,body{background:#fff; overflow:visible; height:auto}
+    #fit{position:static; display:block}
+    #stage{transform:none !important; width:1280px; height:auto}
+    .slide{position:relative; inset:auto; width:1280px; height:720px; opacity:1 !important;
+      visibility:visible !important; border-radius:0; box-shadow:none; page-break-after:always}
+    .hint{display:none}
+  }
 </style>
+</head>
+<body>
 
 <div id="fit"><div id="stage">
 
-<!-- 1 · title -->
-<section class="slide on" style="grid-template-rows:1fr">
-  <div class="title-wrap">
-    <span class="badge"><span class="pulse"></span>Live on Unichain Sepolia</span>
-    <h1>The AMM that knows<br>when a trend is real.</h1>
-    <div class="uline" style="width:92px"></div>
-    <p class="lede" style="font-size:18px;max-width:72ch">
-      Poincaré is a Uniswap v4 hook that runs a <strong>CUSUM quickest-change detector</strong> on the pool's
-      own price, and leans its bonding curve against trends only once the evidence is real — firing at a
-      moment no attacker can predict.
-    </p>
-    <div class="hairline"></div>
-    <div class="title-meta">
-      <span><b>UHI10</b> · Sustainable Liquidity &amp; MEV Protection</span>
-      <span><b>No</b> oracle · <b>No</b> AVS · <b>No</b> keeper</span>
-      <span><b>131</b> tests · Olympix pre-audit via UFSF</span>
-    </div>
+<!-- ════════ 1 · TITLE ════════ -->
+<section class="slide on" style="justify-content:center">
+  <div style="position:absolute; top:46px; left:66px; display:flex; gap:10px; flex-wrap:wrap">
+    <div class="pill"><span class="dot live"></span> Uniswap v4 hook · live on Unichain Sepolia</div>
+    <div class="pill green"><span class="dot g"></span> New · pre-audited via the Uniswap Foundation Security Fund</div>
   </div>
-</section>
 
-<!-- 2 · the problem -->
-<section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · the problem</span>
-    <h2 class="wide">LPs don't bleed on volatility. They bleed on <em>direction</em>.</h2>
-    <div class="uline"></div>
-    <p class="sub">Two paths with identical volatility. Only one of them costs liquidity providers anything.</p>
-  </div>
-  <div class="body">
-    <div class="chartcard"><div id="c-problem" class="chart"></div></div>
-    <p class="cap">Both paths take the <strong>same set of step sizes</strong> — only the order of the signs
-       differs. The one that goes nowhere barely leaks value; the one that trends is arbitraged the whole way.
-       That is Loss-Versus-Rebalancing: it is paid for <strong>direction</strong>, not for movement.</p>
-  </div>
-  <div class="footrule"></div><div class="pageno">02</div>
-</section>
-
-<!-- 3 · the wrong lever -->
-<section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · the insight</span>
-    <h2 class="wide">The fee isn't in the equation.</h2>
-    <div class="uline"></div>
-    <p class="sub">Milionis–Moallemi–Roughgarden–Zhang give the LVR rate exactly. One line, two consequences.</p>
-  </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:1fr 1fr;align-items:center">
-      <div class="eq" style="align-self:center">
-        <span>LVR&nbsp;≈</span><span>½&nbsp;σ²&nbsp;·&nbsp;<span style="color:var(--lav-deep)">marginal liquidity</span></span>
-      </div>
-      <div class="col" style="justify-content:center">
-        <div class="card lav">
-          <h3>Curvature is the lever</h3>
-          <p>“Marginal liquidity” is a property of the curve's <em>shape</em>. The fee term does not appear at
-             all — so fee-tweaking, which most hooks do, pulls a lever the mathematics doesn't contain.</p>
-        </div>
-        <div class="card rose">
-          <h3>The damage is directional</h3>
-          <p>Only sustained one-way moves drain LPs. So the right response is to reshape curvature
-             <strong>asymmetrically</strong> — and only while a real trend is actually happening.</p>
-        </div>
+  <div style="display:flex; align-items:center; gap:26px">
+    <img src="./Logo.png" alt="" style="width:104px; height:104px; object-fit:contain" />
+    <div>
+      <div class="display" style="font-size:62px; font-weight:700; letter-spacing:-.5px; line-height:1.04">Poincaré</div>
+      <div class="display" style="font-size:26px; font-weight:600; color:var(--text-2); margin-top:10px">
+        The pool that knows when the market is really moving
+        <span style="color:var(--lav-deep)">and leans against it.</span>
       </div>
     </div>
   </div>
-  <div class="footrule"></div><div class="pageno">03</div>
+
+  <p class="body" style="max-width:820px; margin-top:32px; font-size:16px">
+    Most AMMs quote the same way in a crash as on a quiet Sunday. Poincaré watches its own price, runs a
+    <b>CUSUM quickest-change detector</b> with a mathematical optimality proof behind it, and defends its
+    liquidity providers only once a genuine trend is underway — firing at a moment no attacker can predict.
+    No oracle, no keeper, and nothing to bribe.
+  </p>
+
+  <div style="display:flex; gap:30px; margin-top:34px; font-size:13px; font-weight:700; color:var(--text-3); flex-wrap:wrap">
+    <span>◆ <span class="tag-lav">131</span> tests green</span>
+    <span>◆ <span class="tag-up">9 / 9</span> pre-audit findings closed</span>
+    <span>◆ Proven on <span class="tag-honey">12 months</span> of real ETH/USDC</span>
+    <span>◆ Manipulation costs more than it pays, by construction</span>
+  </div>
+
+  <div class="footer"><span>Poincaré · UHI10 · Sustainable Liquidity &amp; MEV Protection</span><span>Uniswap v4 · Unichain Sepolia</span></div>
 </section>
 
-<!-- 4 · the engine -->
+<!-- ════════ 2 · PROBLEM ════════ -->
 <section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · the engine</span>
-    <h2 class="wide">“Has a regime change begun?” is a solved problem in statistics.</h2>
-    <div class="uline"></div>
-  </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:.85fr 1.15fr">
-      <div class="col" style="justify-content:center">
-        <p class="lede">It's called <strong>Quickest Change Detection</strong>, and its optimal workhorse is
-           <strong>CUSUM</strong> (Page, 1954). Evidence accumulates; an alarm fires at a threshold.</p>
-        <div class="card lav">
-          <h3>Why that matters here</h3>
-          <p>The firing moment is a <em>data-dependent stopping time</em>. A strong trend crosses fast; noise
-             never does. There is no “after N blocks” to precompute — and CUSUM is <strong>Lorden
-             minimax-optimal</strong>: provably the best possible trade-off between reacting fast and being fooled.</p>
-        </div>
-        <p class="small">A scan of all 562 hooks in the UHI directory returns <strong>zero</strong> uses of CUSUM,
-           change-point detection, SPRT or quickest detection.</p>
+  <div class="eyebrow">The problem</div>
+  <h1>LPs don't bleed on volatility. They bleed on <span class="tag-down">direction</span>.</h1>
+  <div class="grid" style="grid-template-columns:1fr 1.25fr; margin-top:20px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; gap:13px; justify-content:center">
+      <p class="body">
+        There is an invisible tax on every pool, and it has a name: <b>Loss-Versus-Rebalancing</b>. Whenever the
+        price moves, arbitrageurs trade against the pool's stale quote and keep the difference. The
+        Milionis–Moallemi–Roughgarden–Zhang identity pins down what drives it:
+      </p>
+      <div class="card quiet" style="text-align:center; padding:18px; border:1px solid var(--border)">
+        <span class="display" style="font-size:20px; color:var(--text)">LVR rate ≈ ½ · σ² · marginal liquidity</span>
       </div>
-      <div class="col">
-        <div class="chartcard"><div id="c-cusum" class="chart"></div></div>
-      </div>
+      <p class="body">
+        Notice what is <i>missing</i>: <span class="tag-lav">the fee</span>. Every fee-tweaking hook pulls a lever
+        that is not in the formula. And notice what drives it — sustained, one-directional moves.
+        <span class="tag-down">Chop barely hurts LPs. Trends drain them.</span>
+      </p>
+    </div>
+    <div style="display:flex; flex-direction:column; min-height:0">
+      <div class="chartcard"><div id="c-problem" class="chart"></div></div>
+      <p class="small" style="margin-top:10px">
+        Both paths take the <b>same set of step sizes</b> — only the order of the signs differs. The one that goes
+        nowhere barely leaks value; the one that trends is arbitraged the whole way.
+      </p>
     </div>
   </div>
-  <div class="footrule"></div><div class="pageno">04</div>
+  <div class="footer"><span>Poincaré</span><span>02</span></div>
 </section>
 
-<!-- 5 · the actuator -->
+<!-- ════════ 3 · THE ENGINE ════════ -->
 <section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · the actuator</span>
-    <h2 class="wide">Toxic flow pays a spread. Stabilising flow pays nothing.</h2>
-    <div class="uline"></div>
-  </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:1.05fr .95fr">
-      <div class="col">
-        <div class="chartcard"><div id="c-curve" class="chart"></div></div>
+  <div class="eyebrow">The insight · the engine</div>
+  <h1>"Has a real trend started?" was solved in 1954. Nobody brought it on-chain.</h1>
+  <div class="grid" style="grid-template-columns:1fr 1.12fr; margin-top:20px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; gap:13px; justify-content:center">
+      <div class="card">
+        <h3>Quickest Change Detection</h3>
+        <p class="body" style="margin-top:9px; font-size:13.8px">
+          Statisticians spent seventy years on exactly this question: detect a regime change as fast as possible
+          without crying wolf. The workhorse answer is the <b>CUSUM statistic</b> — it accumulates evidence each
+          block and fires the moment that evidence crosses a threshold.
+        </p>
+        <div class="card quiet" style="margin-top:12px; text-align:center; padding:13px; border:1px solid var(--border)">
+          <span class="display" style="font-size:16px">S<sub>t</sub> = max(0, S<sub>t−1</sub> + ℓ<sub>t</sub> − k) &nbsp;→&nbsp; alarm when S<sub>t</sub> ≥ h</span>
+        </div>
+        <p class="small" style="margin-top:11px">
+          It comes with a proof: under <b>Lorden's criterion</b>, CUSUM minimises worst-case detection delay for any
+          tolerated false-alarm rate. Not a heuristic that felt right — the best possible answer to the
+          speed-versus-false-alarms question.
+        </p>
       </div>
-      <div class="col" style="justify-content:center">
-        <div class="card">
-          <h3>We shipped the safe lever, and we can show why</h3>
-          <p>The obvious design — different curve <em>depth</em> per direction — is arb-drainable. We built it,
-             found a buy-shallow / sell-deep round trip that empties the pool, and rewrote the asymmetry as a
-             <strong>non-negative spread on a symmetric base</strong>: safe by construction, proven by fuzzing
-             and a 384,000-operation invariant.</p>
-        </div>
-        <div class="card sage">
-          <h3>Unlike a fee, it is targeted</h3>
-          <p>A symmetric fee taxes everyone on every block. Poincaré charges only the side actually taking
-             money out of LPs, and only while the detector is confident.</p>
-        </div>
+      <div class="card quiet" style="padding:15px 18px; border:1px solid var(--border)">
+        <div class="display" style="font-size:13.5px; font-weight:700; color:var(--lav-deep)">Nobody else does this</div>
+        <p class="small" style="margin-top:5px">
+          A scan of the entire <b>562-hook UHI directory</b> returns <b>zero</b> uses of CUSUM, change-point
+          detection, SPRT or quickest detection. Everything out there triggers on moving averages and fixed
+          thresholds — exactly what an attacker can time.
+        </p>
       </div>
     </div>
+    <div style="display:flex; flex-direction:column; min-height:0">
+      <div class="chartcard"><div id="c-cusum" class="chart"></div></div>
+      <p class="small" style="margin-top:10px">
+        The firing moment is a <b>data-dependent stopping time</b>: a real trend crosses fast, noise never gets
+        there. There is no "after N blocks" for an attacker to precompute.
+      </p>
+    </div>
   </div>
-  <div class="footrule"></div><div class="pageno">05</div>
+  <div class="footer"><span>Poincaré</span><span>03</span></div>
 </section>
 
-<!-- 6 · live on chain -->
+<!-- ════════ 4 · THE DESIGN ════════ -->
 <section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · live on chain</span>
-    <h2 class="wide">Watch it refuse to fire, then commit.</h2>
-    <div class="uline"></div>
-    <p class="sub">40 real swaps through the deployed pool on Unichain Sepolia — every value read from the hook's own <span class="mono">DetectorSample</span> event.</p>
+  <div class="eyebrow">The design</div>
+  <h1>A brain that decides, a curve that acts, a fee that breathes</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; margin-top:20px">
+    <div class="card">
+      <div class="pill">The brain</div>
+      <h3 style="margin-top:11px">Two-sided CUSUM detector</h3>
+      <p class="small" style="margin-top:8px">
+        Runs on the pool's own log-returns, sampled <b>once per block from pre-swap reserves</b>, so flash tricks
+        never reach it. A directional-efficiency gate confirms the move is a march rather than a thrash, and
+        Huber-clipped increments stop fat-tailed crypto returns from fooling it.
+      </p>
+    </div>
+    <div class="card">
+      <div class="pill warn">The actuator</div>
+      <h3 style="margin-top:11px">A directional spread LPs keep</h3>
+      <p class="small" style="margin-top:8px">
+        Once a trend is confirmed, flow pushing <b>with</b> it pays a small, capped spread that goes straight to the
+        LPs it would otherwise have been taken from. Flow that stabilises the pool trades at the full base price —
+        punishing your friends is bad business.
+      </p>
+    </div>
+    <div class="card">
+      <div class="pill green">The revenue</div>
+      <h3 style="margin-top:11px">A fee generated from volatility</h3>
+      <p class="small" style="margin-top:8px">
+        In calm markets LPs still earn: the base fee is computed each block from the pool's own realized
+        volatility, <span class="mono">min(γ·σ̂, cap)</span>. It tightens when things are quiet and widens when they
+        are not — never a constant someone picked in a meeting.
+      </p>
+    </div>
   </div>
-  <div class="body">
+  <div class="card quiet" style="margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:17px 24px; border:1px solid var(--border)">
+    <span class="display" style="font-size:14.5px; font-weight:700; color:var(--text-2); white-space:nowrap">Once per block:</span>
+    <span class="display" style="font-size:14.5px; font-weight:600; color:var(--text)">
+      pool price → <span class="tag-lav">log-return</span> → <span class="tag-down">CUSUM + gate</span> →
+      <span class="tag-honey">bounded, rate-limited κ</span> → <span class="tag-up">spread on the toxic side only</span>
+    </span>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-top:15px">
+    <div class="kpi"><div class="n sm">k = 0.25σ</div><div class="l">CUSUM slack</div><div class="s">calibrated, not guessed</div></div>
+    <div class="kpi"><div class="n sm">h = 6.25σ</div><div class="l">threshold</div><div class="s">set from a false-alarm target</div></div>
+    <div class="kpi"><div class="n">124</div><div class="l">ARL₀, in bars</div><div class="s">~20 days between false alarms</div></div>
+    <div class="kpi"><div class="n">23</div><div class="l">bars to detect</div><div class="s">mean delay once a trend starts</div></div>
+  </div>
+  <p class="small" style="margin-top:13px; text-align:center">
+    The signal is the pool's own price and nothing else. Every parameter is a constructor argument derived from the
+    real ETH/USDC return distribution — <b>never a hard-coded constant, and never a block count</b>.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>04</span></div>
+</section>
+
+<!-- ════════ 5 · THE ACTUATOR ════════ -->
+<section class="slide">
+  <div class="eyebrow">The actuator</div>
+  <h1>Toxic flow pays a spread. Stabilising flow pays nothing.</h1>
+  <div class="grid" style="grid-template-columns:1.1fr 1fr; margin-top:20px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; min-height:0">
+      <div class="chartcard"><div id="c-curve" class="chart"></div></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:13px; justify-content:center">
+      <div class="card">
+        <h3>We shipped the safe lever — and can show why</h3>
+        <p class="small" style="margin-top:8px">
+          The obvious design, different curve <i>depth</i> per direction, is arbitrage-drainable. We built it, found
+          a buy-shallow / sell-deep round trip that empties the pool, and rewrote the asymmetry as a
+          <b>non-negative spread on a symmetric base</b>: safe by construction, and proven by fuzzing plus a
+          128k-call invariant per flavour.
+        </p>
+      </div>
+      <div class="card" style="background:var(--green-bg); border-color:var(--green-border)">
+        <h3 style="color:var(--up-deep)">Unlike a fee, it is targeted</h3>
+        <p class="small" style="margin-top:8px; color:var(--text-2)">
+          A symmetric fee taxes everyone on every block. Poincaré charges <b>only the side actually taking money
+          out of LPs</b>, and only while the detector is confident. The soft side trades at exactly the
+          constant-product price — so there is never a prize sitting there for an attacker.
+        </p>
+      </div>
+      <p class="small">
+        Cost to uninformed flow over the full year: <b>3,925</b> for Poincaré against <b>3,100</b> for the matched
+        symmetric fee — targeting is what that gap buys.
+      </p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>05</span></div>
+</section>
+
+<!-- ════════ 6 · LIVE ON CHAIN ════════ -->
+<section class="slide">
+  <div class="eyebrow">Functionality · live on chain</div>
+  <h1>Watch it refuse to fire, then commit.</h1>
+  <p class="small" style="margin-top:8px">
+    40 real swaps through the deployed pool on Unichain Sepolia — every value read from the hook's own
+    <span class="mono"><b>DetectorSample</b></span> event, not a simulation.
+  </p>
+  <div style="display:flex; flex-direction:column; min-height:0; flex:1; margin-top:14px">
     <div class="chartcard"><div id="c-trace" class="chart"></div></div>
-    <p class="cap">Ten swaps of evidence before it commits — then κ ramps 5% → 10%, rate-limited. At the
-       <strong style="color:var(--sage)">shaded swaps 21–22</strong> κ is still 10%, yet those sells pay
-       <strong>0%</strong>: they trade against the drift, so they are the stabilising side.</p>
+    <p class="small" style="margin-top:10px">
+      Ten swaps of evidence before it commits — then κ ramps 5% → 10%, rate-limited so it can never snap. At the
+      <span class="tag-up">shaded swaps 21–22</span> κ is still 10%, yet those sells pay <b>0%</b>: they trade
+      against the drift, so they are the stabilising side.
+    </p>
   </div>
-  <div class="footrule"></div><div class="pageno">06</div>
+  <div class="footer"><span>Poincaré</span><span>06</span></div>
 </section>
 
-<!-- 7 · stress results -->
-<section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · results</span>
-    <h2 class="wide">It earns its keep exactly where the theory says it should.</h2>
-    <div class="uline"></div>
-    <p class="sub">Two pools on the real Uniswap v4 PoolManager, seeded identically, same fair path, same order flow, 3,842 swaps.</p>
+<!-- ════════ 7 · DEMO HAND-OFF ════════ -->
+<section class="slide" style="justify-content:center">
+  <div style="position:absolute; top:46px; left:66px">
+    <div class="pill"><span class="dot live"></span> Live demo · poincare-beta.vercel.app</div>
   </div>
-  <div class="body">
-    <div class="stats">
-      <div class="stat"><div class="n">−22.9%</div><div class="c">mean LVR reduction over 5 seeded runs (19.3–29.7%)</div></div>
-      <div class="stat"><div class="n sage">−83%</div><div class="c">LVR cut in the flash crash, where LPs bleed most</div></div>
-      <div class="stat"><div class="n honey">0%</div><div class="c">lean in calm markets — correctly, it does nothing</div></div>
+
+  <div class="display" style="font-size:52px; font-weight:700; letter-spacing:-.4px; line-height:1.08">
+    Let's watch it work.
+  </div>
+  <p class="body" style="max-width:760px; margin-top:18px; font-size:16px">
+    A real pool, a real hook, a real chain. Everything on screen is read straight from Unichain Sepolia —
+    no mock data, no staged screenshots.
+  </p>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; margin-top:34px; max-width:1020px">
+    <div class="card" style="padding:18px 20px">
+      <div class="step-n">What to watch · 1</div>
+      <h3 style="margin-top:7px; font-size:16px">The detector holding fire</h3>
+      <p class="small" style="margin-top:6px">S⁺ and S⁻ climbing block by block while κ stays at zero. It refuses to act on noise.</p>
     </div>
+    <div class="card" style="padding:18px 20px">
+      <div class="step-n">What to watch · 2</div>
+      <h3 style="margin-top:7px; font-size:16px">The moment it commits</h3>
+      <p class="small" style="margin-top:6px">Evidence crosses h, the trend label flips, and κ ramps in — rate-limited, never a snap.</p>
+    </div>
+    <div class="card" style="padding:18px 20px">
+      <div class="step-n">What to watch · 3</div>
+      <h3 style="margin-top:7px; font-size:16px">Who actually pays</h3>
+      <p class="small" style="margin-top:6px">The with-trend side quoted worse; the stabilising side quoted at the plain base price.</p>
+    </div>
+  </div>
+
+  <div class="footer"><span>Poincaré</span><span>07</span></div>
+</section>
+
+<!-- ════════ 8 · STRESS RESULTS ════════ -->
+<section class="slide">
+  <div class="eyebrow">Impact · stress test</div>
+  <h1>Same pool, same trades, one difference: the detector. LPs kept <span class="tag-up">$502k</span> more.</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-top:16px">
+    <div class="kpi tint"><div class="n sm">+$501,516</div><div class="l">LP value retained</div><div class="s">10,186,959 vs 9,685,443 USDC</div></div>
+    <div class="kpi"><div class="n">−22.9%</div><div class="l">mean LVR reduction</div><div class="s">5 seeds, range 19.3–29.7%</div></div>
+    <div class="kpi honeytint"><div class="n">−83%</div><div class="l">in the flash crash</div><div class="s">where LPs bleed hardest</div></div>
+    <div class="kpi"><div class="n">0%</div><div class="l">lean in calm markets</div><div class="s">correctly, it does nothing</div></div>
+  </div>
+  <div style="display:flex; flex-direction:column; min-height:0; flex:1; margin-top:14px">
     <div class="chartcard"><div id="c-regimes" class="chart"></div></div>
   </div>
-  <div class="footrule"></div><div class="pageno">07</div>
+  <p class="small" style="margin-top:10px; text-align:center">
+    Two pools on the real Uniswap v4 PoolManager, seeded identically and fed the same fair path and the same
+    <b>3,842 swaps across 1,040 blocks</b>. Protection appears exactly where the theory says it should — and nowhere else.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>08</span></div>
 </section>
 
-<!-- 8 · the honest test -->
+<!-- ════════ 8 · THE HONEST TEST ════════ -->
 <section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · the honest test</span>
-    <h2 class="wide">Then we built the baseline most likely to beat us.</h2>
-    <div class="uline"></div>
-    <p class="sub">Any spread lowers LVR, so beating <span class="mono">x·y=k</span> proves nothing. We added a symmetric vol-fee costing traders the same, over 12 months of real ETH/USDC.</p>
+  <div class="eyebrow">Impact · the honest test</div>
+  <h1>Then we built the baseline most likely to beat us.</h1>
+  <p class="small" style="margin-top:8px">
+    Any spread lowers LVR, so beating <span class="mono">x·y=k</span> proves nothing. We added a symmetric vol-fee
+    costing traders the same, over <b>12 months of real ETH/USDC</b> (19 Jul 2025 → 19 Jul 2026).
+  </p>
+  <div class="grid" style="grid-template-columns:1.35fr .65fr; margin-top:14px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; min-height:0">
+      <div class="chartcard"><div id="c-honest" class="chart"></div></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; justify-content:center">
+      <div class="card" style="background:var(--rose-bg); border-color:#f5d9e1">
+        <h3 style="color:var(--down-deep); font-size:16px">Over the full year, it edges us</h3>
+        <p class="small" style="margin-top:7px; color:var(--text-2)">
+          −3.27% against our −2.37%. That is the number the harness produced, so it is the number we show.
+        </p>
+      </div>
+      <div class="card" style="background:var(--green-bg); border-color:var(--green-border)">
+        <h3 style="color:var(--up-deep); font-size:16px">In the trending half, we win</h3>
+        <p class="small" style="margin-top:7px; color:var(--text-2)">
+          The detector was calibrated on the first half only, so H2 is a genuine <b>out-of-sample</b> hold-out — and
+          it carries the February crash and the June leg-down. <b>−4.09%</b> against the baseline's −3.28%.
+        </p>
+      </div>
+      <p class="small">
+        LVR ≤ constant product on every path, every block — asserted in the test suite. Publishing the run we lose
+        is the point: it is what makes the run we win believable.
+      </p>
+    </div>
   </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:1.3fr .7fr">
-      <div class="col"><div class="chartcard"><div id="c-honest" class="chart"></div></div></div>
-      <div class="col" style="justify-content:center">
-        <div class="card rose">
-          <h3>Over the full year, it edges us</h3>
-          <p>−3.27% against our −2.37%, and we spend ~27% more of our traders' money getting there.
-             That is the number the harness produced, so it is the number we show.</p>
-        </div>
-        <div class="card sage">
-          <h3>In the trending half, we win</h3>
-          <p>The detector was calibrated on the first half of the series only, so the second half is a genuine
-             <strong>out-of-sample</strong> hold-out — and it carries the February crash and the June leg-down.</p>
-        </div>
-        <p class="small">LVR ≤ constant product throughout, on every path — asserted in the test suite.</p>
+  <div class="footer"><span>Poincaré</span><span>09</span></div>
+</section>
+
+<!-- ════════ 9 · SECURITY / OLYMPIX ════════ -->
+<section class="slide">
+  <div class="eyebrow">New since the last iteration · security</div>
+  <h1>The Uniswap Foundation put us through a pre-audit. Nothing is left open.</h1>
+  <p class="small" style="margin-top:8px">
+    The <b>Uniswap Foundation Security Fund</b> sponsored an <b>Olympix BugPoCer</b> scan. It reports only what it can
+    prove — each finding arrives as a runnable Foundry exploit. All nine are fixed, and every fix ships with a
+    regression test that fails on the pre-fix code.
+  </p>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:13px">
+    <div class="kpi tint"><div class="n">0</div><div class="l">high-severity findings</div><div class="s">across the whole scan</div></div>
+    <div class="kpi"><div class="n">9 / 9</div><div class="l">findings fixed</div><div class="s">each with a regression test</div></div>
+    <div class="kpi honeytint"><div class="n">58 / 58</div><div class="l">source units scanned</div><div class="s">the full contract surface</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:.72fr 1.28fr; margin-top:13px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; min-height:0">
+      <div class="chartcard"><div id="c-audit" class="chart"></div></div>
+    </div>
+    <div style="display:flex; flex-direction:column; justify-content:center">
+      <div style="display:flex; flex-direction:column">
+        <div class="led"><span class="sev">MED</span>
+          <span class="t"><b>Reentrancy on withdrawal</b> → transient lock; swaps revert while liquidity settles</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev">MED</span>
+          <span class="t"><b>Shares priced off the under-funded side</b> → priced off the scarcer side</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev lo">LOW</span>
+          <span class="t"><b>Lens quoted what the PoolManager rejects</b> → the Lens mirrors the guard</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev lo">LOW ×2</span>
+          <span class="t"><b>Log-return domain could revert a swap</b> → ratio clamped into the lnWad domain</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev lo">LOW ×2</span>
+          <span class="t"><b>Claim-donation resistance overstated</b> → claim corrected, residual documented</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev lo">LOW</span>
+          <span class="t"><b>First deposit could floor an offset to zero</b> → such seeds now rejected</span>
+          <span class="st">fixed ✓</span></div>
+        <div class="led"><span class="sev lo">LOW</span>
+          <span class="t"><b>Exact-out routing dodged part of the spread</b> → made the exact inverse</span>
+          <span class="st">fixed ✓</span></div>
+      </div>
+      <p class="small" style="margin-top:9px">
+        Seven fixes cover nine findings — two pairs shared a root cause. Finding → fix → test is mapped in
+        <span class="mono"><b>SECURITY.md</b></span>. A scan is not a human audit, and we say so: an external audit
+        remains required before mainnet.
+      </p>
+    </div>
+  </div>
+  <div class="footer"><span>Poincaré</span><span>10</span></div>
+</section>
+
+<!-- ════════ 10 · THE MOAT ════════ -->
+<section class="slide">
+  <div class="eyebrow">Why it can't be gamed</div>
+  <h1>Faking a trend means genuinely moving the market, at your own expense</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; margin-top:22px">
+    <div class="card">
+      <h3 style="font-size:16px"><span class="tag-lav">1 ·</span> No countdown to study</h3>
+      <p class="small" style="margin-top:8px">
+        The firing time depends on the data, and the detector samples <b>once per block from pre-swap reserves</b>,
+        so a flash loan that unwinds inside a block is simply invisible to it. There is no block number to
+        precompute and no crossing to schedule.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:16px"><span class="tag-honey">2 ·</span> Nothing to win</h3>
+      <p class="small" style="margin-top:8px">
+        The spread only ever makes trades worse, never better. The soft side trades at the plain base price, so
+        <span class="mono"><b>max_soft_gain ≡ 0</b></span> — an attacker who fakes a trend finds <i>zero</i> edge
+        waiting on the other side. Proven in the test suite, not argued.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:16px"><span class="tag-up">3 ·</span> Arbitrageurs collect the toll</h3>
+      <p class="small" style="margin-top:8px">
+        Pushing price off fair value opens a gap arbitrageurs harvest the moment the attacker stops. To move the
+        statistic you must genuinely move the market, and that cost climbs every block while buying nothing.
+      </p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; padding:20px 26px; border-color:var(--green-border); background:var(--green-bg)">
+    <h3 style="color:var(--up-deep); font-size:16px">All three layers are simulated end to end, against the real PoolManager</h3>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr; gap:20px; margin-top:12px">
+      <p class="small" style="color:var(--text-2)"><span class="check">✓</span> A fake-trend round trip <b>loses money</b> after gas and modelled arbitrage.</p>
+      <p class="small" style="color:var(--text-2)"><span class="check">✓</span> A single-block flash spike moves the detector by <b>exactly zero</b>.</p>
+      <p class="small" style="color:var(--text-2)"><span class="check">✓</span> A σ-inflation attack on the adaptive mode <b>burns value every block</b>.</p>
+    </div>
+  </div>
+  <p class="small" style="margin-top:16px; text-align:center">
+    The security argument is not "we hope nobody tries". It is an inequality —
+    <b>max_soft_gain &lt; min_trigger_cost</b> — that the suite checks empirically on every run.
+  </p>
+  <div class="footer"><span>Poincaré</span><span>11</span></div>
+</section>
+
+<!-- ════════ 11 · WHAT IT UNLOCKS ════════ -->
+<section class="slide">
+  <div class="eyebrow">Impact · what this unlocks</div>
+  <h1>The detector is a platform, not a one-off.</h1>
+  <p class="small" style="margin-top:8px">Everything below runs on the same statistic — three of the four are already implemented and tested.</p>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; margin-top:16px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <div class="card" style="flex:1">
+        <div class="pill green" style="font-size:11px">✓ built</div>
+        <h3 style="margin-top:9px; font-size:16px">Self-calibrating thresholds</h3>
+        <p class="small" style="margin-top:7px">
+          Feed the CUSUM the standardised increment <span class="mono">r/σ̂</span> and thresholds breathe with the
+          market — scale-free across pairs, no governance. Cuts LVR <b>29.6%</b> on the synthetic path against
+          14.3% for absolute mode, with <i>no</i> absolute calibration. Gated off until its manipulation bound is derived.
+        </p>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="pill green" style="font-size:11px">✓ built</div>
+        <h3 style="margin-top:9px; font-size:16px">Any pair, no code change</h3>
+        <p class="small" style="margin-top:7px">
+          Point the calibration harness at another series and it re-derives σ, k and h from that pair's own returns.
+          Every parameter is already a constructor argument.
+        </p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <div class="card" style="flex:1">
+        <div class="pill warn" style="font-size:11px">the bigger prize</div>
+        <h3 style="margin-top:9px; font-size:16px">The curvature lever</h3>
+        <p class="small" style="margin-top:7px">
+          The spread is the safe half of the idea. Moving <i>depth</i> per direction is a far stronger lever; it needs
+          the manipulation-cost sizing that keeps it arb-safe — exactly the analysis the detector makes tractable.
+        </p>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="pill green" style="font-size:11px">✓ built</div>
+        <h3 style="margin-top:9px; font-size:16px">Routing that self-selects</h3>
+        <p class="small" style="margin-top:7px">
+          The Lens quotes the true curve, so best-execution routers naturally send calm and counter-trend flow here
+          and take toxic flow elsewhere — the LP-favourable split, as a consequence of pricing rather than a rule.
+        </p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <div class="card" style="flex:1; background:var(--green-bg); border-color:var(--green-border)">
+        <h3 style="font-size:16px; color:var(--up-deep)">Why it matters beyond one pool</h3>
+        <p class="small" style="margin-top:7px; color:var(--text-2)">
+          LVR is the largest structural tax on onchain liquidity. Every mitigation shipped so far needs an oracle,
+          an auction, or trusted infrastructure. This one needs <b>nothing but the pool's own price</b>, so it
+          composes with any v4 pool on any chain.
+        </p>
+      </div>
+      <div class="card" style="flex:1">
+        <h3 style="font-size:16px">And it generalises</h3>
+        <p class="small" style="margin-top:7px">
+          Any hook that must decide "<i>is this regime real?</i>" — dynamic fees, circuit breakers, sandwich
+          detection — can consume the same statistic instead of a fixed threshold an attacker can time.
+        </p>
       </div>
     </div>
   </div>
-  <div class="footrule"></div><div class="pageno">08</div>
+  <div class="footer"><span>Poincaré</span><span>12</span></div>
 </section>
 
-<!-- 9 · what's possible -->
+<!-- ════════ 12 · BUILT & CLOSE ════════ -->
 <section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · what this unlocks</span>
-    <h2 class="wide">The detector is a platform, not a one-off.</h2>
-    <div class="uline"></div>
-    <p class="sub">Everything below is built on the same statistic — three of the four are already implemented and tested.</p>
-  </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:1fr 1fr 1fr">
-      <div class="col">
-        <div class="card lav" style="flex:1">
-          <h3>Self-calibrating thresholds ✓ built</h3>
-          <p>Feed the CUSUM the standardised increment <span class="mono">r/σ̂</span> and the thresholds breathe
-             with the market — scale-free across pairs, no governance. Cuts LVR 29.6% on the synthetic path
-             with <em>no</em> absolute calibration. Gated off until its manipulation bound is derived.</p>
-        </div>
-        <div class="card" style="flex:1">
-          <h3>Any pair, no code change ✓ built</h3>
-          <p>Point the calibration harness at another series and it re-derives σ, k and h from that pair's own
-             returns. Every parameter is already a constructor argument.</p>
-        </div>
+  <div class="eyebrow">Built, verified, deployed</div>
+  <h1>A working hook, not a proposal.</h1>
+  <div class="grid" style="grid-template-columns:1.12fr .88fr; margin-top:18px; flex:1; min-height:0">
+    <div style="display:flex; flex-direction:column; justify-content:center">
+      <ul class="checks">
+        <li><span class="check">✓</span><span><b>A valid Uniswap v4 hook</b> — custom curve via <span class="mono">beforeSwapReturnDelta</span>, hook-owned liquidity, CREATE2-mined permission flags</span></li>
+        <li><span class="check">✓</span><span><b>131 Foundry tests</b> — unit, fuzz, invariant, manipulation, calibration, regression</span></li>
+        <li><span class="check">✓</span><span><b>128k randomised calls per invariant flavour</b>, zero reverts: solvency and ghost accounting to the wei</span></li>
+        <li><span class="check">✓</span><span><b>Pre-audited by Olympix via the Uniswap Foundation Security Fund</b> — 9 findings, 9 fixed, each with a regression test that fails on the pre-fix code</span></li>
+        <li><span class="check">✓</span><span><b>Quotes match execution to the wei</b>, even in a fresh block before the first swap</span></li>
+        <li><span class="check">✓</span><span><b>~96k gas</b> for the detector — once per block, not per swap</span></li>
+        <li><span class="check">✓</span><span><b>Unit tests <i>and</i> a public frontend</b>, charting the real on-chain detector trace</span></li>
+        <li><span class="check">✓</span><span><b>Original code.</b> The detector, control law, curve and Lens are ours; the only inherited contracts are Uniswap's <span class="mono">BaseCustomCurve</span> and OpenZeppelin's ERC-20</span></li>
+      </ul>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:9px; justify-content:center">
+      <div class="addr"><span>Live app</span><span class="mono">poincare-beta.vercel.app</span></div>
+      <div class="addr"><span>Repo</span><span class="mono">github.com/Prakhar-30/POINCARE</span></div>
+      <div class="addr"><span>Hook</span><span class="mono">0x9F11…6A88</span></div>
+      <div class="addr"><span>Lens (quoter)</span><span class="mono">0x1ca2…43c2</span></div>
+      <div class="addr"><span>Chain</span><span class="mono">Unichain Sepolia · 1301</span></div>
+      <div class="card" style="padding:15px 18px">
+        <h3 style="font-size:15.5px">Partner integrations: none — deliberately</h3>
+        <p class="small" style="margin-top:7px">
+          No oracle, AVS, keeper, relayer or cross-chain dependency. The only input is the pool's own
+          reserve-implied price. Adding a feed would reintroduce exactly the trust and latency assumptions the
+          detector exists to remove.
+        </p>
       </div>
-      <div class="col">
-        <div class="card honey" style="flex:1">
-          <h3>The curvature lever — the bigger prize</h3>
-          <p>The spread is the safe half of the idea. Moving <em>depth</em> per direction is a far stronger
-             lever; it needs the manipulation-cost sizing that keeps it arb-safe, which is exactly the analysis
-             the detector makes tractable.</p>
-        </div>
-        <div class="card" style="flex:1">
-          <h3>Routing that self-selects ✓ built</h3>
-          <p>The Lens quotes the true curve, so best-execution routers naturally send calm and counter-trend
-             flow here and take toxic flow elsewhere — the LP-favourable split, as a consequence of pricing.</p>
-        </div>
-      </div>
-      <div class="col">
-        <div class="card sage" style="flex:1">
-          <h3>Why it matters beyond one pool</h3>
-          <p>LVR is the largest structural tax on onchain liquidity. Every mitigation shipped so far either
-             needs an oracle, an auction, or trusted infrastructure. This one needs <strong>nothing but the
-             pool's own price</strong>, so it composes with any v4 pool on any chain.</p>
-        </div>
-        <div class="card" style="flex:1">
-          <h3>And it generalises</h3>
-          <p>Any hook that must decide “<em>is this regime real?</em>” — dynamic fees, circuit breakers,
-             sandwich detection — can consume the same statistic instead of a fixed threshold an attacker can time.</p>
-        </div>
-      </div>
+      <p class="small" style="text-align:center">
+        <b>The curve is the actuator. The detector is the contribution.</b><br />BUSL-1.1 · converts to MIT on 2030-07-19
+      </p>
     </div>
   </div>
-  <div class="footrule"></div><div class="pageno">09</div>
-</section>
-
-<!-- 10 · the moat -->
-<section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · manipulation</span>
-    <h2 class="wide">Faking a trend is negative-EV, by construction.</h2>
-    <div class="uline"></div>
-  </div>
-  <div class="body">
-    <div class="steps">
-      <div class="step"><span class="b">1</span>
-        <div><h3>There is no countdown to game</h3>
-        <p>CUSUM fires at a data-dependent stopping time. An attacker cannot precompute the block the curve flips.</p></div></div>
-      <div class="step"><span class="b">2</span>
-        <div><h3>There is no prize waiting</h3>
-        <p>The spread is one-sided and non-negative on a symmetric base, so the soft side trades at <em>exactly</em>
-           the constant-product price. <span class="mono">max_soft_gain ≡ 0</span> — proven in the test suite.</p></div></div>
-      <div class="step"><span class="b">3</span>
-        <div><h3>Getting there costs real money</h3>
-        <p>To move the statistic you must genuinely move the price, which opens an arbitrage gap others harvest.
-           The detector samples once per block on pre-swap reserves, so an atomic flash-and-unwind feeds it nothing.</p></div></div>
-      <div class="step sage"><span class="b">✓</span>
-        <div><h3>All three are tested end to end, against the real PoolManager</h3>
-        <p>A fake-trend round trip loses money · a single-block flash moves the detector by zero ·
-           a σ-inflation attack on the adaptive mode burns value every block.</p></div></div>
-    </div>
-  </div>
-  <div class="footrule"></div><div class="pageno">10</div>
-</section>
-
-<!-- 11 · built & close -->
-<section class="slide">
-  <div>
-    <span class="eyebrow">Poincaré · built, verified, deployed</span>
-    <h2 class="wide">A working hook, not a proposal.</h2>
-    <div class="uline"></div>
-  </div>
-  <div class="body">
-    <div class="cols" style="grid-template-columns:1.1fr .9fr">
-      <div class="col" style="justify-content:center">
-        <ul class="checks">
-          <li><span class="tick">✓</span><span><strong>131 Foundry tests</strong> — unit, fuzz, invariant, manipulation, calibration, regression</span></li>
-          <li><span class="tick">✓</span><span><strong>384,000 randomised operations</strong>, zero reverts: solvency and ghost accounting to the wei</span></li>
-          <li><span class="tick">✓</span><span><strong>Pre-audit scanned by Olympix, through the Uniswap Foundation Security Fund</strong> — every finding fixed, each with a regression test that fails on the pre-fix code</span></li>
-          <li><span class="tick">✓</span><span><strong>Quotes match execution to the wei</strong>, even in a fresh block</span></li>
-          <li><span class="tick">✓</span><span><strong>~96k gas</strong> for the detector — once per block, not per swap</span></li>
-          <li><span class="tick">✓</span><span><strong>Live testnet pool + web app</strong> charting the real on-chain detector trace</span></li>
-        </ul>
-      </div>
-      <div class="col" style="justify-content:center">
-        <div class="addr"><span>Hook</span><span class="mono">0x9F11…6A88</span></div>
-        <div class="addr"><span>Lens (quoter)</span><span class="mono">0x1ca2…43c2</span></div>
-        <div class="addr"><span>PoolManager</span><span>canonical v4 · Unichain Sepolia</span></div>
-        <div class="card">
-          <h3>Partner integrations: none — deliberately</h3>
-          <p>No oracle, AVS, keeper, relayer or cross-chain dependency. The only input is the pool's own
-             reserve-implied price. Adding a feed would reintroduce exactly the trust and latency assumptions
-             the detector exists to remove.</p>
-        </div>
-        <p class="small"><strong>The curve is the actuator. The detector is the contribution.</strong><br>
-           github.com/Prakhar-30/POINCARE · BUSL-1.1</p>
-      </div>
-    </div>
-  </div>
-  <div class="footrule"></div><div class="pageno">11</div>
+  <div class="footer"><span>Poincaré</span><span>13</span></div>
 </section>
 
 </div></div>
-<div class="hint"><kbd>←</kbd> <kbd>→</kbd> to navigate</div>
+<div class="hint"><kbd>←</kbd> <kbd>→</kbd> to navigate · type a number to jump</div>
 
 <script>
 (function(){
   "use strict";
-  const C = { lav:"#7C6FCB", rose:"#D45C77", honey:"#C98A2E", sage:"#3E9B72",
-              ink:"#262A45", ink2:"#5C5B78", ink3:"#918FAC", grid:"#E9E6F4", axis:"#D9D5EA",
-              grey:"#A5A2BC" };
-  const FONT = "Nunito, sans-serif";
 
-  /* shared chart chrome — recessive axes, tabular labels, no chartjunk */
+  /* Chart palette is the same token set the slides use, so a bar and a card
+     tint that mean the same thing are literally the same colour. */
+  const C = { lav:"#8e88d8", lavDeep:"#6f68c8", lavDim:"#c5c1ed",
+              up:"#6bb89a", upDeep:"#4e9c7e", down:"#e58ca0", downDeep:"#c96a82",
+              honey:"#e6b25f", honeyDeep:"#d49a45",
+              text:"#3f3a56", text2:"#5c5775", text3:"#8a85a0", muted:"#a39db8",
+              grid:"#f1edf7", axis:"#e3ddee" };
+  const FONT = "Nunito, sans-serif";
+  const DISPLAY = "Quicksand, sans-serif";
+
+  /* Shared chrome: recessive axes, tabular labels, no chartjunk. Every chart
+     inherits the entrance animation so it GROWS when its slide is reached. */
   const base = {
-    textStyle:{ fontFamily:FONT, color:C.ink2 },
-    animationDuration: 1100,
+    textStyle:{ fontFamily:FONT, color:C.text2 },
+    animationDuration: 1300,
     animationEasing: "cubicOut",
     grid:{ left:8, right:16, top:24, bottom:6, containLabel:true }
   };
   const axisCommon = {
     axisLine:{ lineStyle:{ color:C.axis } },
     axisTick:{ show:false },
-    axisLabel:{ color:C.ink3, fontSize:11.5, fontFamily:FONT },
+    axisLabel:{ color:C.text3, fontSize:11.5, fontFamily:FONT },
     splitLine:{ lineStyle:{ color:C.grid } }
   };
+  const titleStyle = { fontFamily:DISPLAY, fontSize:13.5, fontWeight:700, color:C.text };
 
   const charts = [];
   function make(id, option){
@@ -485,100 +689,111 @@ body.started .hint{opacity:0;pointer-events:none}
     return ch;
   }
 
-  /* ═════ slide 2 · chop vs trend, two panels on one shared y-scale ═════ */
+  /* ═════ 2 · chop vs trend, two panels on one shared y-scale ═════ */
   (function(){
-    /* Both paths take the SAME set of step magnitudes; only the ORDER of the signs
-       differs. That is the whole point of the slide, so it is built that way rather
-       than drawn to look that way. */
+    /* Both paths take the SAME step magnitudes; only the ORDER of the signs
+       differs. That is the claim the slide makes, so it is built that way
+       rather than drawn to look that way. */
     const mags  = [7,5,9,6,8,4,9,7,5,8,6,9,4,7,8,5,9,6,7,4,8,6,9,5,7];
     const chopS = [1,1,-1,1,-1,-1,1,-1,1,1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,1,-1,-1,1];
     const N = mags.length + 1, chop = [100], trend = [100], xs = [0];
     for (let i = 0; i < mags.length; i++){
       xs.push(i + 1);
       chop.push(+(chop[i] + mags[i] * chopS[i]).toFixed(2));
-      trend.push(+(trend[i] + mags[i] * 0.62).toFixed(2));  /* same step sizes, one direction */
+      trend.push(+(trend[i] + mags[i] * 0.45).toFixed(2));
     }
-    /* a final step closes the chop path exactly on its starting level, so the
+    /* a closing step lands the chop path exactly on its starting level, so the
        "ends where it started" label states a fact about the data, not a wish */
     xs.push(N); chop.push(100);
-    trend.push(+(trend[trend.length - 1] + 6 * 0.62).toFixed(2));
+    trend.push(+(trend[trend.length - 1] + 6 * 0.45).toFixed(2));
+
     make("c-problem", Object.assign({}, base, {
-      grid:[{ left:34, right:12, top:34, bottom:26, width:"40%" },
-            { left:"55%", right:112, top:34, bottom:26 }],
-      title:[{ text:"Chop — ends where it started", left:34, top:2,
-               textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } },
-             { text:"Trend — the same volatility, pointed one way", left:"56%", top:2,
-               textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } }],
+      grid:[{ left:36, right:14, top:36, bottom:24, width:"38%" },
+            { left:"55%", right:26, top:36, bottom:24 }],
+      title:[{ text:"Chop — ends where it began", left:34, top:2, textStyle:titleStyle },
+             { text:"Trend — same steps, one direction", left:"55%", top:2, textStyle:titleStyle }],
       xAxis:[ Object.assign({}, axisCommon, { type:"category", data:xs, gridIndex:0, splitLine:{show:false}, axisLabel:{show:false} }),
               Object.assign({}, axisCommon, { type:"category", data:xs, gridIndex:1, splitLine:{show:false}, axisLabel:{show:false} }) ],
-      yAxis:[ Object.assign({}, axisCommon, { type:"value", gridIndex:0, min:70, max:210, interval:35, axisLabel:{ color:C.ink3, fontSize:11 } }),
-              Object.assign({}, axisCommon, { type:"value", gridIndex:1, min:70, max:210, interval:35, axisLabel:{ color:C.ink3, fontSize:11 } }) ],
+      yAxis:[ Object.assign({}, axisCommon, { type:"value", gridIndex:0, min:60, max:200, interval:35, axisLabel:{ color:C.text3, fontSize:11 } }),
+              Object.assign({}, axisCommon, { type:"value", gridIndex:1, min:60, max:200, interval:35, axisLabel:{ color:C.text3, fontSize:11 } }) ],
       series:[
-        { type:"line", data:chop, xAxisIndex:0, yAxisIndex:0, showSymbol:false, smooth:false,
-          lineStyle:{ color:C.grey, width:2.2 },
+        { type:"line", data:chop, xAxisIndex:0, yAxisIndex:0, showSymbol:false,
+          lineStyle:{ color:C.muted, width:2.2 },
           markLine:{ silent:true, symbol:"none", data:[{ yAxis:100 }],
                      lineStyle:{ color:C.grid, type:"dashed" }, label:{ show:false } },
-          markPoint:{ symbol:"circle", symbolSize:9, data:[{ coord:[N, chop[N]],
-                      value:"back where it began" }], itemStyle:{ color:C.grey },
-                      label:{ show:true, position:"top", distance:10, color:C.ink3, fontSize:12,
+          markPoint:{ symbol:"circle", symbolSize:9, data:[{ coord:[N, chop[N]], value:"back where it began" }],
+                      itemStyle:{ color:C.muted },
+                      label:{ show:true, position:"top", distance:10, color:C.text3, fontSize:11.5,
                               fontFamily:FONT, formatter:"{c}" } } },
         { type:"line", data:trend, xAxisIndex:1, yAxisIndex:1, showSymbol:false,
-          lineStyle:{ color:C.lav, width:2.8 },
+          lineStyle:{ color:C.downDeep, width:2.8 },
+          areaStyle:{ color:"rgba(229,140,160,.12)" },
           markLine:{ silent:true, symbol:"none", data:[{ yAxis:100 }],
                      lineStyle:{ color:C.grid, type:"dashed" }, label:{ show:false } },
-          markPoint:{ symbol:"circle", symbolSize:10, data:[{ coord:[N, trend[N]],
-                      value:"arbitraged the whole way" }], itemStyle:{ color:C.lav },
-                      label:{ show:true, position:"top", distance:10, color:C.ink2, fontSize:12,
-                              fontFamily:FONT, formatter:"{c}" } } }
+          markPoint:{ symbol:"circle", symbolSize:10, data:[{ coord:[N, trend[N]], value:"arbitraged the whole way" }],
+                      itemStyle:{ color:C.downDeep },
+                      label:{ show:true, position:"left", distance:11, color:C.downDeep, fontSize:11.5,
+                              fontFamily:FONT, fontWeight:700, formatter:"{c}" } } }
       ]
     }));
   })();
 
-  /* ═════ slide 4 · the CUSUM statistic against its threshold ═════ */
+  /* ═════ 3 · the CUSUM statistic: accumulate, fire, reset, re-accumulate ═════ */
   (function(){
     const N = 30, h = 5, s = [];
-    let v = 0.4;
+    let v = 0.9;
     for (let i = 0; i < N; i++){
-      if (i < 13){ v += (i % 2 ? -0.55 : 0.5) + 0.16 * Math.sin(i * 2.1); v = Math.max(0.05, Math.min(v, 1.9)); }
-      else        { v += 0.74 + 0.1 * Math.sin(i); }
-      s.push(+Math.min(v, 8.2).toFixed(2));
+      if (i < 13){                       /* chop — evidence never gets anywhere */
+        v += (i % 2 ? -0.62 : 0.58) + 0.14 * Math.sin(i * 2.1);
+        v = Math.max(0.12, Math.min(v, 1.85));
+      } else if (i < 21){                /* a real trend — evidence marches up */
+        v += 0.78;
+      } else if (i === 21){              /* it fired: reset, and make it re-earn it */
+        v = 0.15;
+      } else {
+        v += 0.5;
+      }
+      s.push(+v.toFixed(2));
     }
     make("c-cusum", Object.assign({}, base, {
-      grid:{ left:8, right:132, top:38, bottom:30, containLabel:true },
-      title:{ text:"CUSUM evidence S⁺ · schematic", left:0, top:0,
-              textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } },
+      grid:{ left:8, right:26, top:38, bottom:28, containLabel:true },
+      title:{ text:"CUSUM evidence S⁺ against threshold h · schematic", left:0, top:0, textStyle:titleStyle },
       xAxis: Object.assign({}, axisCommon, { type:"category", boundaryGap:false,
-              data:Array.from({length:N}, (_,i)=>i), splitLine:{ show:false },
-              axisLabel:{ show:false }, name:"blocks", nameLocation:"middle", nameGap:14,
-              nameTextStyle:{ color:C.ink3, fontSize:11.5, fontFamily:FONT } }),
-      yAxis: Object.assign({}, axisCommon, { type:"value", min:0, max:9, interval:3 }),
+              data:Array.from({length:N}, (_,i)=>i), splitLine:{ show:false }, axisLabel:{ show:false },
+              name:"blocks", nameLocation:"middle", nameGap:12,
+              nameTextStyle:{ color:C.text3, fontSize:11.5, fontFamily:FONT } }),
+      yAxis: Object.assign({}, axisCommon, { type:"value", min:0, max:8, interval:2 }),
       series:[{
-        type:"line", data:s, showSymbol:false, smooth:.25,
+        type:"line", data:s, showSymbol:false, smooth:.2,
         lineStyle:{ color:C.lav, width:3 },
-        areaStyle:{ color:"rgba(124,111,203,.12)" },
-        markArea:{ silent:true, itemStyle:{ color:"rgba(145,143,172,.07)" },
-          data:[[{ xAxis:0, label:{ show:true, position:"insideTop", color:C.ink3, fontSize:11.5,
+        areaStyle:{ color:"rgba(142,136,216,.14)" },
+        markArea:{ silent:true, itemStyle:{ color:"rgba(163,157,184,.08)" },
+          data:[[{ xAxis:0, label:{ show:true, position:"insideTop", color:C.text3, fontSize:11.5,
                                    fontFamily:FONT, formatter:"chop — evidence decays" } }, { xAxis:12 }]] },
         markLine:{ silent:true, symbol:"none",
-          data:[{ yAxis:h, label:{ show:true, position:"insideEndTop", formatter:"threshold h",
-                                   color:C.honey, fontSize:12, fontFamily:FONT, fontWeight:700 } }],
+          data:[{ yAxis:h, label:{ show:true, position:"insideStartTop", formatter:"threshold h",
+                                   color:C.honeyDeep, fontSize:12, fontFamily:FONT, fontWeight:700 } }],
           lineStyle:{ color:C.honey, width:2, type:"dashed" } },
         markPoint:{ symbol:"circle", symbolSize:13, itemStyle:{ color:"transparent",
-                    borderColor:C.honey, borderWidth:2.5 },
-          data:[{ coord:[18, s[18]], value:"alarm — the curve leans, here",
-                  label:{ show:true, position:"right", distance:12, color:C.honey, fontSize:12.5,
-                          fontFamily:FONT, fontWeight:700, formatter:"{c}" } }] }
+                    borderColor:C.honeyDeep, borderWidth:2.5 },
+          data:[
+            { coord:[18, s[18]], value:"alarm — the curve leans, here",
+              label:{ show:true, position:"left", distance:12, color:C.honeyDeep, fontSize:12,
+                      fontFamily:FONT, fontWeight:700, formatter:"{c}" } },
+            { coord:[22, s[22]], value:"resets — must re-earn it",
+              label:{ show:true, position:"right", distance:12, color:C.text3, fontSize:11.5,
+                      fontFamily:FONT, formatter:"{c}" } }
+          ] }
       }]
     }));
   })();
 
-  /* ═════ slide 5 · the executable curve, computed from x·y=k ═════ */
+  /* ═════ 5 · the executable curve, computed from x·y=k ═════ */
   (function(){
     const k = 10000, x0 = 100, kappa = 0.16;   /* κ exaggerated for legibility */
     const bas = [], withT = [], against = [];
     for (let x = 46; x <= 210; x += 2) bas.push([x, +(k/x).toFixed(2)]);
-    /* with-trend: pushing price further along the trend — output haircut by κ, so the
-       executable path falls away from the base curve */
+    /* with-trend: output haircut by κ, so the executable path falls away from the base */
     for (let x = x0; x <= 176; x += 2){
       const y = k/x, drop = (k/x0 - y) * kappa;
       withT.push([x, +(y - drop).toFixed(2)]);
@@ -587,36 +802,35 @@ body.started .hint{opacity:0;pointer-events:none}
     for (let x = 60; x <= x0; x += 2) against.push([x, +(k/x).toFixed(2)]);
 
     make("c-curve", Object.assign({}, base, {
-      grid:{ left:10, right:20, top:38, bottom:38, containLabel:true },
-      title:{ text:"Executable price around the operating point", left:0, top:0,
-              textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } },
+      grid:{ left:10, right:20, top:36, bottom:36, containLabel:true },
+      title:{ text:"Executable price around the operating point", left:0, top:0, textStyle:titleStyle },
       xAxis: Object.assign({}, axisCommon, { type:"value", min:46, max:212, name:"reserve x",
-              nameLocation:"middle", nameGap:14, axisLabel:{ show:false }, splitLine:{ show:false },
-              nameTextStyle:{ color:C.ink3, fontSize:11.5, fontFamily:FONT } }),
+              nameLocation:"middle", nameGap:12, axisLabel:{ show:false }, splitLine:{ show:false },
+              nameTextStyle:{ color:C.text3, fontSize:11.5, fontFamily:FONT } }),
       yAxis: Object.assign({}, axisCommon, { type:"value", min:40, max:225, name:"reserve y",
-              nameLocation:"middle", nameGap:16, axisLabel:{ show:false },
-              nameTextStyle:{ color:C.ink3, fontSize:11.5, fontFamily:FONT } }),
+              nameLocation:"middle", nameGap:10, axisLabel:{ show:false }, splitLine:{ show:false },
+              nameTextStyle:{ color:C.text3, fontSize:11.5, fontFamily:FONT } }),
       series:[
         { name:"base", type:"line", data:bas, showSymbol:false, smooth:true,
-          lineStyle:{ color:C.grey, width:2, type:"dashed" } },
+          lineStyle:{ color:C.muted, width:2, type:"dashed" } },
         { name:"against", type:"line", data:against, showSymbol:false, smooth:true,
-          lineStyle:{ color:C.sage, width:4 } },
+          lineStyle:{ color:C.upDeep, width:4 } },
         { name:"with", type:"line", data:withT, showSymbol:false, smooth:true,
-          lineStyle:{ color:C.honey, width:4 },
-          markPoint:{ symbol:"circle", symbolSize:9, itemStyle:{ color:C.ink },
+          lineStyle:{ color:C.honeyDeep, width:4 },
+          markPoint:{ symbol:"circle", symbolSize:9, itemStyle:{ color:C.text },
             data:[{ coord:[x0, k/x0], value:"now", label:{ show:true, position:"top", distance:8,
-                    color:C.ink, fontSize:12, fontFamily:FONT, fontWeight:700, formatter:"{c}" } }] } }
+                    color:C.text, fontSize:12, fontFamily:FONT, fontWeight:700, formatter:"{c}" } }] } }
       ],
       graphic:[
-        { type:"text", right:26, top:"30%", style:{ text:"with-trend\npays κ — LPs keep it",
-          fill:C.honey, font:"700 12.5px "+FONT, lineHeight:17, textAlign:"right" } },
-        { type:"text", left:"12%", top:"12%", style:{ text:"against-trend\npays 0 — the base price",
-          fill:C.sage, font:"700 12.5px "+FONT, lineHeight:17 } }
+        { type:"text", right:24, top:"31%", style:{ text:"with-trend\npays κ — LPs keep it",
+          fill:C.honeyDeep, font:"700 12.5px "+FONT, lineHeight:17, textAlign:"right" } },
+        { type:"text", left:"13%", top:"12%", style:{ text:"against-trend\npays 0 — the base price",
+          fill:C.upDeep, font:"700 12.5px "+FONT, lineHeight:17 } }
       ]
     }));
   })();
 
-  /* ═════ slide 6 · the real 40-swap on-chain trace ═════ */
+  /* ═════ 6 · the real 40-swap on-chain trace ═════ */
   (function(){
     const price = [1485.79,1518.43,1551.79,1585.87,1620.71,1656.31,1692.70,1729.88,1767.88,1806.71,
                    1845.40,1883.88,1923.16,1963.27,2004.21,2046.00,2088.67,2132.22,2176.69,2222.08,
@@ -631,13 +845,13 @@ body.started .hint{opacity:0;pointer-events:none}
     const paidPts = paid.map((v,i)=> v ? [i, v] : null).filter(Boolean);
 
     make("c-trace", Object.assign({}, base, {
-      animationDuration: 1400,
+      animationDuration: 1500,
       legend:{ show:true, top:0, right:2, itemWidth:16, itemHeight:3, itemGap:16,
-               textStyle:{ color:C.ink2, fontSize:12, fontFamily:FONT },
+               textStyle:{ color:C.text2, fontSize:12, fontFamily:FONT },
                data:["pool price","directional efficiency D","κ spread"] },
-      grid:[{ left:8, right:18, top:34, height:"34%", containLabel:true },
-            { left:8, right:18, top:"52%", height:"18%", containLabel:true },
-            { left:8, right:18, top:"76%", bottom:30, containLabel:true }],
+      grid:[{ left:8, right:18, top:32, height:"35%", containLabel:true },
+            { left:8, right:18, top:"53%", height:"17%", containLabel:true },
+            { left:8, right:18, top:"76%", bottom:28, containLabel:true }],
       axisPointer:{ link:[{ xAxisIndex:"all" }] },
       xAxis:[ Object.assign({}, axisCommon, { type:"category", data:labels, gridIndex:0,
                boundaryGap:false, splitLine:{ show:false }, axisLabel:{ show:false } }),
@@ -645,109 +859,140 @@ body.started .hint{opacity:0;pointer-events:none}
                boundaryGap:false, splitLine:{ show:false }, axisLabel:{ show:false } }),
               Object.assign({}, axisCommon, { type:"category", data:labels, gridIndex:2,
                boundaryGap:false, splitLine:{ show:false },
-               axisLabel:{ color:C.ink3, fontSize:11, interval:4 },
-               name:"swap (one per block)", nameLocation:"middle", nameGap:22,
-               nameTextStyle:{ color:C.ink3, fontSize:11.5, fontFamily:FONT } }) ],
+               axisLabel:{ color:C.text3, fontSize:11, interval:4 },
+               name:"swap (one per block)", nameLocation:"middle", nameGap:20,
+               nameTextStyle:{ color:C.text3, fontSize:11.5, fontFamily:FONT } }) ],
       yAxis:[ Object.assign({}, axisCommon, { type:"value", gridIndex:0, min:1400, max:2350,
-               interval:300, axisLabel:{ color:C.ink3, fontSize:11, formatter:v=>v.toLocaleString() },
-               name:"USDC per ETH", nameTextStyle:{ color:C.ink3, fontSize:11, fontFamily:FONT, align:"left" },
-               nameGap:10 }),
+               interval:300, axisLabel:{ color:C.text3, fontSize:11, formatter:v=>v.toLocaleString() },
+               name:"USDC per ETH", nameTextStyle:{ color:C.text3, fontSize:11, fontFamily:FONT, align:"left" },
+               nameGap:9 }),
               Object.assign({}, axisCommon, { type:"value", gridIndex:1, min:0, max:100, interval:50,
-               axisLabel:{ color:C.ink3, fontSize:11, formatter:"{value}%" },
-               name:"efficiency D", nameTextStyle:{ color:C.ink3, fontSize:11, fontFamily:FONT, align:"left" },
+               axisLabel:{ color:C.text3, fontSize:11, formatter:"{value}%" },
+               name:"efficiency D", nameTextStyle:{ color:C.text3, fontSize:11, fontFamily:FONT, align:"left" },
                nameGap:8 }),
               Object.assign({}, axisCommon, { type:"value", gridIndex:2, min:0, max:12, interval:6,
-               axisLabel:{ color:C.ink3, fontSize:11, formatter:"{value}%" },
-               name:"κ spread", nameTextStyle:{ color:C.ink3, fontSize:11, fontFamily:FONT, align:"left" },
+               axisLabel:{ color:C.text3, fontSize:11, formatter:"{value}%" },
+               name:"κ spread", nameTextStyle:{ color:C.text3, fontSize:11, fontFamily:FONT, align:"left" },
                nameGap:8 }) ],
       series:[
         { name:"pool price", type:"line", data:price, xAxisIndex:0, yAxisIndex:0,
           showSymbol:false, smooth:.2, lineStyle:{ color:C.lav, width:3 },
-          areaStyle:{ color:"rgba(124,111,203,.09)" },
+          areaStyle:{ color:"rgba(142,136,216,.10)" },
           markLine:{ silent:true, symbol:"none",
-            data:[{ xAxis:10, label:{ show:true, position:"end", rotate:0, distance:6,
-                    formatter:"swap 11 — it commits", color:C.honey, fontSize:12.5,
+            data:[{ xAxis:10, label:{ show:true, position:"end", distance:6,
+                    formatter:"swap 11 — it commits", color:C.honeyDeep, fontSize:12,
                     fontFamily:FONT, fontWeight:700 } }],
             lineStyle:{ color:C.honey, width:1.5, type:"dashed" } } },
         { name:"directional efficiency D", type:"line", data:D, xAxisIndex:1, yAxisIndex:1,
-          showSymbol:false, smooth:.2, lineStyle:{ color:C.grey, width:2.4 },
+          showSymbol:false, smooth:.2, lineStyle:{ color:C.muted, width:2.4 },
           markLine:{ silent:true, symbol:"none",
             data:[{ yAxis:50, label:{ show:true, position:"insideStartTop", formatter:"D gate 50%",
-                    color:C.sage, fontSize:11, fontFamily:FONT } },
+                    color:C.upDeep, fontSize:11, fontFamily:FONT } },
                   { xAxis:10, lineStyle:{ color:C.honey, width:1.5, type:"dashed" }, label:{ show:false } }],
-            lineStyle:{ color:C.sage, width:1.5, type:"dashed" } } },
+            lineStyle:{ color:C.up, width:1.5, type:"dashed" } } },
         { name:"κ spread", type:"line", data:K, xAxisIndex:2, yAxisIndex:2, step:"end",
-          showSymbol:false, lineStyle:{ color:C.honey, width:2.4 },
-          areaStyle:{ color:"rgba(201,138,46,.28)" },
-          markArea:{ silent:true, itemStyle:{ color:"rgba(62,155,114,.20)" },
+          showSymbol:false, lineStyle:{ color:C.honeyDeep, width:2.4 },
+          areaStyle:{ color:"rgba(230,178,95,.30)" },
+          markArea:{ silent:true, itemStyle:{ color:"rgba(107,184,154,.22)" },
             data:[[{ xAxis:20, label:{ show:true, position:"top", formatter:"21–22 pay 0%",
-                     color:C.sage, fontSize:11.5, fontFamily:FONT, fontWeight:700 } }, { xAxis:21 }]] },
-          markLine:{ silent:true, symbol:"none",
-            data:[{ xAxis:10, label:{ show:false } }],
+                     color:C.upDeep, fontSize:11.5, fontFamily:FONT, fontWeight:700 } }, { xAxis:21 }]] },
+          markLine:{ silent:true, symbol:"none", data:[{ xAxis:10, label:{ show:false } }],
             lineStyle:{ color:C.honey, width:1.5, type:"dashed" } } },
         { name:"paid", type:"scatter", data:paidPts, xAxisIndex:2, yAxisIndex:2,
-          symbolSize:7, itemStyle:{ color:C.honey, borderColor:"#fff", borderWidth:1.5 },
+          symbolSize:7, itemStyle:{ color:C.honeyDeep, borderColor:"#fff", borderWidth:1.5 },
           tooltip:{ show:false }, legendHoverLink:false, silent:true }
       ]
     }));
   })();
 
-  /* ═════ slide 7 · LVR reduction by regime ═════ */
+  /* ═════ 7 · LVR reduction by regime (analysis/simulation/summary.csv) ═════ */
   (function(){
     const rows = [["calm",0],["whipsaw",5],["strong down-trend",5],["recovery",9],
                   ["trend w/ pullbacks",10],["strong up-trend",54],["flash crash",83]];
     make("c-regimes", Object.assign({}, base, {
-      grid:{ left:8, right:56, top:30, bottom:16, containLabel:true },
-      title:{ text:"LVR reduction vs constant product, by market regime", left:0, top:0,
-              textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } },
-      xAxis: Object.assign({}, axisCommon, { type:"value", max:90,
-              axisLabel:{ color:C.ink3, fontSize:11, formatter:"{value}%" } }),
+      animationDuration: 1400,
+      animationDelay: idx => idx * 110,       /* each regime bar grows in turn */
+      grid:{ left:8, right:58, top:28, bottom:12, containLabel:true },
+      title:{ text:"LVR reduction vs constant product, by market regime", left:0, top:0, textStyle:titleStyle },
+      xAxis: Object.assign({}, axisCommon, { type:"value", max:90, interval:30,
+              axisLabel:{ color:C.text3, fontSize:11, formatter:"{value}%" } }),
       yAxis: Object.assign({}, axisCommon, { type:"category", data:rows.map(r=>r[0]),
-              splitLine:{ show:false }, axisLabel:{ color:C.ink2, fontSize:12.5, fontFamily:FONT } }),
+              splitLine:{ show:false }, axisLabel:{ color:C.text2, fontSize:12.5, fontFamily:FONT } }),
       series:[{
         type:"bar", data:rows.map(r=>({ value:r[1],
-          itemStyle:{ color: r[1] >= 50 ? C.sage : (r[1] === 0 ? "#DAD7E8" : C.lav),
-                      borderRadius:[0,5,5,0] } })),
-        barWidth:"58%",
+          itemStyle:{ color: r[1] >= 50 ? C.upDeep : (r[1] === 0 ? "#ded9ec" : C.lav),
+                      borderRadius:[0,6,6,0] } })),
+        barWidth:"56%",
         label:{ show:true, position:"right", distance:8, fontSize:12.5, fontFamily:FONT,
-                fontWeight:700, color:C.ink,
+                fontWeight:700, color:C.text,
                 formatter:p => p.value === 0 ? "no lean — correctly" : "−" + p.value + "%" }
       }]
     }));
   })();
 
-  /* ═════ slide 8 · Poincaré vs the matched symmetric fee ═════ */
+  /* ═════ 8 · Poincaré against the matched symmetric vol-fee ═════ */
   (function(){
     make("c-honest", Object.assign({}, base, {
-      grid:{ left:8, right:20, top:52, bottom:20, containLabel:true },
-      title:{ text:"LVR reduction vs constant product · 12 months of real ETH/USDC", left:0, top:0,
-              textStyle:{ fontFamily:"Quicksand", fontSize:13.5, fontWeight:700, color:C.ink } },
+      grid:{ left:8, right:20, top:50, bottom:18, containLabel:true },
+      title:{ text:"LVR reduction vs constant product · 12 months of real ETH/USDC", left:0, top:0, textStyle:titleStyle },
       legend:{ top:22, left:0, itemWidth:12, itemHeight:12, itemGap:18,
-               textStyle:{ color:C.ink2, fontSize:12, fontFamily:FONT } },
+               textStyle:{ color:C.text2, fontSize:12, fontFamily:FONT } },
       xAxis: Object.assign({}, axisCommon, { type:"category", splitLine:{ show:false },
               data:["H1 — calibration half\n(chop-heavy)","H2 — out-of-sample\n(the crash + leg-down)","Full 12 months"],
-              axisLabel:{ color:C.ink2, fontSize:12, fontFamily:FONT, lineHeight:15 } }),
+              axisLabel:{ color:C.text2, fontSize:12, fontFamily:FONT, lineHeight:15 } }),
       yAxis: Object.assign({}, axisCommon, { type:"value", max:5,
-              axisLabel:{ color:C.ink3, fontSize:11, formatter:"{value}%" } }),
+              axisLabel:{ color:C.text3, fontSize:11, formatter:"{value}%" } }),
       series:[
         { name:"Poincaré", type:"bar", data:[1.30, 4.09, 2.37], barWidth:"26%",
-          itemStyle:{ color:C.lav, borderRadius:[5,5,0,0] },
+          animationDelay: idx => idx * 140,
+          itemStyle:{ color:C.lav, borderRadius:[6,6,0,0] },
           label:{ show:true, position:"top", fontSize:12.5, fontFamily:FONT, fontWeight:700,
-                  color:C.ink, formatter:p=>"−"+p.value.toFixed(2)+"%" } },
+                  color:C.text, formatter:p=>"−"+p.value.toFixed(2)+"%" } },
         { name:"matched symmetric vol-fee", type:"bar", data:[3.26, 3.28, 3.27], barWidth:"26%",
-          itemStyle:{ color:"#C9C5DC", borderRadius:[5,5,0,0] },
+          animationDelay: idx => 95 + idx * 140,
+          itemStyle:{ color:"#d9d4e8", borderRadius:[6,6,0,0] },
           label:{ show:true, position:"top", fontSize:12.5, fontFamily:FONT,
-                  color:C.ink3, formatter:p=>"−"+p.value.toFixed(2)+"%" } }
+                  color:C.text3, formatter:p=>"−"+p.value.toFixed(2)+"%" } }
       ]
+    }));
+  })();
+
+  /* ═════ 9 · Olympix pre-audit findings by severity ═════ */
+  (function(){
+    /* The report's own counts: 0 high, 2 medium, 7 low, 9 total, all fixed.
+       The empty High bar IS the point, so it is drawn as a real zero rather
+       than dropped from the axis. */
+    const rows = [["High",0],["Medium",2],["Low",7]];
+    make("c-audit", Object.assign({}, base, {
+      animationDuration: 1500,
+      animationDelay: idx => idx * 260,
+      grid:{ left:8, right:76, top:32, bottom:12, containLabel:true },
+      title:{ text:"Findings by severity — every one closed", left:0, top:0, textStyle:titleStyle },
+      xAxis: Object.assign({}, axisCommon, { type:"value", max:8,
+              axisLabel:{ color:C.text3, fontSize:11 } }),
+      yAxis: Object.assign({}, axisCommon, { type:"category", data:rows.map(r=>r[0]), inverse:true,
+              splitLine:{ show:false },
+              axisLabel:{ color:C.text2, fontSize:13, fontFamily:FONT, fontWeight:700 } }),
+      series:[{
+        type:"bar", data:rows.map(r=>({ value:r[1],
+          itemStyle:{ color: r[1] === 0 ? "#ded9ec" : (r[0] === "Medium" ? C.honey : C.lavDim),
+                      borderRadius:[0,6,6,0] } })),
+        barWidth:"44%",
+        label:{ show:true, position:"right", distance:9, fontSize:12.5, fontFamily:FONT, fontWeight:700,
+                color:p => p.value === 0 ? C.upDeep : C.text,
+                formatter:p => p.value === 0 ? "none found" : p.value + " · fixed ✓" }
+      }]
     }));
   })();
 
   /* ═════ deck navigation ═════ */
   const slides = [...document.querySelectorAll(".slide")];
   const stage = document.getElementById("stage");
-  let i = 0;
+  let i = 0, growTimer = 0;
 
-  function fit(){ stage.style.transform = "scale(" + Math.min(innerWidth/1280, innerHeight/720) + ")"; }
+  function fit(){
+    stage.style.transform = "scale(" + Math.min(innerWidth / 1312, innerHeight / 752) + ")";
+  }
   addEventListener("resize", () => { fit(); charts.forEach(c => c.ch.resize()); });
   fit();
 
@@ -756,21 +1001,41 @@ body.started .hint{opacity:0;pointer-events:none}
     i = Math.max(0, Math.min(slides.length - 1, n));
     if (i === prev && slides[i].classList.contains("on")) return;
     slides.forEach((s, k) => s.classList.toggle("on", k === i));
-    /* replay each chart's entrance on the slide we just landed on */
-    charts.forEach(c => {
-      if (slides[i].contains(c.dom)){ c.ch.resize(); c.ch.setOption(c.option, true); }
-    });
+    /* Replay each chart's entrance on the slide just landed on, once the fade
+       has finished — so the growth is watched, not half-missed behind it. */
+    clearTimeout(growTimer);
+    growTimer = setTimeout(() => {
+      charts.forEach(c => {
+        if (slides[i].contains(c.dom)){ c.ch.resize(); c.ch.setOption(c.option, true); }
+      });
+    }, 320);
   }
+
+  let typed = "", typedTimer = 0;
   addEventListener("keydown", e => {
     document.body.classList.add("started");
-    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown"){ e.preventDefault(); go(i+1); }
-    if (e.key === "ArrowLeft"  || e.key === "PageUp"){ e.preventDefault(); go(i-1); }
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown"){ e.preventDefault(); go(i + 1); }
+    if (e.key === "ArrowLeft"  || e.key === "PageUp"){ e.preventDefault(); go(i - 1); }
     if (e.key === "Home") go(0);
-    if (e.key === "End")  go(slides.length-1);
+    if (e.key === "End")  go(slides.length - 1);
+    /* type a slide number to jump there — "3" lands on 3, "13" on 13 */
+    if (e.key >= "0" && e.key <= "9"){
+      typed += e.key;
+      clearTimeout(typedTimer);
+      const n = parseInt(typed, 10);
+      if (n >= 1 && n <= slides.length) go(n - 1);
+      typedTimer = setTimeout(() => { typed = ""; }, 700);
+    }
   });
-  addEventListener("click", e => { if (!e.target.closest("a")) go(i + (e.clientX < innerWidth*.25 ? -1 : 1)); });
+  addEventListener("click", e => {
+    if (e.target.closest("a")) return;
+    document.body.classList.add("started");
+    go(i + (e.clientX < innerWidth * .25 ? -1 : 1));
+  });
 
-  /* charts were laid out while hidden; size them once fonts settle */
+  /* charts were laid out while hidden; size them once the webfonts settle */
   addEventListener("load", () => setTimeout(() => charts.forEach(c => c.ch.resize()), 60));
 })();
 </script>
+</body>
+</html>
