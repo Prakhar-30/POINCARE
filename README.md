@@ -4,6 +4,11 @@
 
 ### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them, protecting liquidity providers from the losses that trends cause, without an oracle.
 
+**Built for the Uniswap Hook Incubator 10 (UHI10) hookathon.** The repository was scaffolded
+from Uniswap's official [`v4-template`](https://github.com/Uniswap/v4-template); the detector,
+control law, curve, hook and Lens are original work.
+**Partner integrations: none** — deliberately, see [§11](#11-partner-integrations).
+
 ---
 
 ## TL;DR
@@ -491,18 +496,22 @@ passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain cases i
 
 ## 11. Partner integrations
 
-**None.** Poincaré integrates no hookathon partner technology, and that is a design
-constraint rather than an omission: the detector is built to work with **no oracle, no AVS,
-no keeper, no relayer and no cross-chain dependency**. Its only input is the pool's own
+**None.** Poincaré was built for **UHI10** and integrates no hookathon partner technology, and
+that is a design constraint rather than an omission: the detector is built to work with **no
+oracle, no AVS, no keeper, no relayer and no cross-chain dependency**. Its only input is the pool's own
 reserve-implied price, sampled once per block inside `beforeSwap` (§10 scope guardrails).
 Adding an external price feed would reintroduce exactly the trust and latency assumptions the
 quickest-change detector exists to avoid.
 
-What it does build on is standard, public infrastructure: Uniswap v4 (`v4-core`,
-`v4-periphery`), OpenZeppelin's `uniswap-hooks` `BaseCustomCurve` for settlement, `hookmate`
-for router/address constants, and Solady for fixed-point math. The contracts were scanned
-pre-deployment by **Olympix** (automated pre-audit); every finding was fixed and each carries a
-regression test (see [`SECURITY.md`](./SECURITY.md)).
+What it does build on is standard, public infrastructure. The repository was scaffolded from
+Uniswap's official [`v4-template`](https://github.com/Uniswap/v4-template), and the contracts
+depend on Uniswap v4 (`v4-core`, `v4-periphery`), OpenZeppelin's `uniswap-hooks`
+`BaseCustomCurve` for settlement, `hookmate` for router/address constants, and Solady for
+fixed-point math. Everything specific to Poincaré — `Cusum`, `DirectionalSignal`, `ControlLaw`,
+`AsymmetricCurve`, `PriceLib`, `PoincareHook` and `PoincareLens` — is written from scratch.
+
+The contracts were scanned pre-deployment by **Olympix** (automated pre-audit); every finding
+was fixed and each carries a regression test (see [`SECURITY.md`](./SECURITY.md)).
 
 ---
 
