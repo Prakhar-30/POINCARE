@@ -310,6 +310,20 @@ describe("stepDetector — the hook's composition order", () => {
     expect(state.trend).toBe(HookTrend.Up);
   });
 
+  it("survives a zero sigma in adaptive mode instead of dividing by zero", () => {
+    // The hook's constructor requires sigmaFloor > 0 whenever adaptive is set, so
+    // this state is unreachable on-chain -- but the Lab can ask for adaptive on a
+    // pool deployed in absolute mode with a zero floor, and a BigInt division by
+    // zero throws rather than degrading. A cold start is the reachable path: the
+    // accumulators are empty, so the sigma estimate is exactly zero.
+    const degenerate: DetectorParams = { ...params, adaptive: true, sigmaFloor: 0n };
+    expect(() => stepDetector(zeroState(), R, degenerate)).not.toThrow();
+
+    const out = stepDetector(zeroState(), R, degenerate);
+    expect(out.inc).toBe(0n); // no scale means no evidence
+    expect(out.kappa).toBe(0n);
+  });
+
   it("adaptive mode standardizes the increment by sigma", () => {
     const adaptive: DetectorParams = {
       ...params,

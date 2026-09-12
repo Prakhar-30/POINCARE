@@ -33,8 +33,15 @@ const API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 
 /** Minimum seconds between live generations per (hook, kind). Cache hits ignore it. */
 const COOLDOWN_S = 20;
-/** Hard ceiling on generated length; the UI shows two or three sentences. */
-const MAX_OUTPUT_TOKENS = 320;
+/**
+ * Token ceiling for a generation.
+ *
+ * Deliberately far above what three sentences need. Gemini 3.x reasons before it
+ * answers and those thought tokens count against this same budget, so a limit
+ * sized to the visible answer gets spent on reasoning and the reply is truncated
+ * mid-sentence. The prompt constrains the length; this only stops a runaway.
+ */
+const MAX_OUTPUT_TOKENS = 2048;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -127,11 +134,19 @@ async function generate(prompt: string): Promise<string> {
   if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
   const data = await res.json();
-  const text = (data?.candidates?.[0]?.content?.parts ?? [])
+  const candidate = data?.candidates?.[0];
+  const text = (candidate?.content?.parts ?? [])
     .map((p: { text?: string }) => p?.text ?? "")
     .join("")
     .trim();
   if (!text) throw new Error("gemini returned no text");
+
+  // A truncated answer must never reach the cache. The cache key is the question,
+  // so a half-sentence written once would be served as the answer forever, and the
+  // local narration it falls back to is a better answer than a cut-off one.
+  if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+    throw new Error(`gemini stopped early: ${candidate.finishReason}`);
+  }
   return text;
 }
 

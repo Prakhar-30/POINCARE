@@ -240,7 +240,12 @@ export function stepDetector(prev: DetectorState, rRaw: bigint, p: DetectorParam
     const rCap = mulDiv(p.clipWad, sigmaEff, WAD);
     if (r > rCap) r = rCap;
     else if (r < -rCap) r = -rCap;
-    inc = r >= 0n ? mulDiv(r, WAD, sigmaEff) : -mulDiv(-r, WAD, sigmaEff);
+    // Unreachable on-chain: the constructor requires sigmaFloor > 0 whenever
+    // adaptive is set, so sigmaEff is always positive there. Off-chain a caller
+    // can ask for a combination the hook would refuse, and a BigInt division by
+    // zero throws rather than degrading. A zero sigma estimate carries no scale,
+    // so the standardized increment is zero: no evidence, not a crash.
+    inc = sigmaEff === 0n ? 0n : r >= 0n ? mulDiv(r, WAD, sigmaEff) : -mulDiv(-r, WAD, sigmaEff);
   } else {
     const rCap = p.clipWad;
     if (r > rCap) r = rCap;

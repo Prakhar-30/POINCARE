@@ -24,6 +24,19 @@ import type { DetectorPoint } from "@/lib/onchain";
  *  - `kappaMin` is clamped under `kappaMax` so the control law's own validity
  *    condition (`kappaMax >= kappaMin`) holds for every slider position.
  */
+/**
+ * Standing in for a `sigmaFloor` the deployed pool does not have.
+ *
+ * `PoincareHook`'s constructor requires `sigmaFloor > 0` whenever `adaptive` is
+ * set, but a pool deployed in absolute mode can legitimately carry a floor of
+ * zero — the current one does. Toggling adaptive in the Lab would then describe a
+ * configuration the hook would refuse to deploy, and standardizing by a zero
+ * sigma is a division by zero. This floor keeps the replay inside the contract's
+ * own validity rule; at roughly a thousandth of a realistic per-block sigma it
+ * only ever binds in the degenerate cold-start case it exists for.
+ */
+const FALLBACK_SIGMA_FLOOR = 1_000_000_000_000n; // 1e-6 in WAD
+
 export function paramsOf(input: ConfigInput, live: DetectorParams): DetectorParams {
   const kappaMax = toWad(input.kappaMax);
   return {
@@ -37,6 +50,8 @@ export function paramsOf(input: ConfigInput, live: DetectorParams): DetectorPara
     kappaMin: live.kappaMin > kappaMax ? kappaMax : live.kappaMin,
     dMax: toWad(input.dMax),
     adaptive: input.adaptive,
+    sigmaFloor:
+      input.adaptive && live.sigmaFloor === 0n ? FALLBACK_SIGMA_FLOOR : live.sigmaFloor,
   };
 }
 
