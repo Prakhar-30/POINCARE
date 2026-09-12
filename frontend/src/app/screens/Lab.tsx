@@ -369,10 +369,14 @@ export function Lab() {
               />
             </div>
 
+            {/* The model is only worth asking once there is an actual comparison to
+                make. Unchanged, the local description of the deployed detector is
+                the better answer anyway, and not spending free-tier budget to be
+                told a configuration matches itself leaves it for the real questions. */}
             <AiNote
               explained={explained}
               title={changed ? "What this calibration changes" : "The deployed calibration"}
-              onAsk={explained.ask}
+              onAsk={changed ? explained.ask : undefined}
             />
 
             <p style={{ fontSize: 10.5, lineHeight: 1.6, color: "var(--faint)" }}>

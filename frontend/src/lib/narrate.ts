@@ -174,8 +174,37 @@ export function fallbackRegime(f: RegimeFacts): string {
   return parts.join(" ");
 }
 
+/** True when the candidate has not been moved off the deployed configuration. */
+const sameConfig = (a: ConfigFacts, b: ConfigFacts) =>
+  a.k === b.k &&
+  a.h === b.h &&
+  a.dFloor === b.dFloor &&
+  a.kappaMax === b.kappaMax &&
+  a.lambda === b.lambda &&
+  a.adaptive === b.adaptive;
+
 export function fallbackLab(f: LabFacts): string {
   const { live, candidate } = f;
+
+  // Nothing has been changed yet, so there is no comparison to make. Describe what
+  // the deployed detector did over this window instead — saying "it fires the same
+  // number of times as itself" is true and worthless.
+  if (sameConfig(live, candidate)) {
+    const cadence =
+      live.blocksPerFiring === null
+        ? "never crossed its threshold"
+        : `fired ${live.firings} time${live.firings === 1 ? "" : "s"}, about one every ${live.blocksPerFiring.toFixed(0)} sampled blocks`;
+    const gate =
+      live.gateSaves > 0
+        ? ` The directional-efficiency floor held evidence back on ${live.gateSaves} of them, where the raw statistic was already past the threshold but the move was not cleanly directional — that is the gate doing the job it exists for.`
+        : "";
+    return (
+      `Over these ${f.window.blocks} recorded blocks the deployed detector ${cadence}, leaning on ` +
+      `${live.dutyCyclePct.toFixed(0)}% of the window and peaking at a ${live.peakKappaPct.toFixed(2)}% spread.` +
+      `${gate} Move a slider to replay the same blocks under a different calibration.`
+    );
+  }
+
   const dFirings = candidate.firings - live.firings;
   const dDuty = candidate.dutyCyclePct - live.dutyCyclePct;
 

@@ -48,9 +48,12 @@ export function ReplayChart({
     const liveVals = live.slice(0, n).map((p) => norm(p, liveH));
     const candVals = candidate.slice(0, n).map((p) => norm(p, candidateH));
 
-    // A saturated statistic can sit far above the threshold and would squash the
-    // interesting region against the axis, so the view is capped and lines clip.
-    const CAP = 4;
+    // The statistic saturates at sMax, so in threshold-multiples the data tops out
+    // at sMax/h — commonly a small number (4 on the current deployment). Scaling to
+    // the data with headroom keeps that ceiling visible as a ceiling instead of
+    // flattening it against the top edge. The cap only guards a pathological
+    // sMax/h, where the 1.0 line would otherwise be squashed onto the axis.
+    const CAP = 8;
     const top = Math.min(CAP, Math.max(1.5, ...liveVals, ...candVals) * 1.12);
 
     const x = (i: number) => PAD.left + (i / (n - 1)) * (W - PAD.left - PAD.right);
@@ -97,6 +100,9 @@ export function ReplayChart({
       livePath: path(liveVals),
       candPath: path(candVals),
       pricePath,
+      // Whether the two series actually coincide, so the legend can say so rather
+      // than leaving the reader to wonder where the second line went.
+      identical: liveVals.every((v, i) => v === candVals[i]),
       liveBands: bandsOf(live.slice(0, n)),
       candBands: bandsOf(candidate.slice(0, n)),
       candFires: firesOf(candidate.slice(0, n), candVals),
@@ -118,6 +124,9 @@ export function ReplayChart({
           <span style={{ color: "var(--lav)" }}>▬ live</span>
           <span style={{ color: "var(--honey-deep)" }}>▬ candidate</span>
           <span style={{ color: "var(--down)" }}>┅ fires at 1.0</span>
+          {model?.identical && (
+            <span style={{ color: "var(--faint)", fontWeight: 600 }}>· identical, one path</span>
+          )}
         </span>
       </div>
 
@@ -180,12 +189,25 @@ export function ReplayChart({
               opacity={0.8}
             />
 
-            <path d={model.livePath} fill="none" stroke="var(--lav)" strokeWidth={1.7} strokeLinejoin="round" />
+            {/* The live trace is drawn as a wide soft band and the candidate as a
+                thin line on top of it. When the two configurations agree — which
+                they do until a slider moves — the candidate sits inside the band
+                and the agreement is legible, instead of one line silently hiding
+                the other and contradicting the legend. */}
+            <path
+              d={model.livePath}
+              fill="none"
+              stroke="var(--lav)"
+              strokeWidth={5}
+              strokeOpacity={0.38}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
             <path
               d={model.candPath}
               fill="none"
               stroke="var(--honey-deep)"
-              strokeWidth={2}
+              strokeWidth={1.8}
               strokeLinejoin="round"
             />
 
