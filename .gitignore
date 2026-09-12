@@ -24,3 +24,5 @@ CLAUDE.md
 # pool is driven and how the detector is made to fire on chain, so a reviewer needs them.
 # Both read the key from $PK and Supabase creds from frontend/.env — never hardcoded.
 frontend/probe*.mjs
+# Supabase CLI scratch (version cache, local link state)
+frontend/supabase/.temp/
