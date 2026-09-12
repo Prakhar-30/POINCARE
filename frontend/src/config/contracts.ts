@@ -156,6 +156,13 @@ export const HOOK_ABI = [
   { type: "function", name: "dMax", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "lambda", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "dFloor", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  // the rest of PoincareConfig, needed to replay the detector faithfully off-chain
+  { type: "function", name: "adaptive", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
+  { type: "function", name: "sigmaFloor", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "clipWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "feeGamma", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "feeCap", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "alphaWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "lastSampledPriceWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "lastSampledBlock", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },

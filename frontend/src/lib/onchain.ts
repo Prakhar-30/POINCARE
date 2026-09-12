@@ -89,6 +89,25 @@ export const DETECTOR_SAMPLE_EVENT = parseAbiItem(
   "event DetectorSample(uint256 blockNumber, uint256 priceWad, int256 r, int256 sPos, int256 sNeg, uint256 dWad, uint256 sigmaWad, uint256 kappaWad, uint8 trend, uint256 feeWad)",
 );
 
+/**
+ * The event's raw WAD integers, verbatim, as decimal strings.
+ *
+ * The numeric fields on `DetectorPoint` are for charting and lose the low digits
+ * of an 18-decimal value once they pass through a JS float. The Detector Lab
+ * replays the detector's exact integer arithmetic, so it reads these instead and
+ * reproduces the chain to the wei. Absent on rows synced before migration 004,
+ * where the replay falls back to the float columns.
+ */
+export type RawWad = {
+  r: string;
+  s_pos: string;
+  s_neg: string;
+  d: string;
+  sigma: string;
+  kappa: string;
+  fee: string;
+};
+
 /** One decoded detector sample: the full detector state at one block. */
 export type DetectorPoint = {
   block_number: number;
@@ -104,6 +123,8 @@ export type DetectorPoint = {
   /** UI trend label (hook orientation inverted to match the chart; see TREND). */
   trend: TrendLabel;
   fee: number;
+  /** Exact event values for replay; see {@link RawWad}. */
+  wad?: RawWad | null;
 };
 
 /** Fetch + decode DetectorSample logs in [fromBlock, toBlock], ascending by block. */
@@ -132,6 +153,16 @@ export async function fetchDetectorSamples(
       kappa: fromWad(l.args.kappaWad as bigint),
       trend: TREND[Number(l.args.trend)] ?? "none",
       fee: fromWad(l.args.feeWad as bigint),
+      // Carried verbatim so the Lab can replay the exact integer arithmetic.
+      wad: {
+        r: String(l.args.r as bigint),
+        s_pos: String(l.args.sPos as bigint),
+        s_neg: String(l.args.sNeg as bigint),
+        d: String(l.args.dWad as bigint),
+        sigma: String(l.args.sigmaWad as bigint),
+        kappa: String(l.args.kappaWad as bigint),
+        fee: String(l.args.feeWad as bigint),
+      },
     };
   });
 }
