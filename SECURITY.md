@@ -43,9 +43,11 @@ Reviewers should size the shadow-accounting trade-off explicitly.
 
 ## Prior review
 
-The contracts were scanned by **Olympix BugPoCer** (automated pre-audit) before the current
-deployment. Every reported finding was fixed, and each fix carries a regression test that fails
-on the pre-fix code and passes now:
+Poincaré was selected by the **Uniswap Foundation Security Fund**, which sponsored a security
+review by **Olympix**, run before the current deployment. The review reports only what it can
+demonstrate: each finding arrives as a runnable Foundry proof of concept. Nine findings were
+reported, none high-severity. Every one was fixed, and each fix carries a regression test that
+fails on the pre-fix code and passes now:
 
 | Finding | Fix | Test |
 |---|---|---|

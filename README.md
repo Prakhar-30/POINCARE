@@ -4,10 +4,19 @@
 
 ### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them, protecting liquidity providers from the losses that trends cause, without an oracle.
 
-**Built for the Uniswap Hook Incubator 10 (UHI10) hookathon.** The repository was scaffolded
-from Uniswap's official [`v4-template`](https://github.com/Uniswap/v4-template); the detector,
-control law, curve, hook and Lens are original work.
-**Partner integrations: none** — deliberately, see [§11](#11-partner-integrations).
+**Recognition and review.** Poincaré was submitted to the **Uniswap Hook Incubator 10 (UHI10)**
+hookathon, where it was selected as one of the winners. It was subsequently selected by the
+**Uniswap Foundation Security Fund**, which sponsored a security review by **Olympix**; all nine
+reported findings are fixed and each carries a regression test that fails on the pre-fix code
+(see [§11](#11-security-review)).
+
+Entered at **ETHOnline** under the Continuity track. What pre-existed, what was built during the
+hackathon, and how AI tools were used are documented in [`SUBMISSION.md`](./SUBMISSION.md).
+
+The repository was scaffolded from Uniswap's official
+[`v4-template`](https://github.com/Uniswap/v4-template), and the detector, control law, curve,
+hook and Lens are original work. It depends on no oracle, keeper, AVS, relayer or cross-chain
+service, which is a design constraint rather than an omission (see [§12](#12-external-dependencies)).
 
 ---
 
@@ -362,61 +371,65 @@ bleed the most. Full methodology, per-scenario breakdown, the two order books, a
 
 ### 9.1 Against real market data: 12 months of ETH/USDC
 
-The same comparison, but driven by **real Binance ETHUSDC 4h closes** (2025-07-19 → 2026-07-19,
-2,190 candles) instead of a synthetic path. Over this window ETH went **$3,554 → $1,868** through
-several distinct regimes: a rally to a **$4,833** peak, a multi-leg bear with the February crash,
-and a June leg-down.
+The same comparison, but driven by **real Binance ETHUSDC 4h closes** (2025-09-13 → 2026-09-12,
+2,190 candles) instead of a synthetic path. Over this window ETH went **$4,759 → $2,523**, with a
+high of $4,759 and a low of $1,544, through several distinct regimes.
 
-Two things changed in this study relative to the synthetic one, both of which make it harsher and
-more informative:
+Two things make this study harsher than the synthetic one:
 
-1. **The detector is calibrated on this pair's own returns.** `k` and `h` are no longer chosen;
+1. **The detector is calibrated on this pair's own returns.** `k` and `h` are not chosen;
    `test/calibration/RealDataCalibration.t.sol` measures ARL₀ and detection delay on the real,
-   heavy-tailed return distribution of the **first half** of the series and derives `k = 0.25σ`,
-   `h = 6.25σ` — ARL₀ = 124 bars (≈20 days between false alarms), detection delay 23 bars. The
-   second half is therefore genuinely **out-of-sample**. (The configuration this study used
-   before, labelled "illustrative" in the code, measures an ARL₀ of **15 bars** — it was firing
-   every 2½ days.) Method: [`analysis/CALIBRATION.md`](analysis/CALIBRATION.md).
+   heavy-tailed return distribution of the **first half** of the series and derives `k = 0.25σ`
+   and `h = 6.00σ` from σ = 0.014443 per bar, giving ARL₀ = 120 bars (about 20 days between false
+   alarms) and a detection delay of 21 bars. The second half is therefore genuinely
+   **out-of-sample**. Method: [`analysis/CALIBRATION.md`](analysis/CALIBRATION.md).
 2. **A third pool: a symmetric vol-scaled fee at a matched friction budget.** Any spread reduces
    LVR, so beating plain `x·y=k` proves nothing on its own. The question is whether spending a
-   friction budget **directionally** beats spending it **symmetrically**.
+   friction budget **directionally** beats spending it **symmetrically**. `FEE_GAMMA` is sized so
+   the baseline costs uninformed traders the same, and the test **asserts** the match within 25%
+   so the comparison cannot quietly drift into being unfair.
 
 ![Real ETH/USDC LP value: Poincaré vs vol-fee vs constant-product](public/sim/real/real_lpvalue.png)
 
 | metric | POINCARÉ | CONTROL | VOLFEE (matched) |
 |---|---:|---:|---:|
-| Cumulative LVR | 319,186 | 326,924 | 316,236 |
-| LVR vs control | **−2.37%** | — | −3.27% |
-| Cost to uninformed flow | 3,925 | 0 | 3,100 |
-| LP value advantage | **+11,141** | — | +11,314 |
+| Cumulative LVR | 314,124 | 328,143 | 313,664 |
+| LVR vs control | −4.27% | — | **−4.41%** |
+| Cost to uninformed flow | 3,521 | 0 | 3,521 |
+| LP value advantage | **+23,706** | — | +18,184 |
+| LP value per unit of trader cost | **6.73** | — | 5.17 |
 
-**Over the full year, the directional lever does not beat the symmetric one.** The two finish
-within 1.5% of each other on LP value, and Poincaré spends ~27% more of its traders' money getting
-there. That is the number the harness produced, and we report it rather than the one the thesis
-wanted.
+**The two metrics point different ways, and both are reported.** On raw LVR reduction the
+symmetric fee edges Poincaré, 4.41% against 4.27%. On **LP value retained**, which is the ground
+truth the harness marks at fair, Poincaré leads by about 30%: +23,706 against +18,184, for an
+identical 3,521 of trader cost (matched to 0.01%). A symmetric fee collects on every block from
+everyone, and Poincaré collects only from the flow that is taking money out of LPs, which is why
+it converts a given friction budget into more retained LP value while reducing slightly less
+measured LVR.
 
-**Where the thesis does hold is exactly where it predicts it will — in trends:**
+**By half of the window:**
 
 | half of the window | POINCARÉ vs control | VOLFEE vs control |
 |---|---:|---:|
-| H1 — the 2025 rally, chop-heavy (calibration sample) | −1.30% | −3.26% |
-| **H2 — the February crash and June leg-down (out-of-sample)** | **−4.09%** | −3.28% |
+| H1, the calibration sample | −4.55% | −4.56% |
+| **H2, out-of-sample** | −3.73% | **−4.11%** |
 
-In the trending half the detector-gated lever wins; in chop it is dead weight while an always-on
-fee keeps collecting. A full year of ETH/USDC contains enough chop to wash the two out. The
-synthetic stress path in §9 (-22.9% mean over 5 seeds) is trend-dense by construction, which is
-precisely why it flatters the design — this run is the honest counterweight to it.
+On LVR the baseline holds its edge out-of-sample too, which is a change from the previous window
+and is reported as such. The synthetic stress path in §9 (−22.9% mean over 5 seeds) is trend-dense
+by construction, which is precisely why it flatters the design, and this run remains the honest
+counterweight to it.
 
-Two things do survive everywhere. **LVR ≤ control throughout** (asserted in the test): leaning
+Two things survive everywhere. **LVR ≤ control throughout** (asserted in the test), so leaning
 against detected trends never costs LPs more than doing nothing. And the qualitative property no
-LVR number captures — flow trading *against* the drift, and all flow in calm markets, pays
+LVR aggregate captures: flow trading *against* the drift, and all flow in calm markets, pays
 **nothing**, ever, while a symmetric fee taxes it on every block.
 
-One caveat materially favours Poincaré and is not yet modelled: the harness forces the same
+One caveat materially favours Poincaré and is still not modelled: the harness forces the same
 uninformed order through every pool, so a benign trader pushing with the trend pays the full `κ`.
 In reality they would route elsewhere (§8) and never pay it, so Poincaré's measured cost to benign
-flow is an overstatement. A routing-aware flow model is the next refinement and the change most
-likely to move this result. Full methodology, per-half breakdown and caveats:
+flow is an overstatement, and the LP-value-per-unit-cost figure above is therefore a floor rather
+than a ceiling. A routing-aware flow model is the next refinement and the change most likely to
+move this result. Full methodology, per-half breakdown and caveats:
 [`analysis/simulation/SIMULATION.md`](analysis/simulation/SIMULATION.md). Reproduce:
 `python analysis/simulation/fetch_realdata.py` →
 `FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol` →
@@ -502,7 +515,7 @@ model is unavailable, with the UI labelling which one is showing.
 > **Status:** the MVP described above is **built and green**, 131 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
-> regression test per finding from the **Olympix BugPoCer pre-audit scan**, all fixed). The
+> regression test per finding from the **Olympix security review**, all fixed). The
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
@@ -513,12 +526,13 @@ web app (`frontend/`) that trades, provides liquidity, charts the detector's rea
 `DetectorSample` trace block by block, and ships the **Detector Lab** (§9.3). Addresses of
 record: `deployments/unichain-sepolia.json`.
 
-**Pre-audit:** the contracts were scanned by **Olympix BugPoCer** before deployment. Every
-reported finding was fixed and each has a regression test that fails on the pre-fix code and
-passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain cases in
-`PriceLib.t.sol`). An external human audit is still required before mainnet (item 5 below).
+**Security review:** the contracts were reviewed by **Olympix** under the **Uniswap Foundation
+Security Fund**. Every reported finding was fixed and each has a regression test that fails on
+the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain
+cases in `PriceLib.t.sol`). Full finding table in [§11](#11-security-review). An independent
+external audit is still required before mainnet (item 5 below).
 
-**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix pre-audit fixes with their regression suite; the **Detector Lab** (§9.3) with its wei-exact off-chain port of the detector libraries and the AI regime narration behind it; and the full Foundry suite.
+**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; the **Detector Lab** (§9.3) with its wei-exact off-chain port of the detector libraries and the AI regime narration behind it; and the full Foundry suite.
 
 **Next, to production:**
 
@@ -530,28 +544,56 @@ passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain cases i
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
 
-## 11. Partner integrations
+## 11. Security review
 
-**None.** Poincaré was built for **UHI10** and integrates no hookathon partner technology, and
-that is a design constraint rather than an omission: the detector is built to work with **no
-oracle, no AVS, no keeper, no relayer and no cross-chain dependency**. Its only input is the pool's own
-reserve-implied price, sampled once per block inside `beforeSwap` (§10 scope guardrails).
-Adding an external price feed would reintroduce exactly the trust and latency assumptions the
-quickest-change detector exists to avoid.
+Poincaré was selected by the **Uniswap Foundation Security Fund**, which sponsored a security
+review by **Olympix**. The review ran across the full contract surface (58 source units) and
+reports only what it can demonstrate: each finding arrives as a runnable Foundry proof of
+concept rather than a pattern match.
+
+**Nine findings, zero high-severity, all fixed.** Seven fixes cover the nine, because two pairs
+shared a root cause. Every fix ships with a regression test that fails on the pre-fix code and
+passes now, in `test/regression/OlympixFindings.t.sol` plus the log-domain cases in
+`PriceLib.t.sol`.
+
+| Severity | Finding | Fix |
+|---|---|---|
+| Medium | A native-ETH payout recipient could reenter a swap mid-withdrawal and price against half-settled reserves | Transient `_liquidityLock` held across the whole add/remove including settlement; `_beforeSwap` reverts while it is set |
+| Medium | LP shares were priced off token0 while the token1 counterpart floored down, minting claims token1 never backed | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected |
+| Low | The Lens returned a quote for a zero amount that a real swap reverts on | The Lens mirrors the PoolManager's `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful |
+| Low ×2 | An extreme move could push `lnWad` outside its domain, letting the detector revert a swap and violating the never-revert rule (§4.5) | The ratio is clamped into the safe domain, and a mid that floors to zero skips the sample instead of reverting |
+| Low ×2 | The docs claimed full donation resistance, but ERC-6909 claims are transferable, so a claim donation can move `_reserves()` | Claim corrected; the residual is bounded, because donated claims accrue pro-rata to all LPs and the donor forfeits them. Recorded in [`SECURITY.md`](./SECURITY.md) |
+| Low | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio, opening an arb seam | Seeds where either offset rounds to zero are rejected |
+| Low | Exact-out routing could dodge part of the directional spread, because marking up the input undercharges on a convex curve | Exact-out reimplemented as the exact inverse of the exact-in haircut |
+
+Finding, fix and test are mapped one to one in [`SECURITY.md`](./SECURITY.md) and tracked in
+[`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §H.
+
+**What this does not mean.** A sponsored review is not a full external human audit, and we do not
+present it as one. An independent audit remains required before mainnet, and stays open as item
+A9 in the tracker.
+
+---
+
+## 12. External dependencies
+
+**None that carry trust.** The detector works with no oracle, no AVS, no keeper, no relayer and
+no cross-chain dependency. Its only input is the pool's own reserve-implied price, sampled once
+per block inside `beforeSwap`. Adding an external price feed would reintroduce exactly the trust
+and latency assumptions a quickest-change detector exists to avoid, so the absence is the design
+rather than a gap in it.
 
 What it does build on is standard, public infrastructure. The repository was scaffolded from
 Uniswap's official [`v4-template`](https://github.com/Uniswap/v4-template), and the contracts
 depend on Uniswap v4 (`v4-core`, `v4-periphery`), OpenZeppelin's `uniswap-hooks`
-`BaseCustomCurve` for settlement, `hookmate` for router/address constants, and Solady for
-fixed-point math. Everything specific to Poincaré — `Cusum`, `DirectionalSignal`, `ControlLaw`,
-`AsymmetricCurve`, `PriceLib`, `PoincareHook` and `PoincareLens` — is written from scratch.
-
-The contracts were scanned pre-deployment by **Olympix** (automated pre-audit); every finding
-was fixed and each carries a regression test (see [`SECURITY.md`](./SECURITY.md)).
+`BaseCustomCurve` for settlement, `hookmate` for router and address constants, and Solady for
+fixed-point math. Everything specific to Poincaré, meaning `Cusum`, `DirectionalSignal`,
+`ControlLaw`, `AsymmetricCurve`, `PriceLib`, `PoincareHook` and `PoincareLens`, is written from
+scratch.
 
 ---
 
-## 12. License
+## 13. License
 
 Poincare is licensed under the **Business Source License 1.1** (`BUSL-1.1`) — see [LICENSE](./LICENSE).
 Production/commercial use of the hook, detector, curve, or any derivative requires a commercial

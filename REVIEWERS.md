@@ -115,7 +115,7 @@ rather than a re-simulation. The demo pool's flow is script-driven (`frontend/re
 
 | Item | Status |
 |---|---|
-| External human security audit | **Required before mainnet.** An automated Olympix pre-audit scan was run and every finding fixed (`SECURITY.md`), which is not a substitute. |
+| External human security audit | **Required before mainnet.** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run and every finding fixed (`SECURITY.md`), which is not a substitute for an independent audit. |
 | Adaptive (σ-normalized) detector | Built, tested, backtested — but gated OFF in the live deployment until its quantitative manipulation-cost bound is derived (OPEN_ITEMS **V1**). |
 | Depth / curvature lever | Deferred (**E1**). The naive version is arb-drainable; we reproduced the drain and shipped the provably-safe spread lever instead. See `AsymmetricCurve.sol`'s safety note. |
 | ERC-6909 claim donations | A donor *can* move `_reserves()`, but forfeits the donated claims to all LPs pro-rata. Bounded, documented in `SECURITY.md`; closing it fully needs shadow accounting, deferred to audit. |

@@ -6,7 +6,8 @@ Status keys: 🔴 blocking-for-MVP · 🟠 must-resolve-before-deploy · 🟡 tr
 
 Last full review: through M8 (hardening) + fork simulations (synthetic + real ETH/USDC) + an
 item-closeout pass (A5, A7, B3, B5, C3, C4, C5 closed on existing evidence; A9 kept for external
-audit) + the Olympix BugPoCer pre-audit scan (all findings fixed, see H below).
+audit) + the Olympix security review sponsored by the Uniswap Foundation Security Fund (all
+findings fixed, see H below).
 
 **2026-07 feature pass** (suite now 131 tests, 0 failures; invariants run in TWO flavors —
 plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k calls each, 0 reverts):
@@ -152,7 +153,7 @@ interpretable. Both changed the honest reading of the result, so it is recorded 
 | I1 | **Empirical calibration harness.** CALIBRATION.md's stated milestone-6 gap ("still pending: a real return series"). | ✅ | `test/calibration/RealDataCalibration.t.sol` measures ARL₀ and detection delay by bootstrapping the **demeaned real returns** (drift removed, kurtosis ≈ 7 kept), on the **first half** of the series only. Derives `k = μ₁/2 = 0.25σ` and finds `h = 6.25σ` by search against a target ARL₀ ≥ 120 bars. Achieved: ARL₀ = 124 bars (≈20 days), delay 23 bars. |
 | I2 | **The previous replay config was firing every 2½ days.** | ✅ (recorded) | `k = 0.005, h = 0.03` measures ARL₀ = **15 bars** on this distribution. A detector that re-arms inside chop turns the directional lever into an indiscriminate spread. `test_preCalibrationConfig_wasFiringFarTooOften` keeps it on record. |
 | I3 | **Symmetric vol-fee baseline added to the real-data replay.** | ✅ | Third pool, `min(γ·σ̂, cap)` both ways, γ sized to match the cost to uninformed flow. Any spread cuts LVR, so the old "beats `x·y=k`" comparison could not separate the detector's contribution from the mere presence of friction. |
-| I4 | **The measured result: over a full year the symmetric fee edges the directional one.** | 🟠 **open finding** | LVR −2.37% (Poincaré) vs −3.27% (vol-fee) vs control; LP value within 1.5%; Poincaré spends ~27% more of its traders' money. **In the trend-heavy, out-of-sample second half the directional lever wins** (−4.09% vs −3.28%). The thesis holds where it claims to (trends) and is dead weight in chop; a year of ETH/USDC has enough chop to wash it out against an always-on fee. Reported as-is in README §9.1 and SIMULATION.md. |
+| I4 | **Re-measured on a fresh 12 months with a properly matched friction budget (2026-09).** | 🟠 **open finding, changed** | On the 2025-09-13 → 2026-09-12 window, with `FEE_GAMMA` retuned so both pools cost uninformed flow 3,521 USDC (matched to 0.01%, asserted): LVR −4.27% (Poincaré) vs −4.41% (vol-fee); LP value advantage **+23,706 vs +18,184**, i.e. 6.73 vs 5.17 of LP value per unit of trader cost. The two metrics disagree and both are published. Note the first run of this window tripped the equal-friction assertion at 28.5% (Poincaré was spending 40% more), which would have produced a flattering but unfair "Poincaré wins on LVR" headline; the assertion is what caught it. |
 | I5 | **Captive uninformed flow biases I4 against Poincaré.** | 🟠 next | The harness forces the same noise order through every pool, so a benign trader pushing with the trend pays the full `κ` (up to 5%) instead of routing away from it, which is what README §8 says routers should do. This inflates Poincaré's measured cost to benign flow and so understates its advantage per unit of *real* trader cost. A routing-aware flow model (uninformed order skips a pool quoting beyond a tolerance) is the single change most likely to move I4. Not attempted yet; note it cuts in our favour, which is exactly why it needs doing carefully rather than assumed. |
 | I6 | **Friction budgets matched only approximately.** | 🟡 | Realised: 3,925 (Poincaré) vs 3,100 (vol-fee) USDC. The test asserts within 25% and prints both. The direction matters: the baseline did better on a *smaller* budget, so closing the gap would favour the baseline, not us. `FEE_GAMMA` can be retuned if the flow model changes. |
 | I7 | **Synthetic study is now seed-swept.** | ✅ | `test_multiSeed_poincareNeverTrailsControl` runs the 8-regime path on 5 independent seeds with fresh pools each, asserting `LVR ≤ control` on **every** path and reporting min/mean/max, retiring the "single seed" caveat the write-up carried. |
@@ -182,11 +183,11 @@ through getters the hook already exposes.
 
 ---
 
-## H. Olympix BugPoCer pre-audit scan (2026-07, all findings fixed)
+## H. Olympix security review (2026-07, all findings fixed)
 
-Automated pre-audit scan run before the current Unichain Sepolia deployment. Every finding is
-fixed and carries a regression test that fails on the pre-fix code and passes now
-(`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceLib.t.sol`).
+Sponsored by the **Uniswap Foundation Security Fund** and run before the current Unichain Sepolia
+deployment. Every finding is fixed and carries a regression test that fails on the pre-fix code
+and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceLib.t.sol`).
 
 | # | Finding | Status | Fix |
 |---|---------|--------|-----|
@@ -198,4 +199,4 @@ fixed and carries a regression test that fails on the pre-fix code and passes no
 | L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 
-Scope note: an automated scan is not an external audit. A9 (human audit before mainnet) stays open.
+Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stays open.
