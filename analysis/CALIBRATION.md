@@ -158,16 +158,20 @@ so the *measurement* is authoritative and Siegmund is only a sanity check.
 
 | Parameter | Value | Where it comes from |
 |---|---|---|
-| σ (calibration half) | 0.013677 per 4h bar | measured |
+| σ (calibration half) | 0.014443 per 4h bar | measured |
 | μ₁ (smallest drift worth leaning against) | 0.5 σ | read off the data: the strongest sustained 30-bar drifts in the window run 0.5–0.75 σ/bar |
-| `k` | 0.25 σ = 0.003419 | the classic `k = μ₁/2` |
-| `h` | 6.25 σ = 0.085483 | **search**: the smallest `h` on a σ/4 grid whose *measured* ARL₀ ≥ 120 bars |
+| `k` | 0.25 σ = 0.003611 | the classic `k = μ₁/2` |
+| `h` | 6.00 σ = 0.086657 | **search**: the smallest `h` on a σ/4 grid whose *measured* ARL₀ ≥ 120 bars |
 | `sMax` | 2 h | κ saturates at twice the detection threshold |
 | `κ_min`, `κ_max`, `Δκ_max` | 0, 0.05, 0.015 | security/seam parameters — **not** calibrated from data, by design |
 
-**The achieved operating point.** At that `(k, h)` the harness measures **ARL₀ = 124 bars** (≈20
-days between false alarms at 6 bars/day) and a **detection delay of 23 bars** at the design drift,
+**The achieved operating point.** At that `(k, h)` the harness measures **ARL₀ = 120 bars** (≈20
+days between false alarms at 6 bars/day) and a **detection delay of 21 bars** at the design drift,
 so true detections dominate false alarms by ~5×.
+
+These figures are re-derived on the window in use. They were last measured on the
+2025-09-13 → 2026-09-12 ETH/USDC series; a different window gives a different σ and therefore
+different absolute `k` and `h`, which is the point of deriving them rather than fixing them.
 
 **Why the target is 120 bars.** A real trend episode in this window lasts ~30–60 bars. False
 alarms must be rarer than that by a clear margin, or the detector re-arms inside chop and the

@@ -138,9 +138,8 @@ FOUNDRY_PROFILE=sim forge test --match-path test/sim/ForkRealData.t.sol -vv
 python analysis/simulation/plot_realdata.py          # -> public/sim/real/
 ```
 
-**Window:** 2025-07-19 → 2026-07-19, 2,190 candles. ETH went **$3,554 → $1,868** through several
-distinct regimes: a rally to a **$4,833** peak, a multi-leg bear with the February crash, and a
-June leg-down.
+**Window:** 2025-09-13 → 2026-09-12, 2,190 candles. ETH went **$4,759 → $2,523**, with a high of
+**$4,759** and a low of **$1,544**, through several distinct regimes.
 
 ### The three pools
 
@@ -160,47 +159,56 @@ friction. The question worth answering is whether spending a friction budget **d
 
 `k` and `h` are no longer hand-set. `test/calibration/RealDataCalibration.t.sol` measures ARL₀ and
 detection delay on the real, heavy-tailed returns of the **first half** of this series and derives
-`k = 0.25σ`, `h = 6.25σ` (measured ARL₀ = 124 bars ≈ 20 days, detection delay 23 bars). The second
+`k = 0.25σ`, `h = 6.00σ` from σ = 0.014443/bar (measured ARL₀ = 120 bars ≈ 20 days, detection
+delay 21 bars). The second
 half is therefore **out-of-sample**, and reported separately below. Method and justification:
 [`analysis/CALIBRATION.md`](../CALIBRATION.md).
 
 For reference, the configuration this study used before calibration (`k = 0.005, h = 0.03`,
-labelled "illustrative, not optimised" in the code) measures an **ARL₀ of 15 bars** on this
-distribution — a false alarm every 2½ days.
+labelled "illustrative, not optimised" in the code) measures an **ARL₀ of 16 bars** on this
+distribution, which is a false alarm every 2½ days.
 
 ### Results
 
 | metric | POINCARÉ | CONTROL | VOLFEE | |
 |---|---:|---:|---:|---|
-| Cumulative LVR (USDC) | 319,186 | 326,924 | 316,236 | lower is better |
-| LVR vs control | **−2.37%** | — | **−3.27%** | |
-| Cost to uninformed flow (USDC) | 3,925 | 0 | 3,100 | the friction budget |
-| LP value advantage vs control (USDC) | **+11,141** | — | **+11,314** | ground truth |
+| Cumulative LVR (USDC) | 314,124 | 328,143 | 313,664 | lower is better |
+| LVR vs control | −4.27% | — | **−4.41%** | |
+| Cost to uninformed flow (USDC) | 3,521 | 0 | 3,521 | matched to 0.01% |
+| LP value advantage vs control (USDC) | **+23,706** | — | +18,184 | ground truth |
+| LP value per USDC of trader cost | **6.73** | — | 5.17 | |
 
 ![Real ETH/USDC LP value](../../public/sim/real/real_lpvalue.png)
 
-**Read this honestly: over the full year, the directional lever does not beat the symmetric one.**
-The two finish within 1.5% of each other on LP value, and Poincaré gets there while costing
-uninformed traders ~27% *more* — so per unit of trader cost the plain symmetric fee is ahead on
-this window (2.84 vs 3.65 USDC of LP value per USDC of trader cost). We are reporting the number
-the harness produced, not the one the thesis wanted.
+**Read this honestly: the two headline metrics disagree, and both are reported.** On raw LVR
+reduction the symmetric fee edges Poincaré, 4.41% against 4.27%. On LP value retained, which is the
+ground truth the harness marks at fair, Poincaré leads by about 30%, at an identical trader cost of
+3,521 USDC matched to within 0.01%. A symmetric fee collects on every block from everyone, while
+Poincaré collects only from the flow that is taking money out of LPs, which is why it converts the
+same friction budget into more retained LP value while reducing slightly less measured LVR.
 
-### Where it does hold: the trending half
+Note how this number was reached. The first run of this window tripped the equal-friction
+assertion at 28.5%: Poincaré was spending 40% more of its traders' money than the baseline, which
+would have produced a flattering and unfair "Poincaré wins on LVR" headline. `FEE_GAMMA` was
+retuned and the study re-run. The assertion is what caught it.
 
-Splitting the window at the calibration boundary separates the two regimes cleanly. The first half
-is the 2025 rally — choppy, few clean sustained moves. The second half carries the February crash
-and the June leg-down, and is also the **out-of-sample** half.
+### Split by half
+
+Splitting the window at the calibration boundary keeps the out-of-sample half separable.
 
 | half | POINCARÉ | CONTROL | VOLFEE | POINCARÉ vs control | VOLFEE vs control |
 |---|---:|---:|---:|---:|---:|
-| H1 (calibration sample, chop-heavy) | 199,109 | 201,722 | 195,138 | −1.30% | −3.26% |
-| **H2 (out-of-sample, trend-heavy)** | 120,077 | 125,203 | 121,098 | **−4.09%** | −3.28% |
+| H1 (calibration sample) | 208,843 | 218,787 | 208,804 | −4.55% | −4.56% |
+| **H2 (out-of-sample)** | 105,281 | 109,356 | 104,860 | −3.73% | **−4.11%** |
 
-So the mechanism behaves exactly as the thesis predicts — it earns its keep **when there are real
-trends to lean against**, and it is dead weight in chop — but a full year of ETH/USDC contains
-enough chop that the annual average washes out against an always-on fee. The synthetic stress path
-above (−29.7%) is trend-dense by construction, which is why it flatters the design; this is the
-honest counterweight to it.
+On the LVR metric the baseline holds a narrow edge in both halves on this window, which is a
+change from the previous one, where Poincaré won the trending half clearly. Reported as measured.
+The synthetic stress path above (−29.7%) is trend-dense by construction, which is why it flatters
+the design, and this remains the honest counterweight to it.
+
+What does not change is where the two mechanisms differ qualitatively. Poincaré charges only
+with-trend flow while a trend is confirmed, so counter-trend flow and all flow in calm markets pay
+**nothing**, and that is what the LP-value-per-unit-of-trader-cost column above is measuring.
 
 The floor claim survives everywhere and is asserted in the test: **LVR ≤ control throughout**.
 Leaning against detected trends never costs LPs more than doing nothing.
@@ -213,11 +221,10 @@ Leaning against detected trends never costs LPs more than doing nothing.
   pay it. This materially overstates Poincaré's cost to benign flow, and therefore understates its
   advantage per unit of real trader cost. A routing-aware flow model is the obvious next
   refinement, and it is the single change most likely to move this result.
-- **The friction budgets did not match exactly.** `FEE_GAMMA` was pre-computed to equalise them;
-  realised, the vol-fee pool spent 3,100 against Poincaré's 3,925. The test asserts they land
-  within 25% and reports both, so the gap is visible rather than assumed. Note the direction: the
-  baseline achieved more LVR reduction with a *smaller* budget, so correcting the mismatch would
-  favour the baseline further, not Poincaré.
+- **The friction budgets now match.** `FEE_GAMMA` is sized so the vol-fee pool spends 3,521
+  against Poincaré's 3,521, a gap of 0.01%. The test asserts they land within 25% and reports
+  both, so a future window that drifts out of match fails loudly rather than quietly producing an
+  unfair comparison.
 - **One pair, one year, one seed of noise flow.** The synthetic study is seed-swept
   (`test_multiSeed_poincareNeverTrailsControl`); this one is not — it is a single historical path,
   which is the point, but it is still n=1 as evidence about markets in general.

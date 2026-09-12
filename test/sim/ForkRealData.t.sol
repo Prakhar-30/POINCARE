@@ -49,13 +49,13 @@ contract ForkRealDataTest is Test {
     // test/calibration/RealDataCalibration.t.sol, which measures ARL0 and detection delay on
     // the real (heavy-tailed) returns of the FIRST HALF of this series only - so the second
     // half is out-of-sample for these numbers. See analysis/CALIBRATION.md.
-    //   sigma (calibration half)  = 0.013677 per 4h bar
+    //   sigma (calibration half)  = 0.014443 per 4h bar
     //   k = mu1/2 = 0.25 sigma     (mu1 = 0.5 sigma, the smallest drift worth leaning against)
-    //   h = 6.25 sigma             (the smallest h whose measured ARL0 >= 120 bars ~ 20 days)
+    //   h = 6.00 sigma             (the smallest h whose measured ARL0 >= 120 bars ~ 20 days)
     //   measured at that h: ARL0 = 124 bars, detection delay at mu1 = 23 bars
-    int256 constant K = 3419317141238437; //      0.25 sigma
-    int256 constant H = 85482928530960943; //     6.25 sigma  (ARL0 = 124 bars)
-    int256 constant S_MAX = 170965857061921886; // 2h: kappa saturates at twice the threshold
+    int256 constant K = 3610706429159388; //      0.25 sigma
+    int256 constant H = 86656954299825324; //     6.00 sigma  (ARL0 = 120 bars)
+    int256 constant S_MAX = 173313908599650648; // 2h: kappa saturates at twice the threshold
     uint256 constant KAPPA_MIN = 0;
     uint256 constant KAPPA_MAX = 5e16; // 5% - a security cap, NOT calibrated from data
     uint256 constant D_MAX = 15e15; // 1.5%/block
@@ -66,7 +66,7 @@ contract ForkRealDataTest is Test {
     // FEE_GAMMA is chosen so this pool's cost to uninformed flow matches POINCARE's over the
     // window (the equal-friction-budget condition); the run reports both realized costs so the
     // match can be checked rather than trusted.
-    uint256 constant FEE_GAMMA = 315e14; // 0.0315 -> ~2.8bp at this pair's realized vol
+    uint256 constant FEE_GAMMA = 441e14; // 0.0441 -> sized so the baseline's cost to uninformed flow matches Poincare's
     uint256 constant FEE_CAP = 1e17;
 
     IPoolManager pm;
