@@ -5,13 +5,14 @@ import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
-export type Tab = "dashboard" | "trade" | "pool" | "analytics";
+export type Tab = "dashboard" | "trade" | "pool" | "analytics" | "lab";
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "trade", label: "Trade", icon: "swap" },
   { id: "pool", label: "Pool", icon: "pool" },
   { id: "analytics", label: "Analytics", icon: "analytics" },
+  { id: "lab", label: "Lab", icon: "target" },
 ];
 
 export function TopNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {

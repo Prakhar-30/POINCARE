@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { usePoolState } from "@/hooks/usePoolState";
 import { useDetectorConfig } from "@/hooks/useDetectorConfig";
 import { useDetectorSeries } from "@/hooks/useDetectorSeries";
@@ -7,6 +8,9 @@ import { Icon } from "@/components/ui/Icon";
 import { Gauge } from "@/components/ui/Gauge";
 import { EvidenceChart } from "@/components/ui/EvidenceChart";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
+import { AiNote } from "@/components/ui/AiNote";
+import { useExplain } from "@/hooks/useExplain";
+import { fallbackRegime, regimeFactsOf } from "@/lib/narrate";
 
 function regimeOf(trend: string) {
   if (trend === "up") return { label: "Up-trend", color: "var(--up)", ring: "rgba(107,184,154,.15)" };
@@ -21,6 +25,20 @@ export function Analytics() {
   const users = useWalletTotals().data;
   const series = useDetectorSeries();
   const regime = regimeOf(s.trend);
+
+  // Narrate the current regime, keyed on the latest sampled block: the reading
+  // only changes when the detector takes a new sample, so that is exactly how
+  // often it is worth asking (and what the server caches under).
+  const facts = useMemo(() => regimeFactsOf(series.points, cfg), [series.points, cfg]);
+  const narration = useExplain({
+    kind: "regime",
+    cacheKey: facts ? String(series.points[series.points.length - 1]?.block_number ?? "") : null,
+    facts,
+    fallback: facts
+      ? fallbackRegime(facts)
+      : "Waiting for the first detector samples — one is recorded per traded block.",
+    auto: true,
+  });
   const kappaMax = cfg.kappaMax || 0.1;
   const narrow = useIsNarrow();
 
@@ -61,6 +79,10 @@ export function Analytics() {
               and never on a fixed block count.
             </p>
           </div>
+        </div>
+
+        <div className="px-4 sm:px-6 pb-5">
+          <AiNote explained={narration} />
         </div>
       </div>
 
