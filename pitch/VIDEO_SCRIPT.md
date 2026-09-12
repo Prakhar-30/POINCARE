@@ -1,235 +1,143 @@
-# Poincaré — 5-minute demo video script
+# Poincaré · demo video speaker notes
 
-Spoken content is **696 words**. At 160 wpm — a normal pitch pace, not rushed — that is
-**4:21**, landing around **4:35** once you add a beat on each slide change and the cuts in and
-out of the demo. At a slower 150 wpm it is 4:38 spoken, ~4:52 total, which is uncomfortably
-close to the cap.
-
-**So: do one timed read-through before you record.** If you land past 4:50, apply trim #1 at the
-bottom of this file — it takes ~9s out and costs you nothing.
-
-Judging rules require a human voice, so every word below is for you to read aloud.
-
-Deck: `pitch/poincare-uhi10-deck.html` — arrow keys to advance, **or type a slide number to
-jump**. You need the jump: the video skips slides 6, 11 and 12.
-
----
+**Deck:** `pitch/poincare-deck.html` (arrow keys, or type a slide number to jump).
+**Length:** 510 spoken words, which is 3:24 at 150 wpm and lands around **3:35** once you add
+slide changes and the cuts in and out of the demo.
+**Record at 720p or higher. Under 2:00 or over 4:00 is auto-rejected on upload.**
 
 ## Running order
 
 | Time | Segment | Slides |
 |---|---|---|
-| 0:00 – 1:54 | Presentation, part 1 | 1 → 2 → 3 → 4 → 5 → **press 7** |
-| 1:54 – 3:15 | Live demo (screen capture) | — |
-| 3:15 – 4:40 | Presentation, part 2 | **press 8** → 9 → 10 → **press 13** |
+| 0:00 – 1:15 | Presentation, part 1 | 1 → 2 → 3 → 4 |
+| 1:15 – 2:50 | Live demo (screen capture) | — |
+| 2:50 – 3:45 | Presentation, part 2 | 5 → 6 → 7 |
 
-**Skipped on camera:** slide 6 (the demo covers it), 11 (folded into slide 5), 12 (folded into
-the close). They stay in the deck for judges who read it rather than watch.
-
----
-
-# PART 1 — PRESENTATION (0:00 – 1:54)
-
-### Slide 1 · Title — 0:00–0:15
-
-> Hi, I'm Prakhar. This is Poincaré — a Uniswap v4 hook that watches its own price, works out
-> when a trend is *actually* real, and leans its curve against it.
->
-> No oracle. No keeper. Nothing to bribe.
+No slides are skipped. Advance in order.
 
 ---
 
-### Slide 2 · The problem — 0:15–0:41
+# PART 1 · PRESENTATION (0:00 – 1:15)
 
-> LPs don't lose money because markets are volatile. They lose it because markets have
-> *direction*.
+### Slide 1 · Title
+
+> Hi, I'm Prakhar. Poincaré is a Uniswap v4 hook that watches its own price, works out when a
+> trend is genuinely real, and leans its curve against it.
 >
-> These two paths take identical step sizes — only the order of the signs differs. The one
-> that chops ends where it started and barely leaks. The one that trends is arbitraged the
-> whole way.
+> No oracle, no keeper, nothing to bribe.
+
+### Slide 2 · The problem
+
+> LPs don't lose money because markets are volatile. They lose it because markets have direction.
 >
-> That's loss-versus-rebalancing. And the fee isn't in that equation — which is the lever
-> most hooks pull.
+> Identical steps here, only the signs reordered. The one that chops ends where it started. The
+> one that trends gets arbitraged the whole way.
+>
+> That's loss-versus-rebalancing, and the fee isn't in that equation, which is the lever almost
+> every other hook pulls.
+
+### Slide 3 · The engine
+
+> So the real question is: has a genuine trend started?
+>
+> Statisticians solved that in 1954. It's called quickest change detection, and the answer is the
+> CUSUM statistic. It accumulates evidence every block and fires when that evidence crosses a
+> threshold.
+>
+> The firing moment depends on the data, so there's no block count for an attacker to precompute.
+
+### Slide 4 · The Detector Lab
+
+> Those parameters decide what counts as a trend, so don't take my calibration on trust. This
+> cycle I built the Detector Lab.
+>
+> It replays the pool's own recorded history under any parameters you choose, against the deployed
+> configuration as a control. Replaying the live parameters reproduces the chain to the wei.
+>
+> Let's look.
 
 ---
 
-### Slide 3 · The engine — 0:41–1:16
+# PART 2 · LIVE DEMO (1:15 – 2:50)
 
-> So the real question is: *has a genuine trend started?*
->
-> Statisticians solved that in 1954. It's called quickest change detection, and the answer is
-> CUSUM. It accumulates evidence every block and fires when that evidence crosses a threshold.
->
-> Watch it. Noise never gets there. A real trend crosses fast — then it resets and has to earn
-> the next one.
->
-> And it's Lorden-optimal: provably the best trade-off between reacting fast and being fooled.
-> We scanned all 562 hooks in the UHI directory. Zero use change-point detection.
+Screen capture of **poincare-beta.vercel.app** on Unichain Sepolia. Edit out any waiting.
 
-*Your Original Idea slide — 30% of the score. Don't rush it. Let the chart finish growing
-before you start.*
+### Dashboard, then Analytics
+
+*(Open the app. Land on Dashboard, move to Analytics.)*
+
+> A real pool on Unichain Sepolia, every number read straight from the contract.
+>
+> These two lines are the CUSUM statistics, accumulating evidence against the threshold.
+> Directional efficiency is the gate that separates a real march from a thrash.
+>
+> And this panel reads the state back in plain English.
+
+### Trade
+
+*(Go to Trade. Show a quote in one direction, then flip the direction.)*
+
+> This is who pays. When a trend is confirmed, flow pushing with it is charged a spread, and that
+> spread goes to the LPs it would otherwise have been taken from.
+>
+> Flow trading against the trend pays nothing, quoted at the plain base price.
+
+### The Detector Lab
+
+*(Go to the Lab. Point at the parity badge. Drag the threshold slider. Then the directional gate.
+Then press explain.)*
+
+> And this is the Lab. That badge is the point: this replay reproduces the chain exactly.
+>
+> Watch when I lower the firing threshold. The candidate pulls away, fires far more often, and the
+> time spent leaning jumps. That's a detector reacting to noise.
+>
+> Drop the directional gate to zero and the duty cycle explodes, because nothing is filtering chop.
+>
+> You don't have to believe my calibration. You can move the slider.
 
 ---
 
-### Slide 4 · The design — 1:16–1:32
+# PART 3 · PRESENTATION (2:50 – 3:45)
 
-> Three parts. A CUSUM brain that samples once per block from *pre-swap* reserves, so a flash
-> loan that unwinds inside a block is invisible to it. A curve that acts. And a fee built from
-> the pool's own realised volatility — every parameter calibrated, never hard-coded.
+### Slide 5 · The honest test
+
+> Does it work? Any spread lowers LVR, so beating constant product proves nothing. So I built the
+> baseline most likely to beat me: a symmetric vol-scaled fee costing traders exactly the same,
+> over twelve months of real ETH/USDC.
+>
+> On raw LVR it edges me, and I'm showing you that. But on LP value retained, Poincaré keeps thirty
+> percent more for the same trader cost, because it only charges the flow taking money out.
+
+### Slide 6 · Security
+
+> Poincaré was selected by the Uniswap Foundation Security Fund, which sponsored a review by
+> Olympix. Nine findings, none high severity, all fixed, each with a regression test that fails on
+> the old code.
+
+### Slide 7 · Close
+
+> So: a working hook, live on chain. A hundred and thirty-one Foundry tests, forty more on the
+> off-chain port, and quotes that match execution to the wei.
+>
+> The curve is the actuator. The detector is the contribution. Thank you.
 
 ---
 
-### Slide 5 · The actuator — 1:32–1:54
+## If you run long
 
-> Here's the part I'm proudest of. The obvious design is different curve *depth* per direction.
-> We built that — and found a round trip that drains the pool.
->
-> So we rewrote it as a one-sided spread on a symmetric base. Toxic flow pays. Stabilising flow
-> pays exactly the constant-product price.
->
-> So there's no prize waiting for an attacker. Faking a trend is negative-EV by construction.
+Trim in this order. Each is self-contained.
 
-*Press `7`.*
+1. **Slide 3**, drop *"The firing moment depends on the data, so there's no block count for an
+   attacker to precompute."* Saves about 7 seconds.
+2. **Slide 7**, drop the test-counts sentence, going straight from "live on chain" to "The curve
+   is the actuator." Saves about 9 seconds.
+3. **Trade section**, drop *"and that spread goes to the LPs it would otherwise have been taken
+   from."* Saves about 5 seconds.
 
----
+## Before you record
 
-### Slide 7 · Demo hand-off — 1:54–1:58
-
-> That's the idea. Here it is running on Unichain Sepolia.
-
-*Cut to screen capture.*
-
----
-
-# PART 2 — LIVE DEMO (1:54 – 3:15, about 80 seconds)
-
-## Before you hit record
-
-The detector needs a **sustained, monotonic move sampled once per block** to fire. You cannot
-produce that by hand-clicking swaps in 80 seconds. Use your own driver:
-
-```bash
-cd frontend
-PK=0x<demo-wallet-key> STEP=0.022 UP=22 DOWN=22 node trend.mjs
-```
-
-It swaps in one direction until D climbs past the 50% floor and S⁺ crosses h, then reverses.
-It prints the detector state after every swap and writes each to Supabase, so the app's charts
-move while it runs.
-
-**Start the driver 40–60 seconds before you cut to the demo.** You want to arrive on camera
-with evidence already climbing and kappa about to engage — not watching a flat line. Do a full
-dry run first and note how long it takes to fire, so you know exactly when to start it.
-
-Also have ready:
-
-- The app open at **poincare-beta.vercel.app**, wallet connected, on Unichain Sepolia.
-- Testnet ETH plus minted USDC/WETH in the demo wallet.
-- A second tab already showing the trade tape — your fallback if a swap stalls.
-
-Two things that can bite you on camera. Testnet `eth_estimateGas` mis-simulates hook calls; the
-app passes explicit gas, but a swap can still hang — if it does, **cut, don't fight it**. And
-the app charts USDC-per-WETH while the hook stores WETH/USDC, so the frontend deliberately
-inverts the trend label to match its own chart. That's correct, not a bug — worth knowing if a
-judge asks.
-
-Record the demo as its own take and edit it in. Don't attempt one continuous run.
-
-## On camera
-
-**0:00–0:10 — establish that it's real**
-> This is the live app on Unichain Sepolia. The hook for this pool is the Poincaré contract,
-> right there. Everything on screen is read from chain state.
-
-**0:10–0:32 — the detector holding fire**
-> These two lines are the CUSUM evidence, read from the hook's own DetectorSample event — one
-> sample per block.
->
-> I've got a driver pushing a sustained trend through the pool, so you can watch the evidence
-> climb. But look at kappa: still zero. It's refusing to act. It will not lean on noise.
-
-**0:32–0:48 — the commit**
-> There. Evidence crossed the threshold, the trend flips, and kappa ramps in — rate-limited,
-> so it can never snap. Nothing scheduled that. It fired when the data earned it.
-
-**0:48–1:08 — who actually pays**
-> Now watch who pays. Quote a buy — pushing *with* the trend — and I get the spread.
->
-> Quote a sell, against the trend, same block, same pool: plain constant-product price. Zero.
-> The side stabilising the pool isn't charged anything.
-
-**1:08–1:18 — close the loop**
-> That quote comes from the Lens, which prices through the same libraries as the swap path —
-> so quotes and execution agree to the wei.
-
-*Cut back to the deck. Press `8`.*
-
----
-
-# PART 3 — PRESENTATION (3:15 – 4:40)
-
-### Slide 8 · Stress results — 3:15–3:36
-
-> Back to the evidence. Two identical pools on the real v4 PoolManager — same price path, same
-> 3,842 swaps. LPs kept half a million dollars more.
->
-> And look *where*. Nothing in calm markets, which is correct. Then 83% off the flash crash,
-> where LPs bleed hardest.
-
----
-
-### Slide 9 · The honest test — 3:36–4:02
-
-> But any spread lowers LVR, so beating constant product proves nothing.
->
-> So we built the baseline most likely to beat us — a symmetric volatility fee costing traders
-> the same — over twelve months of real ETH/USDC.
->
-> Across the full year it edges us. In the out-of-sample half, the one with the February crash,
-> we win. We show you the run we lose, because that's what makes the run we win believable.
-
-*This slide is why judges should trust every other number in the deck. Say it plainly.*
-
----
-
-### Slide 10 · Security — 4:02–4:25
-
-> New since our last iteration: the **Uniswap Foundation Security Fund** sponsored a pre-audit
-> scan of the contracts by **Olympix**.
->
-> Nine findings. Zero high severity. All nine fixed — each with a regression test that fails
-> on the pre-fix code and passes now.
->
-> We also say plainly that a scan is not a human audit. That's still required before mainnet.
-
----
-
-### Slide 13 · Close — 4:25–4:40
-
-> So: a working v4 hook, 131 tests green, live on testnet with a frontend you can open right
-> now. No oracle, no keeper, no partner dependencies — the only input is the pool's own price.
->
-> The curve is the actuator. The detector is the contribution. Thanks for watching.
-
----
-
-## If you still run long
-
-Trim in this order — each keeps the argument intact:
-
-1. **Slide 4** — cut to: *"A CUSUM brain sampling once per block, a curve that acts, and a fee
-   built from real volatility."* Saves ~9s.
-2. **Demo 0:00–0:10** — drop the last sentence. Saves ~4s.
-3. **Slide 8** — drop the flash-crash line, keep the half-million. Saves ~7s.
-
-Do **not** cut slide 3 or slide 9. Slide 3 carries Original Idea (30%); slide 9 is what makes
-every other number you quote credible.
-
-## Delivery notes
-
-- Slides 2, 3, 8 and 9 animate their charts on entry (~1.5s). Land, take a beat, then talk.
-- Say "kappa", not "κ".
-- The two numbers people remember are **half a million dollars** and **nine findings, zero
-  high**. Land both cleanly.
-- The eligibility facts (valid v4 hook, public repo, tests *and* frontend, no partner
-  integrations, original code) are all on slide 13 in writing — you don't need to recite them.
+- Do one timed read-through. If you land past 3:55, apply trim 1.
+- Have the app loaded and the wallet already connected, so no connection flow is on camera.
+- Check the Lab's narration badge reads `gemini-3.6-flash`, not `computed locally`.
+- Steady pace, quiet room. The rules call out rushing and background noise specifically.
