@@ -31,6 +31,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 
+/**
+ * Namespace for every cached note this version of the function writes.
+ *
+ * The cache key is the question, so an answer written once is served forever and
+ * there is otherwise no way to invalidate one short of deleting rows by hand.
+ * Bumping this retires the whole previous generation at once. Bump it whenever
+ * the output would change for the same question: a prompt edit, a length or
+ * formatting change, a model family change.
+ *
+ * v2: raised the token ceiling after v1 answers were truncated mid-sentence by
+ * Gemini 3.x thought tokens counting against it.
+ */
+const CACHE_VERSION = "v2";
+
 /** Minimum seconds between live generations per (hook, kind). Cache hits ignore it. */
 const COOLDOWN_S = 20;
 /**
@@ -163,11 +177,13 @@ Deno.serve(async (req) => {
 
   const kind = String(body.kind ?? "");
   const hook = String(body.hook ?? "").toLowerCase();
-  const cacheKey = String(body.cacheKey ?? "").slice(0, 120);
+  // Namespaced, so bumping CACHE_VERSION retires every previously cached answer
+  // without touching the table.
+  const cacheKey = `${CACHE_VERSION}:${String(body.cacheKey ?? "").slice(0, 120)}`;
 
   if (!TASK[kind]) return json({ error: "unknown kind" }, 400);
   if (!/^0x[0-9a-f]{40}$/.test(hook)) return json({ error: "bad hook" }, 400);
-  if (!cacheKey) return json({ error: "missing cacheKey" }, 400);
+  if (!body.cacheKey) return json({ error: "missing cacheKey" }, 400);
 
   // 1. Cache: the same question always resolves here after the first asking.
   const cached = await admin
