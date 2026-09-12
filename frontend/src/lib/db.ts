@@ -206,30 +206,56 @@ export async function fetchRecentConfigs(limit = 6): Promise<SavedConfig[]> {
 
 export type Explanation = { body: string; model: string | null; cached: boolean };
 
+/** Why a narration request did not produce text. Shown as a badge tooltip. */
+export type ExplainFailure = { reason: string };
+
 /**
  * Ask the `explain` edge function to narrate a set of facts.
  *
- * Returns null on every failure path — not configured, cooling down, quota
- * exhausted, network error — because every caller has a deterministic local
- * narration to fall back to and none of them should surface an error instead.
+ * Never throws and never blocks rendering: every caller has a deterministic
+ * local narration to fall back to, so a failure returns the REASON rather than
+ * an error. Surfacing it matters — a retired model or an unset secret otherwise
+ * looks identical to "no model configured" from the UI, and the difference is
+ * only visible in the function logs.
  */
 export async function requestExplanation(
   kind: "regime" | "lab",
   cacheKey: string,
   facts: unknown,
-): Promise<Explanation | null> {
-  if (!supabaseReady) return null;
+): Promise<Explanation | ExplainFailure> {
+  if (!supabaseReady) return { reason: "backend not configured" };
   try {
     const { data, error } = await supabase.functions.invoke("explain", {
       body: { kind, hook: HOOK, cacheKey, facts },
     });
-    if (error || !data?.body) return null;
-    return { body: data.body as string, model: data.model ?? null, cached: Boolean(data.cached) };
+    if (data?.body) {
+      return { body: data.body as string, model: data.model ?? null, cached: Boolean(data.cached) };
+    }
+
+    // The function answers failures with a JSON body ("cooling down", "generation
+    // failed", "not configured"), but supabase-js turns any non-2xx into a
+    // FunctionsHttpError and leaves that body unread on the Response. Pull it out,
+    // or the UI only ever learns "Edge Function returned a non-2xx status code".
+    let reason = (data?.error as string | undefined) ?? error?.message ?? "no response";
+    const ctx = (error as { context?: Response } | null)?.context;
+    if (ctx && typeof ctx.json === "function") {
+      try {
+        const body = await ctx.json();
+        if (typeof body?.error === "string") reason = body.error;
+      } catch {
+        // Non-JSON error body; the status-derived message is the best available.
+      }
+    }
+    console.warn("requestExplanation", reason);
+    return { reason };
   } catch (e) {
-    console.warn("requestExplanation", e); // narration is optional; the caller degrades
-    return null;
+    console.warn("requestExplanation", e);
+    return { reason: e instanceof Error ? e.message : "request failed" };
   }
 }
+
+/** Narrow an explanation result to the success case. */
+export const isExplanation = (r: Explanation | ExplainFailure): r is Explanation => "body" in r;
 
 export async function fetchTape(limit = 24): Promise<SwapRow[]> {
   if (!supabaseReady) return [];

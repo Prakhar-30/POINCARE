@@ -20,7 +20,15 @@ export function AiNote({
   /** Shown as a button when narration is manual (the Lab's comparison). */
   onAsk?: () => void;
 }) {
-  const { text, source, model, cached, loading } = explained;
+  const { text, source, model, cached, loading, reason } = explained;
+
+  // "Computed locally" covers both "no model configured" and "the model was tried
+  // and failed", which look identical from the outside and are fixed very
+  // differently. When there is a reason, say so on the badge.
+  const localLabel = reason ? "computed locally · model unavailable" : "computed locally";
+  const localTitle = reason
+    ? `The model could not be reached (${reason}), so this reading is computed locally from the same on-chain numbers.`
+    : "The model was unavailable; this reading is computed locally from the same numbers";
 
   return (
     <div
@@ -52,12 +60,10 @@ export function AiNote({
               border: "1px solid var(--lav-dim)",
             }}
             title={
-              source === "model"
-                ? "Generated from the pool's on-chain detector state"
-                : "The model was unavailable; this reading is computed locally from the same numbers"
+              source === "model" ? "Generated from the pool's on-chain detector state" : localTitle
             }
           >
-            {source === "model" ? `${model ?? "model"}${cached ? " · cached" : ""}` : "computed locally"}
+            {source === "model" ? `${model ?? "model"}${cached ? " · cached" : ""}` : localLabel}
           </span>
 
           {onAsk && source !== "model" && (

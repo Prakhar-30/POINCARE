@@ -24,7 +24,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+// Overridable by the GEMINI_MODEL secret, which is the right lever when Google
+// retires a model: the secret takes effect without redeploying the function.
+// gemini-2.5-flash was retired for new projects and the API names this as its
+// replacement, so it is the default rather than the newest available model.
+const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 
 /** Minimum seconds between live generations per (hook, kind). Cache hits ignore it. */

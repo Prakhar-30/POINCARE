@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { requestExplanation } from "@/lib/db";
+import { isExplanation, requestExplanation } from "@/lib/db";
 
 export type ExplainSource = "model" | "local" | "pending";
 
@@ -9,6 +9,8 @@ export type Explained = {
   model: string | null;
   cached: boolean;
   loading: boolean;
+  /** Why the model was not used, when it was tried and failed. */
+  reason: string | null;
   /** Ask the model now. Used by the manual (`auto: false`) surfaces. */
   ask: () => void;
 };
@@ -37,11 +39,12 @@ export function useExplain(opts: {
 }): Explained {
   const { kind, cacheKey, facts, fallback, auto = false } = opts;
 
-  const [state, setState] = useState<{ text: string; model: string | null; cached: boolean }>({
-    text: "",
-    model: null,
-    cached: false,
-  });
+  const [state, setState] = useState<{
+    text: string;
+    model: string | null;
+    cached: boolean;
+    reason: string | null;
+  }>({ text: "", model: null, cached: false, reason: null });
   const [loading, setLoading] = useState(false);
 
   // The facts travel by ref so a re-render with a fresh object identity does not
@@ -59,13 +62,15 @@ export function useExplain(opts: {
       // A later key won the race; its result is the one that should land.
       if (askedFor.current !== key) return;
       setLoading(false);
-      if (res) {
-        setState({ text: res.body, model: res.model, cached: res.cached });
+      if (isExplanation(res)) {
+        setState({ text: res.body, model: res.model, cached: res.cached, reason: null });
         return;
       }
       // Failed — most often a cooldown or an exhausted free-tier budget, both of
-      // which pass. Release the guard so the button can retry; the automatic path
-      // does not re-fire on its own, since only a cacheKey change triggers it.
+      // which pass. Keep the reason so the badge can say which, and release the
+      // guard so the button can retry; the automatic path does not re-fire on its
+      // own, since only a cacheKey change triggers it.
+      setState((s) => ({ ...s, reason: res.reason }));
       askedFor.current = null;
     },
     [kind],
@@ -79,7 +84,7 @@ export function useExplain(opts: {
   // A new question invalidates the previous answer, so the stale text does not
   // sit under a changed set of numbers while the next request is in flight.
   useEffect(() => {
-    setState({ text: "", model: null, cached: false });
+    setState({ text: "", model: null, cached: false, reason: null });
   }, [cacheKey]);
 
   const ask = useCallback(() => {
@@ -91,6 +96,7 @@ export function useExplain(opts: {
     source: state.text ? "model" : loading ? "pending" : "local",
     model: state.model,
     cached: state.cached,
+    reason: state.reason,
     loading,
     ask,
   };
