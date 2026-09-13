@@ -20,6 +20,37 @@ service, which is a design constraint rather than an omission (see [§12](#12-ex
 
 ---
 
+## Where the Uniswap v4 integration lives
+
+A map for reviewers. Poincaré is a **custom-curve v4 hook**, so it replaces native `x·y=k` pricing
+rather than sitting alongside it. Line numbers are against the current `main`.
+
+| What | Where | Notes |
+|---|---|---|
+| **The hook** | [`src/PoincareHook.sol:96`](./src/PoincareHook.sol#L96) | `contract PoincareHook is BaseCustomCurve, ERC20` |
+| **Custom-curve pricing** | [`src/PoincareHook.sol:259`](./src/PoincareHook.sol#L259) | `_getUnspecifiedAmount`: prices the swap on our own invariant. This is what `beforeSwapReturnDelta` consumes |
+| **`beforeSwap` override** | [`src/PoincareHook.sol:245`](./src/PoincareHook.sol#L245) | Reentrancy guard over the inherited path |
+| **Vol fee reported to `HookSwap`** | [`src/PoincareHook.sol:290`](./src/PoincareHook.sol#L290) | `_getSwapFeeAmount` |
+| **Hook-owned liquidity** | [`src/PoincareHook.sol:223`](./src/PoincareHook.sol#L223), [`:445`](./src/PoincareHook.sol#L445), [`:497`](./src/PoincareHook.sol#L497) | `addLiquidity`, `_getAmountIn`, `_getAmountOut`; the native tick-liquidity path is reverted |
+| **Reserves as ERC-6909 claims** | [`src/PoincareHook.sol:536`](./src/PoincareHook.sol#L536) | `poolManager.balanceOf(address(this), currency.toId())`, never a tracked variable |
+| **The quoter** | [`src/PoincareLens.sol:33`](./src/PoincareLens.sol#L33) | `quoteExactInput`. Exists because the canonical Quoter cannot price a custom curve |
+| **`HookMiner` CREATE2 deploy** | [`script/DeployPoincareUnichain.s.sol:209`](./script/DeployPoincareUnichain.s.sol#L209) | Mines the salt so permission flags are encoded in the address |
+| **Detector libraries** | [`src/libraries/`](./src/libraries/) | `Cusum`, `DirectionalSignal`, `ControlLaw`, `AsymmetricCurve`, `PriceLib`. All original |
+
+**Live deployment** (Unichain Sepolia, chain 1301), against the canonical v4 `PoolManager`
+`0x00B036B58a818B1BC34d502D3fE730Db729e62AC`:
+
+| | |
+|---|---|
+| Hook | `0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88` |
+| Lens (quoter) | `0x1ca28a5de680109513ce26c861e049116a2643c2` |
+| App | https://poincare-beta.vercel.app |
+
+Developer feedback on the v4 stack, as required by the Uniswap Stack Contribution prize:
+[`FEEDBACK.md`](./FEEDBACK.md).
+
+---
+
 ## TL;DR
 
 A normal AMM is a frozen curve: it quotes the same way whether the market is drifting hard in one direction (when liquidity providers bleed value to arbitrageurs) or just chopping around harmlessly. Poincaré watches its own price, runs a **CUSUM quickest-change detector** to decide, with mathematically optimal speed, whether a *genuine* directional trend has begun, and when one has, it **bends its bonding curve asymmetrically**: it hardens the side the trend is pushing (where LPs lose money) and stays cheap and open on the stabilising side (rewarding the flow that helps).
