@@ -1,7 +1,7 @@
 # Poincaré · demo video speaker notes
 
 **Deck:** `pitch/poincare-deck.html` (arrow keys, or type a slide number to jump).
-**Length:** 510 spoken words, which is 3:24 at 150 wpm and lands around **3:35** once you add
+**Length:** 528 spoken words, which is 3:31 at 150 wpm and lands around **3:35** once you add
 slide changes and the cuts in and out of the demo.
 **Record at 720p or higher. Under 2:00 or over 4:00 is auto-rejected on upload.**
 
@@ -54,43 +54,43 @@ No slides are skipped. Advance in order.
 > It replays the pool's own recorded history under any parameters you choose, against the deployed
 > configuration as a control. Replaying the live parameters reproduces the chain to the wei.
 >
-> Let's look.
+> Let's watch it work.
 
 ---
 
 # PART 2 · LIVE DEMO (1:15 – 2:50)
 
-Screen capture of **poincare-beta.vercel.app** on Unichain Sepolia. Edit out any waiting.
+Screen capture of **poincare-beta.vercel.app** on Unichain Sepolia. The trade driver is already
+running in a terminal before you start recording (see *Before you record*). Edit out any waiting.
 
-### Dashboard, then Analytics
+### Dashboard
 
-*(Open the app. Land on Dashboard, move to Analytics.)*
+*(Cut to the app on the Dashboard. Point at the evidence chart, then the two gauges.)*
 
-> A real pool on Unichain Sepolia, every number read straight from the contract.
+> Before I started talking I kicked off a script making real swaps against this pool, one per
+> block. So this is the detector working live, every number read straight from the contract.
 >
-> These two lines are the CUSUM statistics, accumulating evidence against the threshold.
-> Directional efficiency is the gate that separates a real march from a thrash.
->
-> And this panel reads the state back in plain English.
+> These two lines are the CUSUM statistics accumulating evidence against the threshold. That gauge
+> is directional efficiency, separating a real march from a thrash. And kappa, ramping in,
+> rate-limited so it can never snap.
 
 ### Trade
 
 *(Go to Trade. Show a quote in one direction, then flip the direction.)*
 
-> This is who pays. When a trend is confirmed, flow pushing with it is charged a spread, and that
-> spread goes to the LPs it would otherwise have been taken from.
+> This is who pays. Flow pushing with the trend is charged a spread that goes back to the LPs.
 >
 > Flow trading against the trend pays nothing, quoted at the plain base price.
 
 ### The Detector Lab
 
-*(Go to the Lab. Point at the parity badge. Drag the threshold slider. Then the directional gate.
-Then press explain.)*
+*(Go to the Lab. Point at the parity badge. Drag the threshold slider. Then the directional gate.)*
 
-> And this is the Lab. That badge is the point: this replay reproduces the chain exactly.
+> And this is the Lab. That badge is the point: it's telling me this replay reproduces the chain
+> exactly, to the wei, over the blocks that script just produced.
 >
 > Watch when I lower the firing threshold. The candidate pulls away, fires far more often, and the
-> time spent leaning jumps. That's a detector reacting to noise.
+> time leaning jumps. That's a detector reacting to noise.
 >
 > Drop the directional gate to zero and the duty cycle explodes, because nothing is filtering chop.
 >
@@ -118,7 +118,7 @@ Then press explain.)*
 ### Slide 7 · Close
 
 > So: a working hook, live on chain. A hundred and thirty-one Foundry tests, forty more on the
-> off-chain port, and quotes that match execution to the wei.
+> off-chain port, quotes matching execution to the wei.
 >
 > The curve is the actuator. The detector is the contribution. Thank you.
 
@@ -132,11 +132,35 @@ Trim in this order. Each is self-contained.
    attacker to precompute."* Saves about 7 seconds.
 2. **Slide 7**, drop the test-counts sentence, going straight from "live on chain" to "The curve
    is the actuator." Saves about 9 seconds.
-3. **Trade section**, drop *"and that spread goes to the LPs it would otherwise have been taken
-   from."* Saves about 5 seconds.
+3. **Dashboard**, drop *"every number read straight from the contract"* and end that sentence at
+   "working live". Saves about 4 seconds.
 
 ## Before you record
 
+**Start the trade driver first.** From `frontend/`, with a funded key:
+
+```
+PK=0x... STEP=0.002 UP=40 DOWN=0 node trend.mjs
+```
+
+Start it, then begin recording. By the time you reach the demo at 1:15 the detector is engaged and
+still climbing.
+
+Why those values rather than the defaults:
+
+- `STEP=0.002` makes the evidence cross the threshold around swap 6 and ramp kappa to its cap by
+  swap 21, so the climb is watchable. The default `STEP=0.022` fires on swap **one** and maxes
+  kappa on swap two, which leaves nothing to see.
+- `UP=40 DOWN=0` keeps the trend pointing one way for the whole demo. The default second phase
+  reverses it, which would flip the trend label mid-demo.
+- 40 swaps at roughly three to five seconds each runs two to three and a half minutes, covering
+  the demo. If it finishes early nothing is lost: the detector only samples when a swap lands, so
+  kappa freezes where it was rather than decaying off screen.
+
+Also:
+
+- Those fresh swaps are what flip the Lab's parity badge to **"matches chain to the wei"**, because
+  samples recorded now carry the exact-integer column. Worth pointing at deliberately.
 - Do one timed read-through. If you land past 3:55, apply trim 1.
 - Have the app loaded and the wallet already connected, so no connection flow is on camera.
 - Check the Lab's narration badge reads `gemini-3.6-flash`, not `computed locally`.
