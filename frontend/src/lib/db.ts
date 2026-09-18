@@ -92,114 +92,26 @@ export async function recordLpEvent(evt: LpEvent) {
 
 // detector_samples: the on-chain DetectorSample trace, mirrored for history
 
-/** Postgres error for "column does not exist" — migration 004 has not been run. */
-const UNDEFINED_COLUMN = "42703";
-
 /** Mirror freshly-read on-chain samples. Idempotent: unique(hook, block_number). */
 export async function recordDetectorSamples(points: DetectorPoint[]) {
   if (!supabaseReady || points.length === 0) return;
   const rows = points.map((p) => ({ ...p, hook: HOOK }));
-
   const { error } = await supabase
     .from("detector_samples")
     .upsert(rows, { onConflict: "hook,block_number", ignoreDuplicates: true });
-  if (!error) return;
-
-  // The `wad` column arrives with migration 004. Against a database that has not
-  // been migrated yet, drop it and mirror the rest rather than losing the whole
-  // sync: history still charts, and the Lab falls back to the float columns.
-  if (error.code === UNDEFINED_COLUMN) {
-    const { error: retry } = await supabase
-      .from("detector_samples")
-      .upsert(
-        rows.map(({ wad: _wad, ...rest }) => rest),
-        { onConflict: "hook,block_number", ignoreDuplicates: true },
-      );
-    if (retry) console.warn("recordDetectorSamples", retry.message);
-    return;
-  }
-  console.warn("recordDetectorSamples", error.message);
+  if (error) console.warn("recordDetectorSamples", error.message);
 }
-
-const SAMPLE_COLUMNS = "block_number,price,r,s_pos,s_neg,d,sigma,kappa,trend,fee";
 
 /** Detector history for this hook, ascending by block (newest `limit` samples). */
 export async function fetchDetectorSeries(limit = 240): Promise<DetectorPoint[]> {
   if (!supabaseReady) return [];
-
-  const query = (columns: string) =>
-    supabase
-      .from("detector_samples")
-      .select(columns)
-      .eq("hook", HOOK)
-      .order("block_number", { ascending: false })
-      .limit(limit);
-
-  let { data, error } = await query(`${SAMPLE_COLUMNS},wad`);
-  if (error?.code === UNDEFINED_COLUMN) ({ data } = await query(SAMPLE_COLUMNS));
-  return ((data as unknown as DetectorPoint[]) ?? []).reverse();
-}
-
-// detector_configs: calibrations dialled in the Lab, shareable by slug
-
-/** A saved parameter set. Values are decimal numbers, as the Lab's sliders hold them. */
-export type SavedConfig = {
-  slug: string;
-  label: string | null;
-  author: string | null;
-  created_at?: string;
-  params: Record<string, number | boolean>;
-};
-
-/** Short, URL-safe, collision-resistant enough for a share link. */
-const slugOf = () => Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);
-
-/**
- * Persist a calibration and return its share slug. Rows are immutable by
- * convention: saving again mints a new slug rather than rewriting one, so a link
- * someone already shared cannot change meaning underneath them.
- */
-export async function saveLabConfig(
-  params: Record<string, number | boolean>,
-  label?: string,
-  author?: string,
-): Promise<string | null> {
-  if (!supabaseReady) return null;
-  const slug = slugOf();
-  const { error } = await supabase.from("detector_configs").insert({
-    slug,
-    hook: HOOK,
-    label: label?.slice(0, 60) || null,
-    author: author ? lc(author) : null,
-    params,
-  });
-  if (error) {
-    console.warn("saveLabConfig", error.message);
-    return null;
-  }
-  return slug;
-}
-
-export async function fetchLabConfig(slug: string): Promise<SavedConfig | null> {
-  if (!supabaseReady) return null;
   const { data } = await supabase
-    .from("detector_configs")
-    .select("slug,label,author,created_at,params")
-    .eq("slug", slug)
-    .maybeSingle();
-  return (data as SavedConfig) ?? null;
-}
-
-/** Recently shared calibrations for this hook. */
-export async function fetchRecentConfigs(limit = 6): Promise<SavedConfig[]> {
-  if (!supabaseReady) return [];
-  const { data } = await supabase
-    .from("detector_configs")
-    .select("slug,label,author,created_at,params")
+    .from("detector_samples")
+    .select("block_number,price,r,s_pos,s_neg,d,sigma,kappa,trend,fee")
     .eq("hook", HOOK)
-    .order("created_at", { ascending: false })
+    .order("block_number", { ascending: false })
     .limit(limit);
-  return (data as SavedConfig[]) ?? [];
+  return ((data as DetectorPoint[]) ?? []).reverse();
 }
 
 // ai_notes: the narration endpoint (the Gemini key lives server-side, never here)
@@ -212,14 +124,14 @@ export type ExplainFailure = { reason: string };
 /**
  * Ask the `explain` edge function to narrate a set of facts.
  *
- * Never throws and never blocks rendering: every caller has a deterministic
- * local narration to fall back to, so a failure returns the REASON rather than
- * an error. Surfacing it matters — a retired model or an unset secret otherwise
- * looks identical to "no model configured" from the UI, and the difference is
- * only visible in the function logs.
+ * Never throws and never blocks rendering: the caller has a deterministic local
+ * narration to fall back to, so a failure returns the REASON rather than an
+ * error. Surfacing it matters, because a retired model or an unset secret
+ * otherwise looks identical to "no model configured" from the UI, and the
+ * difference is only visible in the function logs.
  */
 export async function requestExplanation(
-  kind: "regime" | "lab",
+  kind: "regime",
   cacheKey: string,
   facts: unknown,
 ): Promise<Explanation | ExplainFailure> {

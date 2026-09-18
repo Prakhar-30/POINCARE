@@ -13,12 +13,9 @@ import type { Explained } from "@/hooks/useExplain";
 export function AiNote({
   explained,
   title = "What the detector is doing",
-  onAsk,
 }: {
   explained: Explained;
   title?: string;
-  /** Shown as a button when narration is manual (the Lab's comparison). */
-  onAsk?: () => void;
 }) {
   const { text, source, model, cached, loading, reason } = explained;
 
@@ -66,22 +63,6 @@ export function AiNote({
             {source === "model" ? `${model ?? "model"}${cached ? " · cached" : ""}` : localLabel}
           </span>
 
-          {onAsk && source !== "model" && (
-            <button
-              onClick={onAsk}
-              disabled={loading}
-              className="rounded-full px-2.5 py-0.5"
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: "var(--surface)",
-                background: "var(--lav-deep)",
-                opacity: loading ? 0.6 : 1,
-              }}
-            >
-              {loading ? "thinking…" : "explain"}
-            </button>
-          )}
         </div>
       </div>
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
-import { useSearchParams } from "react-router-dom";
 import { ACTIVE_CHAIN_ID, LIVE_CHAIN_IDS, setActiveChain } from "@/config/contracts";
 import { TopNav, type Tab } from "./TopNav";
 import { WalletGate } from "./WalletGate";
@@ -8,7 +7,6 @@ import { Dashboard } from "./screens/Dashboard";
 import { Trade } from "./screens/Trade";
 import { Pool } from "./screens/Pool";
 import { Analytics } from "./screens/Analytics";
-import { Lab } from "./screens/Lab";
 import { AppFooter } from "./AppFooter";
 import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 import { WrongNetworkBanner } from "@/components/ui/WrongNetworkBanner";
@@ -27,10 +25,7 @@ function useChainSync() {
 
 export function AppShell() {
   const { isConnected } = useAccount();
-  // A shared calibration link (?lab=<slug>) has to land on the Lab, not the
-  // dashboard, or the link does not actually share anything.
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(searchParams.get("lab") ? "lab" : "dashboard");
+  const [tab, setTab] = useState<Tab>("dashboard");
   useWalletIdentity();
   useChainSync();
 
@@ -46,7 +41,6 @@ export function AppShell() {
         {tab === "trade" && <Trade />}
         {tab === "pool" && <Pool />}
         {tab === "analytics" && <Analytics />}
-        {tab === "lab" && <Lab />}
       </div>
       <AppFooter />
     </div>

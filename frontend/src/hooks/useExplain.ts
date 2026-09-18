@@ -30,11 +30,11 @@ export type Explained = {
  * the server caches under.
  */
 export function useExplain(opts: {
-  kind: "regime" | "lab";
+  kind: "regime";
   cacheKey: string | null;
   facts: unknown;
   fallback: string;
-  /** Fetch automatically when `cacheKey` changes. False = only on `ask()`. */
+  /** Fetch automatically when `cacheKey` changes. */
   auto?: boolean;
 }): Explained {
   const { kind, cacheKey, facts, fallback, auto = false } = opts;

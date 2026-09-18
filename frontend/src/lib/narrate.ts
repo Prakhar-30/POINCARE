@@ -11,7 +11,6 @@
 
 import type { DetectorConfig } from "@/hooks/useDetectorConfig";
 import type { DetectorPoint } from "@/lib/onchain";
-import type { ReplayMetrics } from "@/lib/replay";
 import { fmtPct } from "@/lib/format";
 
 /** The numbers behind "what is the pool doing right now". */
@@ -31,28 +30,6 @@ export type RegimeFacts = {
   blocksInWindow: number;
   leanBlocksInWindow: number;
   priceChangePctInWindow: number;
-};
-
-/** The numbers behind "how does this candidate config differ from the live one". */
-export type LabFacts = {
-  window: { blocks: number; firstBlock: number; lastBlock: number };
-  live: ConfigFacts;
-  candidate: ConfigFacts;
-};
-
-type ConfigFacts = {
-  k: number;
-  h: number;
-  dFloor: number;
-  kappaMax: number;
-  lambda: number;
-  adaptive: boolean;
-  firings: number;
-  leanBlocks: number;
-  dutyCyclePct: number;
-  blocksPerFiring: number | null;
-  peakKappaPct: number;
-  gateSaves: number;
 };
 
 /** The dominant CUSUM statistic and how far it has climbed toward firing. */
@@ -92,49 +69,6 @@ export function regimeFactsOf(
   };
 }
 
-export function labFactsOf(
-  live: { metrics: ReplayMetrics; cfg: ConfigInput },
-  candidate: { metrics: ReplayMetrics; cfg: ConfigInput },
-  points: DetectorPoint[],
-): LabFacts {
-  const shape = (m: ReplayMetrics, c: ConfigInput): ConfigFacts => ({
-    k: c.k,
-    h: c.h,
-    dFloor: c.dFloor,
-    kappaMax: c.kappaMax,
-    lambda: c.lambda,
-    adaptive: c.adaptive,
-    firings: m.firings,
-    leanBlocks: m.leanBlocks,
-    dutyCyclePct: m.dutyCycle * 100,
-    blocksPerFiring: m.blocksPerFiring,
-    peakKappaPct: m.peakKappa * 100,
-    gateSaves: m.gateSaves,
-  });
-
-  return {
-    window: {
-      blocks: points.length,
-      firstBlock: points[0]?.block_number ?? 0,
-      lastBlock: points[points.length - 1]?.block_number ?? 0,
-    },
-    live: shape(live.metrics, live.cfg),
-    candidate: shape(candidate.metrics, candidate.cfg),
-  };
-}
-
-/** The decimal (non-WAD) view of a parameter set, as the Lab's sliders hold it. */
-export type ConfigInput = {
-  k: number;
-  h: number;
-  sMax: number;
-  lambda: number;
-  dFloor: number;
-  kappaMax: number;
-  dMax: number;
-  adaptive: boolean;
-};
-
 // ---------------------------------------------------------------------------
 // deterministic fallbacks
 // ---------------------------------------------------------------------------
@@ -172,60 +106,6 @@ export function fallbackRegime(f: RegimeFacts): string {
   }
 
   return parts.join(" ");
-}
-
-/** True when the candidate has not been moved off the deployed configuration. */
-const sameConfig = (a: ConfigFacts, b: ConfigFacts) =>
-  a.k === b.k &&
-  a.h === b.h &&
-  a.dFloor === b.dFloor &&
-  a.kappaMax === b.kappaMax &&
-  a.lambda === b.lambda &&
-  a.adaptive === b.adaptive;
-
-export function fallbackLab(f: LabFacts): string {
-  const { live, candidate } = f;
-
-  // Nothing has been changed yet, so there is no comparison to make. Describe what
-  // the deployed detector did over this window instead — saying "it fires the same
-  // number of times as itself" is true and worthless.
-  if (sameConfig(live, candidate)) {
-    const cadence =
-      live.blocksPerFiring === null
-        ? "never crossed its threshold"
-        : `fired ${live.firings} time${live.firings === 1 ? "" : "s"}, about one every ${live.blocksPerFiring.toFixed(0)} sampled blocks`;
-    const gate =
-      live.gateSaves > 0
-        ? ` The directional-efficiency floor held evidence back on ${live.gateSaves} of them, where the raw statistic was already past the threshold but the move was not cleanly directional — that is the gate doing the job it exists for.`
-        : "";
-    return (
-      `Over these ${f.window.blocks} recorded blocks the deployed detector ${cadence}, leaning on ` +
-      `${live.dutyCyclePct.toFixed(0)}% of the window and peaking at a ${live.peakKappaPct.toFixed(2)}% spread.` +
-      `${gate} Move a slider to replay the same blocks under a different calibration.`
-    );
-  }
-
-  const dFirings = candidate.firings - live.firings;
-  const dDuty = candidate.dutyCyclePct - live.dutyCyclePct;
-
-  const verdict =
-    dFirings === 0
-      ? `fires the same number of times (${live.firings}) over these ${f.window.blocks} blocks`
-      : dFirings > 0
-        ? `fires ${dFirings} more time${Math.abs(dFirings) === 1 ? "" : "s"} (${candidate.firings} vs ${live.firings}) over these ${f.window.blocks} blocks`
-        : `fires ${-dFirings} fewer time${Math.abs(dFirings) === 1 ? "" : "s"} (${candidate.firings} vs ${live.firings}) over these ${f.window.blocks} blocks`;
-
-  const duty =
-    Math.abs(dDuty) < 0.5
-      ? `It spends about the same share of the window leaning (${candidate.dutyCyclePct.toFixed(0)}%).`
-      : `It spends ${candidate.dutyCyclePct.toFixed(0)}% of the window leaning versus ${live.dutyCyclePct.toFixed(0)}% live, a ${dDuty > 0 ? "wider" : "narrower"} duty cycle.`;
-
-  const gate =
-    candidate.gateSaves > live.gateSaves
-      ? ` The directional-efficiency floor held it back on ${candidate.gateSaves} blocks where the raw statistic would have fired, so the extra sensitivity is landing on chop.`
-      : "";
-
-  return `This configuration ${verdict}. ${duty}${gate}`;
 }
 
 /** Short label used in the UI for how the current narration was produced. */

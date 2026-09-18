@@ -1,7 +1,7 @@
 # Poincaré · demo video speaker notes
 
 **Deck:** `pitch/poincare-deck.html` (arrow keys, or type a slide number to jump).
-**Length:** 528 spoken words, which is 3:31 at 150 wpm and lands around **3:35** once you add
+**Length:** 508 spoken words, which is 3:23 at 150 wpm and lands around **3:30** once you add
 slide changes and the cuts in and out of the demo.
 **Record at 720p or higher. Under 2:00 or over 4:00 is auto-rejected on upload.**
 
@@ -10,8 +10,8 @@ slide changes and the cuts in and out of the demo.
 | Time | Segment | Slides |
 |---|---|---|
 | 0:00 – 1:15 | Presentation, part 1 | 1 → 2 → 3 → 4 |
-| 1:15 – 2:50 | Live demo (screen capture) | — |
-| 2:50 – 3:45 | Presentation, part 2 | 5 → 6 → 7 |
+| 1:15 – 2:40 | Live demo (screen capture) | · |
+| 2:40 – 3:30 | Presentation, part 2 | 5 → 6 → 7 |
 
 No slides are skipped. Advance in order.
 
@@ -46,19 +46,19 @@ No slides are skipped. Advance in order.
 >
 > The firing moment depends on the data, so there's no block count for an attacker to precompute.
 
-### Slide 4 · The Detector Lab
+### Slide 4 · The actuator
 
-> Those parameters decide what counts as a trend, so don't take my calibration on trust. This
-> cycle I built the Detector Lab.
+> So once a trend is confirmed, what actually changes? Flow pushing with the trend pays a small,
+> capped spread that goes to the LPs it would otherwise have been taken from.
 >
-> It replays the pool's own recorded history under any parameters you choose, against the deployed
-> configuration as a control. Replaying the live parameters reproduces the chain to the wei.
+> Flow trading against the trend pays nothing. A symmetric fee taxes everyone on every block; this
+> only charges the side taking money out.
 >
 > Let's watch it work.
 
 ---
 
-# PART 2 · LIVE DEMO (1:15 – 2:50)
+# PART 2 · LIVE DEMO (1:15 – 2:40)
 
 Screen capture of **poincare-beta.vercel.app** on Unichain Sepolia. The trade driver is already
 running in a terminal before you start recording (see *Before you record*). Edit out any waiting.
@@ -76,29 +76,21 @@ running in a terminal before you start recording (see *Before you record*). Edit
 
 ### Trade
 
-*(Go to Trade. Show a quote in one direction, then flip the direction.)*
+*(Go to Trade. Quote a buy, point at the spread. Then flip to a sell of the same size.)*
 
-> This is who pays. Flow pushing with the trend is charged a spread that goes back to the LPs.
+> This is who pays. I'm buying WETH, which is the side pushing with the detected trend, and the
+> quote carries the spread. That spread goes back to the LPs it would otherwise have been taken
+> from.
 >
-> Flow trading against the trend pays nothing, quoted at the plain base price.
-
-### The Detector Lab
-
-*(Go to the Lab. Point at the parity badge. Drag the threshold slider. Then the directional gate.)*
-
-> And this is the Lab. That badge is the point: it's telling me this replay reproduces the chain
-> exactly, to the wei, over the blocks that script just produced.
+> Now the same size the other way. Trading against the trend, and the spread is zero. Plain base
+> price. Punishing the traders who stabilise your pool is bad business.
 >
-> Watch when I lower the firing threshold. The candidate pulls away, fires far more often, and the
-> time leaning jumps. That's a detector reacting to noise.
->
-> Drop the directional gate to zero and the duty cycle explodes, because nothing is filtering chop.
->
-> You don't have to believe my calibration. You can move the slider.
+> And nobody set that number. It came out of the detector, rate-limited, and it goes back to zero
+> on its own when the trend does.
 
 ---
 
-# PART 3 · PRESENTATION (2:50 – 3:45)
+# PART 3 · PRESENTATION (2:40 – 3:30)
 
 ### Slide 5 · The honest test
 
@@ -117,8 +109,8 @@ running in a terminal before you start recording (see *Before you record*). Edit
 
 ### Slide 7 · Close
 
-> So: a working hook, live on chain. A hundred and thirty-one Foundry tests, forty more on the
-> off-chain port, quotes matching execution to the wei.
+> So: a working hook, live on chain. A hundred and thirty-one Foundry tests, invariants at a
+> hundred and twenty-eight thousand calls, quotes matching execution to the wei.
 >
 > The curve is the actuator. The detector is the contribution. Thank you.
 
@@ -132,8 +124,7 @@ Trim in this order. Each is self-contained.
    attacker to precompute."* Saves about 7 seconds.
 2. **Slide 7**, drop the test-counts sentence, going straight from "live on chain" to "The curve
    is the actuator." Saves about 9 seconds.
-3. **Dashboard**, drop *"every number read straight from the contract"* and end that sentence at
-   "working live". Saves about 4 seconds.
+3. **Trade**, drop the last line *"And nobody set that number..."*. Saves about 8 seconds.
 
 ## Before you record
 
@@ -159,9 +150,7 @@ Why those values rather than the defaults:
 
 Also:
 
-- Those fresh swaps are what flip the Lab's parity badge to **"matches chain to the wei"**, because
-  samples recorded now carry the exact-integer column. Worth pointing at deliberately.
 - Do one timed read-through. If you land past 3:55, apply trim 1.
 - Have the app loaded and the wallet already connected, so no connection flow is on camera.
-- Check the Lab's narration badge reads `gemini-3.6-flash`, not `computed locally`.
+- Check the Analytics narration badge reads `gemini-3.6-flash`, not `computed locally`.
 - Steady pace, quiet room. The rules call out rushing and background noise specifically.

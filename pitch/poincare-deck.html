@@ -250,38 +250,37 @@
   <div class="footer"><span>Poincaré</span><span>03</span></div>
 </section>
 
-<!-- ════════ 4 · NEW: THE DETECTOR LAB + DEMO HAND-OFF ════════ -->
+<!-- ════════ 4 · THE ACTUATOR + DEMO HAND-OFF ════════ -->
 <section class="slide">
-  <div class="eyebrow">New this cycle · then let's watch it work</div>
-  <h1>Don't take the calibration on trust. <span class="tag-honey">Retune it yourself.</span></h1>
+  <div class="eyebrow">The actuator · then let's watch it work</div>
+  <h1>Toxic flow pays a spread. <span class="tag-up">Stabilising flow pays nothing.</span></h1>
   <p class="small" style="margin-top:9px; max-width:980px">
-    The detector's parameters decide what counts as a trend. So we shipped the <b>Detector Lab</b>: it replays the
-    pool's own recorded history under any parameters you choose, against the deployed configuration as a control,
-    using an exact port of <span class="mono">Cusum.sol</span>, <span class="mono">DirectionalSignal.sol</span> and
-    <span class="mono">ControlLaw.sol</span>.
+    Once a trend is confirmed, flow pushing <b>with</b> it pays a small, capped, rate-limited spread that goes
+    straight to the LPs it would otherwise have been taken from. Flow trading <b>against</b> the trend, and all
+    flow in calm markets, trades at the plain constant-product price.
   </p>
 
   <div class="grid" style="grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:18px">
     <div class="card" style="background:var(--green-bg); border-color:var(--green-border)">
-      <div class="pill green" style="font-size:11px">the claim, verified</div>
-      <h3 style="margin-top:10px; font-size:16px; color:var(--up-deep)">Zero wei of drift</h3>
+      <div class="pill green" style="font-size:11px">why it is safe</div>
+      <h3 style="margin-top:10px; font-size:16px; color:var(--up-deep)">We shipped the safe lever</h3>
       <p class="small" style="margin-top:7px; color:var(--text-2)">
-        Replaying the deployed parameters reproduces the trace the hook actually emitted across
-        <b>362 real blocks</b>, exactly, with every trend label matching. The capture is committed as a fixture and
-        asserted in CI, so the port cannot drift from the contracts without failing a build.
+        The obvious design, different curve <i>depth</i> per direction, is arbitrage-drainable. We built it, found a
+        buy-shallow / sell-deep round trip that empties the pool, and rewrote the asymmetry as a non-negative
+        spread on a symmetric base: unprofitable to round-trip by construction.
       </p>
     </div>
     <div class="card">
-      <div class="pill">what it answers</div>
-      <h3 style="margin-top:10px; font-size:16px">Was this tuning right?</h3>
+      <div class="pill">unlike a fee</div>
+      <h3 style="margin-top:10px; font-size:16px">It is targeted</h3>
       <p class="small" style="margin-top:7px">
-        Drop the threshold and watch it fire inside chop. Drop the directional gate and watch the duty cycle
-        explode. The honest answer to "why these numbers" stops being a paragraph and becomes something a
-        reviewer can move a slider and check.
+        A symmetric fee taxes everyone on every block. Poincaré charges only the side actually taking money out
+        of LPs, and only while the detector is confident. The soft side trades at exactly the constant-product
+        price, so there is never a prize sitting there for an attacker.
       </p>
     </div>
     <div class="card">
-      <div class="pill warn">what to watch next</div>
+      <div class="pill warn" style="font-size:11px">what to watch</div>
       <h3 style="margin-top:10px; font-size:16px">In the live demo</h3>
       <p class="small" style="margin-top:7px">
         The detector holding fire while evidence climbs. The moment it commits and κ ramps in, rate-limited.
@@ -403,10 +402,9 @@
     <div style="display:flex; flex-direction:column; justify-content:center">
       <ul class="checks">
         <li><span class="check">✓</span><span><b>A valid Uniswap v4 hook</b>, custom curve via <span class="mono">beforeSwapReturnDelta</span>, hook-owned liquidity, CREATE2-mined permission flags</span></li>
-        <li><span class="check">✓</span><span><b>131 Foundry tests</b> plus <b>40 TypeScript tests</b>: unit, fuzz, invariant, manipulation, calibration, regression</span></li>
+        <li><span class="check">✓</span><span><b>131 Foundry tests</b>: unit, fuzz, invariant, manipulation, calibration, regression</span></li>
         <li><span class="check">✓</span><span><b>128k randomised calls per invariant flavour</b>, zero reverts: solvency and ghost accounting to the wei</span></li>
         <li><span class="check">✓</span><span><b>Reviewed by Olympix under the Uniswap Foundation Security Fund</b>, 9 findings, 9 fixed, each with a regression test</span></li>
-        <li><span class="check">✓</span><span><b>The Detector Lab reproduces the chain to the wei</b>, asserted in CI against a committed capture of the live trace</span></li>
         <li><span class="check">✓</span><span><b>Quotes match execution to the wei</b>, even in a fresh block before the first swap</span></li>
         <li><span class="check">✓</span><span><b>~96k gas</b> for the detector, once per block rather than per swap</span></li>
         <li><span class="check">✓</span><span><b>Original code.</b> The detector, control law, curve and Lens are ours; the only inherited contracts are Uniswap's <span class="mono">BaseCustomCurve</span> and OpenZeppelin's ERC-20</span></li>

@@ -164,22 +164,31 @@ real-data claims are (a) LVR ≤ constant product always, asserted; (b) the adva
 in genuine trends, shown by the half-window split; and (c) against-trend and calm-market flow pays
 **nothing**, which no LVR aggregate captures but a symmetric fee can never match.
 
-## J. The Detector Lab (2026-09)
+## J. The Detector Lab: built, then removed (2026-09)
 
 An in-app replay of the pool's recorded `DetectorSample` trace under arbitrary detector
 parameters, backed by an exact TypeScript port of `Cusum.sol`, `DirectionalSignal.sol` and
-`ControlLaw.sol` (`frontend/src/lib/detector.ts`). No contract change: it reads the config
-through getters the hook already exposes.
+`ControlLaw.sol`. It was built, shipped and then **removed** as not carrying its weight in the
+product: it was a verification tool for one reviewer's question rather than something a trader or
+LP used. The code is in git history (`frontend/src/lib/detector.ts`, `replay.ts`,
+`app/screens/Lab.tsx` and their tests) if the approach is ever wanted again.
 
-| # | Item | Status | Notes |
-|---|------|--------|-------|
-| J1 | **Port fidelity.** An off-chain reimplementation that silently drifts from the contracts would make every number the Lab shows wrong. | ✅ | Verified against the live deployment: replaying the deployed parameters over 362 real Unichain Sepolia blocks reproduces the emitted trace with **0 wei** deviation on both CUSUM statistics and 0 trend mismatches. A verbatim 80-sample capture + the deployed config is committed as a fixture and asserted in `frontend/src/lib/detector.test.ts`; the unit vectors are lifted from the Solidity suite (same constants, same expected values). 39 tests, `pnpm test`. |
-| J2 | **Float round-trip would have broken exactness.** The charting columns are `numeric`, and an 18-decimal value loses its low digits through a JS float. | ✅ | Migration 004 adds a nullable `wad jsonb` column carrying the event's raw integers as decimal strings; the replay reads those and falls back to the floats for rows synced before it. The parity badge distinguishes the two rather than calling both "matching". Also fixed a real bug found by the test: `toFixed(18)` prints a float's binary expansion (`0.07` → `0.070000000000000007`), so `toWad` now goes through the shortest round-tripping decimal string. |
-| J3 | **Clip is not adjustable, by construction.** | ✅ (documented) | Recorded returns are already Huber-clipped at the deployed `clipWad`. A *smaller* clip would replay correctly, but a larger one cannot recover what the live hook discarded, so the Lab pins it at the deployed value and says so in the UI. |
-| J4 | **EWMA seeding is an inversion, not a recording.** `ewmaNet`/`ewmaTV` are not in the event. | 🟡 | Seeded by inverting the recorded `σ̂` (exact) and `D` (exact in magnitude); only the SIGN of `ewmaNet` is inferred, from that block's return. Decay washes any seed error out within a few effective windows, and a "cold start" toggle replays from zero instead (which disables the parity check, since it deliberately discards the chain's state). Adding the accumulators to `DetectorSample` would close this, and is a contract change deferred with the next deployment. |
-| J5 | **Metrics are window-relative, not forecasts.** `blocksPerFiring` is an empirical run-length over whatever history exists, not a measured ARL₀. | 🟡 (documented) | Comparable *between configurations on the same window*, which is the question the Lab asks; stated in the UI. The distributional ARL₀ work stays in `test/calibration/RealDataCalibration.t.sol`. |
-| J6 | **Model narration must never be load-bearing.** | ✅ | The Gemini key lives only as an edge-function secret (a `VITE_`-prefixed key would ship in the bundle). Every panel computes a deterministic local narration first and renders it immediately; the model result replaces it only on success, and the UI labels the source. Free-tier budget is managed by caching per sampled block / per config digest in `ai_notes`, plus a server-side cooldown; the client payload is sanitized to scalars before it reaches the prompt, so a caller cannot inject instructions through a fact field. |
-| J7 | **Shared calibrations are immutable.** | ✅ | Saving mints a new slug rather than rewriting one, so a link that was already shared cannot change meaning later. `ai_notes` has no anon insert policy: the model budget is not anonymously spendable. |
+Two things are worth keeping from it, because they were real and are cheap to redo:
+
+- **The port reproduced the chain exactly.** Replaying the deployed parameters over 362 real
+  Unichain Sepolia blocks matched the emitted trace to **0 wei** on both CUSUM statistics, with no
+  trend mismatches. That is evidence the on-chain detector is deterministic and portable, and it
+  would be the basis of any future off-chain simulator or calibration tool.
+- **Three real defects surfaced while building it**, all fixed at the time: `toWad` used
+  `toFixed(18)`, which prints a float's binary expansion and put parameters several wei off; the
+  narration cache had no invalidation path, so one truncated answer would have been served
+  permanently (now namespaced by `CACHE_VERSION`); and enabling the adaptive detector against a
+  pool deployed with `sigmaFloor = 0` divided by zero, which is a configuration the hook's own
+  constructor would refuse.
+
+**What survives in the product:** the plain-English narration of the live detector state on the
+Analytics screen, and its `ai_notes` cache. `detector_configs` and `detector_samples.wad` existed
+only for the Lab and are dropped by `frontend/supabase/migration_005_drop_lab.sql`.
 
 ---
 

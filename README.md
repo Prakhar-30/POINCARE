@@ -506,41 +506,6 @@ carry over and help, but the bound must be re-established before v2 ships. It is
 next step, not a redesign, and the back-test + real-data harness above is exactly the tool to
 validate it.
 
-### 9.3 The Detector Lab: retune the detector against the pool's own history
-
-The calibration argument in §9.1 is the part of this project hardest to take on trust: `k` and
-`h` are derived from a return distribution, and the claim is that *those* values, rather than
-looser ones, are what separate a real trend from chop. The **Detector Lab** (in the web app)
-makes that checkable by hand.
-
-It replays the pool's real recorded history — the per-block `DetectorSample` trace, which
-carries the exact log-return the detector consumed — through an **exact TypeScript port of
-`Cusum.sol`, `DirectionalSignal.sol` and `ControlLaw.sol`**, under whatever parameters you dial
-in. The live configuration is replayed alongside as the control, so every comparison is over the
-same blocks with the same seed and the only difference is the parameters. It reports firings,
-blocks-per-firing (the empirical quantity ARL₀ targets), duty cycle, peak spread, and how many
-blocks the directional-efficiency gate rejected.
-
-**The port is verified against the chain, not asserted.** Replaying the deployed parameters must
-reproduce the trace the hook actually emitted, and it does: **zero wei of deviation on either
-CUSUM statistic across 362 real Unichain Sepolia blocks**, with every trend label matching. A
-verbatim capture of that trace and the deployed configuration is committed as a fixture
-(`frontend/src/lib/__fixtures__/unichain-sepolia-trace.json`) and asserted in CI, so a divergence
-between the contracts and the port fails a test rather than quietly mis-drawing a chart. The
-port's unit vectors are lifted from the Solidity suite itself, with the same constants and the
-same expected numbers.
-
-Two limits are stated in the UI rather than hidden: the Huber clip is held at the deployed value
-(recorded returns are already clipped, and a wider clip cannot recover what the live hook
-discarded), and the EWMA accumulators are seeded by inverting the recorded `σ̂` and `D`, since
-the event does not carry them. A calibration can be shared as a URL.
-
-Each panel is also narrated in plain English — what the detector is doing and why, or what a
-candidate calibration changes — by a small model call routed through a Supabase edge function so
-the key never enters the browser bundle. Generation is cached per sampled block and per
-configuration, and **every panel has a deterministic local narration it falls back to** when the
-model is unavailable, with the UI labelling which one is showing.
-
 ## 10. Roadmap
 
 > **Status:** the MVP described above is **built and green**, 131 passing Foundry tests (unit,
@@ -553,9 +518,9 @@ model is unavailable, with the UI labelling which one is showing.
 `0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`, Lens `0x1ca28a5de680109513ce26c861e049116a2643c2`,
 deployed at block 57598397 against the canonical v4 `PoolManager`
 `0x00B036B58a818B1BC34d502D3fE730Db729e62AC`, with a demo WETH/USDC pool, a faucet, and a
-web app (`frontend/`) that trades, provides liquidity, charts the detector's real
-`DetectorSample` trace block by block, and ships the **Detector Lab** (§9.3). Addresses of
-record: `deployments/unichain-sepolia.json`.
+web app (`frontend/`) that trades, provides liquidity, and charts the detector's real
+`DetectorSample` trace block by block. Addresses of record:
+`deployments/unichain-sepolia.json`.
 
 **Security review:** the contracts were reviewed by **Olympix** under the **Uniswap Foundation
 Security Fund**. Every reported finding was fixed and each has a regression test that fails on
@@ -563,7 +528,7 @@ the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus t
 cases in `PriceLib.t.sol`). Full finding table in [§11](#11-security-review). An independent
 external audit is still required before mainnet (item 5 below).
 
-**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; the **Detector Lab** (§9.3) with its wei-exact off-chain port of the detector libraries and the AI regime narration behind it; and the full Foundry suite.
+**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
 
 **Next, to production:**
 

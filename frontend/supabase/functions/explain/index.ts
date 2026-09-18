@@ -1,5 +1,5 @@
 /**
- * `explain` — the Detector Lab's narration endpoint.
+ * `explain` — the detector's narration endpoint.
  *
  * Turns the detector's numbers into a plain-English read. It exists as an edge
  * function for two reasons, both structural rather than incidental:
@@ -7,7 +7,7 @@
  *  1. The Gemini key must never reach the browser. Anything a Vite app can read
  *     at runtime is in the bundle, so the call has to happen server-side.
  *  2. Generation is metered by a free tier. The same question has the same
- *     answer — a given block's regime, a given configuration's comparison — so
+ *     answer for a given block's regime, so
  *     every note is written to `ai_notes` once and served from cache after. The
  *     cache IS the rate-limit strategy; the cooldown below is only the backstop
  *     for a burst of genuine cache misses.
@@ -125,10 +125,6 @@ const TASK: Record<string, string> = {
   regime:
     "Describe the pool's CURRENT regime: what the detector sees right now, whether it is " +
     "engaged or holding back, and which side (if any) is paying a spread.",
-  lab:
-    "Compare a candidate detector configuration against the pool's live one, replayed over " +
-    "the same real block history. Say what the candidate changes in practice — how much more " +
-    "or less often it fires, and whether that is picking up real trends or reacting to chop.",
 };
 
 async function generate(prompt: string): Promise<string> {
