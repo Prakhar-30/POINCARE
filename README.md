@@ -2,7 +2,7 @@
 
 [![Test Suite](https://github.com/Prakhar-30/POINCARE/actions/workflows/test.yml/badge.svg)](https://github.com/Prakhar-30/POINCARE/actions/workflows/test.yml)
 
-### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its bonding curve against them, protecting liquidity providers from the losses that trends cause, without an oracle.
+### An adaptive Uniswap v4 AMM that detects real price trends with a provably-optimal change-detector and leans its pricing against them, protecting liquidity providers from the losses that trends cause, without an oracle.
 
 **Recognition and review.** Poincaré was submitted to the **Uniswap Hook Incubator 10 (UHI10)**
 hookathon, where it was selected as one of the winners. It was subsequently selected by the
@@ -53,11 +53,11 @@ Developer feedback on the v4 stack, as required by the Uniswap Stack Contributio
 
 ## TL;DR
 
-A normal AMM is a frozen curve: it quotes the same way whether the market is drifting hard in one direction (when liquidity providers bleed value to arbitrageurs) or just chopping around harmlessly. Poincaré watches its own price, runs a **CUSUM quickest-change detector** to decide, with mathematically optimal speed, whether a *genuine* directional trend has begun, and when one has, it **bends its bonding curve asymmetrically**: it hardens the side the trend is pushing (where LPs lose money) and stays cheap and open on the stabilising side (rewarding the flow that helps).
+A normal AMM is a frozen curve: it quotes the same way whether the market is drifting hard in one direction (when liquidity providers bleed value to arbitrageurs) or just chopping around harmlessly. Poincaré watches its own price, runs a **CUSUM quickest-change detector** to decide, with mathematically optimal speed, whether a *genuine* directional trend has begun, and when one has, it **charges a directional spread**: the side the trend is pushing pays a premium the LP keeps (that is the side where LPs lose money), while the stabilising side trades at the plain constant-product price, unpenalised.
 
 The detector fires at a **data-dependent moment**, not after a fixed number of blocks, so there is no countdown for an attacker to game. And because the only way to fool the detector is to *genuinely move the market* (spending real money and feeding arbitrageurs), manipulation is bounded by design, not wished away.
 
-**What it uses:** the *Milionis LVR identity* (why curvature is the lever), an *asymmetric hyperbolic bonding curve* (the actuator, shipped as an arb-safe directional spread; see §3.1), a *directional-efficiency signal*, and *CUSUM / Quickest Change Detection* with *Lorden minimax optimality* (the engine), with *robust-QCD* hardening on the roadmap.
+**What it uses:** the *Milionis LVR identity* (why the pool's quote is the lever), a *non-negative directional spread on a symmetric constant-product base* (the actuator; see §3.1), a *directional-efficiency signal*, and *CUSUM / Quickest Change Detection* with *Lorden minimax optimality* (the engine), with *robust-QCD* hardening on the roadmap.
 
 ---
 
@@ -72,7 +72,7 @@ Two truths fall out of that one line:
 - **Curvature is the lever.** "Marginal liquidity" is a property of the curve's *shape*. A flat curve bleeds more LVR; a sharp curve bleeds less. The *fee* is not in this equation, so fee-tweaking, which most hooks do, is pulling the wrong lever.
 - **The damage is directional.** LVR is driven by *sustained, one-directional* price moves, not by symmetric noise. A market that thrashes around but goes nowhere barely hurts LPs; a market that *trends* is what drains them.
 
-So the right response is: **reshape the curve's curvature, asymmetrically, but only when a real trend is actually happening.** That last clause is the hard part, and the whole project.
+So the right response is: **quote asymmetrically, charging the side that is taking value and not the side that is giving it back, but only when a real trend is actually happening.** That last clause is the hard part, and the whole project.
 
 ---
 
@@ -85,8 +85,8 @@ Poincaré has two parts: a **detector** (the brain) that decides *when* there is
 flowchart LR
     PRICE("Pool's own price<br/>(reserve-implied, r1/r0)") --> SIG("Directional-efficiency signal<br/>trend vs chop")
     SIG --> CUSUM("CUSUM detector<br/>accumulate evidence<br/>fire at threshold h")
-    CUSUM --> LAW("Control law<br/>evidence to bounded curvature")
-    LAW --> CURVE("Asymmetric bonding curve<br/>hardens trend side,<br/>softens stabilising side")
+    CUSUM --> LAW("Control law<br/>evidence to bounded spread")
+    LAW --> CURVE("Directional spread<br/>charges trend side,<br/>leaves stabilising side at base")
     CURVE --> PRICE
     classDef io stroke:#8b949e,color:#8b949e,stroke-width:2px;
     classDef sig stroke:#3fb950,color:#3fb950,stroke-width:2px;
@@ -106,7 +106,7 @@ The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses chang
 
 ## 3. The mathematics we use
 
-### 3.1 The actuator: an asymmetric hyperbolic curve
+### 3.1 The actuator: a directional spread on a symmetric curve
 
 A constant-product pool is the hyperbola `x·y = k`. The natural way to make it *asymmetric* is to generalise it with **direction-dependent virtual offsets**: small offsets for the with-trend side (a steep, shallow curve, heavy impact) and large offsets for the stabilising side (a flat, deep curve):
 
@@ -117,11 +117,11 @@ This is the design the figure below illustrates, and it is where we started.
 > **Why we did *not* ship raw direction-dependent offsets, and what we ship instead.**
 > Choosing *different depths* per swap direction and re-anchoring at the current reserves on every swap is **arbitrage-exploitable**. We reproduced it as a concrete round-trip drain: buy on the shallow branch, sell back on the deep branch, and walk away with pool value. The root cause is that depth-asymmetry shifts the **mid-price**, not just the spread, which opens a free round trip, a hole an MEV bot empties on day one.
 >
-> The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. The richer depth/curvature lever was subsequently built offline and measured against this one across four years of real ETH/USDC. It loses, and by a wide margin; the spread is not a compromise we settled for but the better mechanism on the evidence. See [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
+> The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. A curvature-changing lever was built offline and measured against this one across four years of real ETH/USDC. It lost by roughly thirty to one, and it is **closed, not deferred**: there is no depth-asymmetry mode in the codebase, no configuration that enables one, and no plan to add one. The spread is not a compromise we settled for; it is the mechanism, and the only one. The measurements that closed it are kept as evidence in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
 
 ![The asymmetric bonding curve](public/fig1_asymmetric_curve.png)
 
-*Fig 1. Conceptual view. In calm markets the curve is symmetric and deep (grey). When a real up-trend is detected, the executable price hardens on the trend-following side (red) and stays at the base on the counter-trend side (green). The kink at the operating point is a real, dynamic bid–ask spread, and in the shipped MVP that kink is the directional **spread**, not a depth change.*
+*Fig 1. Conceptual view. In calm markets the curve is symmetric and deep (grey). When a real up-trend is detected, the executable price hardens on the trend-following side (red) and stays at the base on the counter-trend side (green). The kink at the operating point is a real, dynamic bid–ask spread, that kink is the directional **spread**; the pool's curvature never changes.*
 
 ### 3.2 The signal: directional efficiency
 
@@ -150,9 +150,9 @@ The attacker who tries to fool the detector is itself a studied problem. **Minim
 
 **What the MVP actually relies on for manipulation resistance** is not the robust increment (that is the heavy-tailed roadmap upgrade) but three concrete, *implemented* layers, proven in the test-suite (§4.2, §4.4): (1) the **data-dependent firing time** removes any countdown to game; (2) the **bounded, one-sided spread** means the soft side trades at the base price, so faking a trend yields **zero** extractable advantage on the other side (`max_soft_gain ≡ 0`); and (3) **arbitrage** makes genuinely moving the price costly (`min_trigger_cost > 0`). The robust-QCD increment hardens layer (1) further against heavy-tailed crypto returns and is the next detector upgrade; see **§9.2** for the self-normalizing, self-calibrating **v2** that builds on it (thresholds expressed in units of the live volatility σ, so they adapt to the market automatically).
 
-### 3.5 The control law: evidence to bounded curvature
+### 3.5 The control law: evidence to a bounded spread
 
-The detector's accumulated evidence sets the curve's asymmetry, **bounded** so it can never swing far enough to be worth gaming:
+The detector's accumulated evidence sets the size of the directional spread, **bounded** so it can never grow far enough to be worth gaming:
 
 $$\kappa \;=\; \text{clamp}\big(f(S_t),\; \kappa_{\min},\; \kappa_{\max}\big)$$
 
@@ -506,6 +506,152 @@ carry over and help, but the bound must be re-established before v2 ships. It is
 next step, not a redesign, and the back-test + real-data harness above is exactly the tool to
 validate it.
 
+### 9.3 Four years, and a recalibration
+
+The 12-month replay above calibrated the detector. This is the longer study that followed it:
+**four calendar years of real ETH/USDC, 2022-09-19 to 2026-09-18, 7,776 four-hour closes**, with
+every parameter swept one at a time. It changed two of them.
+
+All four pools below are stepped over the **identical** price path with the identical order
+flow. LP value is marked at the external fair price, so it nets everything an LP actually
+experiences: fees earned, spread retained, arbitrage lost, and inventory carried. The baseline
+is a 30bps static pool, because nobody runs a zero-fee one.
+
+| Pool | LP value | Arb extracted | Flow kept | vs 30bps |
+|---|---:|---:|---:|---:|
+| Normal pool, 5 bps | 2,783,380 | 473,696 | 81.87% | −309 bps |
+| Normal pool, 30 bps | 2,872,414 | 387,110 | 30.11% | — |
+| Poincaré, live config | 2,981,485 | 299,929 | 34.12% | **+379 bps** |
+| **Poincaré, recalibrated** | **3,057,581** | **264,835** | 31.16% | **+644 bps** |
+
+On a $2,000,000 position the recalibrated pool is worth **$185,167 more than an ordinary 30bps
+pool over the four years**, and takes **$122,275 away from arbitrageurs**, a 32% cut in their
+income. Against the previously deployed configuration it is worth **$76,096**, or +255 bps.
+
+![LP value over four years](public/fouryear/lp_value.png)
+
+*Fig 9. What a $2,000,000 position was worth. The upper panel is the raw level; because all
+four pools track within a few percent across a 2.5x price move, the lower panel is what actually
+shows the mechanism working: each pool's difference against the 30bps baseline. The advantage
+accumulates steadily rather than arriving in one lucky episode.*
+
+![Cumulative arbitrage extraction](public/fouryear/arb_extracted.png)
+
+*Fig 10. Cumulative value taken by arbitrageurs. Lower is better; this is LP money leaving the
+pool. The ordering is stable for the whole four years.*
+
+#### What changed, and why
+
+Only two numbers moved.
+
+**`dFloor`, the directional-efficiency gate: 0.50 → 0.25.** The signal `D = |Σr| / Σ|r|` is a
+ratio, and a fixed threshold on it does not mean a fixed thing. For a driftless series of `n`
+samples the numerator is `E|Sₙ| = σ√(2n/π)` and the denominator is `n·σ√(2/π)`, so the *no-trend
+expectation* is
+
+```
+E[D] = 1/√n ,   with  n = 1/(1 − λ)  effective samples under EWMA decay λ
+```
+
+At the deployed `λ = 0.9` that noise floor is `1/√10 = 0.316`. So the gate is only meaningful as
+a **ratio to it**:
+
+```
+r = dFloor / √(1 − λ)
+```
+
+how many noise-widths of directionality the detector demands before acting. The old gate sat at
+`r = 1.58` and spent most real trends waiting. The new one asks `r = 0.79`.
+
+This also means **`dFloor` and `λ` were never independent parameters**, which the sweep
+confirms: holding `r = 0.79` fixed while `λ` moves from 0.90 to 0.98 — a five-fold change in
+effective window — moves LP value by **under 0.5%**. The derivation breaks exactly where it
+predicts it should, at `λ = 0.70` where `n = 3.3` and the central limit theorem has not engaged.
+`test/DeployedConfig.t.sol` asserts the coupling so that changing `λ` alone cannot silently move
+the gate.
+
+**`κ_max`, the spread cap: 0.10 → 0.05.** This is **not** a second improvement; it is the
+control, and it makes the pool *safer*, not looser. Dropping the gate doubles how often κ is
+engaged, which on its own would raise the mean fee and push traders away — and a pool that gains
+LP value by charging more has not improved anything. Halved, the pool posts a **136 bps mean fee
+against the old 137 bps**, so what remains is attributable to the detector acting on more real
+trends rather than the pool being more expensive. Halving the worst-case directional spread also
+*tightens* the manipulation bound in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) A3.
+
+![What the gate change does](public/fouryear/gate_engagement.png)
+
+*Fig 11. The change, seen directly. The detector now acts on 63% of bars rather than 32%, at an
+unchanged mean fee. The shaded band is a gap in the source data (see the caveats below).*
+
+#### What did not change, and why that matters
+
+Seven parameters were swept and left alone, which is as much a result as the two that moved:
+
+| Parameter | Verdict |
+|---|---|
+| `k` = 0.001, `h` = 0.005 | **Already at a local optimum.** Both directions cost LP value (k: −24 / −45 bps, h: −29 / −36 bps). The original calibration was right. |
+| `sMax` = 0.02 | **At the knee.** Flat above (0.04, 0.08 change nothing), sharply worse below (0.01 costs 162 bps). |
+| `clip` = 0.20 | **Never binds.** 0.20 and 0.40 give bit-identical results — a 4h log return never reaches 20%. It is a tail guard against one absurd print, not a tuning knob. |
+| `λ` = 0.9 | Unchanged, but now **coupled to `dFloor`** by the equation above. |
+| `feeGamma` = 0.5, `feeCap` = 30 bps | Unchanged. The vol fee is a minor component next to the directional spread, but the cap binds nearly always, so it is load-bearing for the mean fee. |
+
+We also tried, and rejected, three richer mechanisms: a multiplicative-weights learner over a
+whitelist of configurations, an adaptive-conformal quantile tracker in place of `γ·σ̂`, and a
+self-normalised CUSUM. The learner and the tracker were **no better than the deployed config
+once compared at a matched operating point**; the self-normalised detector scored exactly
+**+0 bps**, which is the correct outcome — its value is invariance across volatility regimes this
+tape does not contain, not return on this one. All three are kept in
+`test/optimal/GammaFourYear.t.sol`.
+
+#### Year by year
+
+One four-year number can hide a single lucky episode, so each year was also run as an
+**independent pool** seeded at that year's opening price.
+
+![Year by year](public/fouryear/year_by_year.png)
+
+| Period | ETH | Normal 5 bps | Normal 30 bps | Live | Recalibrated |
+|---|---|---:|---:|---:|---:|
+| 2022-09 → 2023-09 | $1,308 → $2,477 | 2,758,501 | 2,774,002 | 2,775,565 | **2,789,939** |
+| 2023-09 → 2024-09 | $2,469 → $3,920 | 2,527,244 | 2,548,570 | 2,569,616 | **2,598,972** |
+| 2024-09 → 2025-09 | $3,850 → $4,026 | 2,052,180 | 2,073,949 | 2,102,272 | **2,122,610** |
+| 2025-09 → 2026-09 | $4,012 → $2,481 | 1,577,711 | 1,590,641 | 1,603,705 | **1,611,189** |
+
+The ordering **recalibrated > live > 30 bps > 5 bps holds in every single year**, through a
+doubling, a grind sideways, and a 38% drawdown, with less arbitrage extracted in all four.
+
+#### Caveats, stated plainly
+
+- **Year 1 is the weak one, and it is instructive.** The live config beat an ordinary 30bps pool
+  by 5 bps that year — effectively nothing — despite ETH nearly doubling. Year 3 went almost
+  nowhere and the hook did its best work. What the detector is paid for is **sustained
+  directional runs, not net displacement**, and those are not the same thing. This is not a
+  bull-market product.
+- **The source data has one hole.** 2022-09-29 to 2023-03-12, 3,940 hours, which the replay is
+  forced to treat as a single 4h step from $1,338 to $1,552. Re-running from past it
+  (`test_gapExcluded`) gives +631 bps and +392 bps instead of +644 and +379 — the levels shift by
+  13 to 25 bps and no conclusion changes.
+- **This is 4-hour bars; the hook samples per block.** Four orders of magnitude in arrival rate.
+  The scale-free *relationships* carry over; `κ_max = 0.05` specifically is a this-regime number
+  and is on the roadmap to be re-derived at block cadence.
+- **The recalibrated pool keeps 3 percentage points less flow** (31.16% vs 34.12%). LP value
+  already nets the lost fee revenue, so the +255 bps stands, but in a competitive market that is
+  volume going elsewhere. Worth noting that the 5 bps pool keeps **82%** of flow and still ends
+  with the *least* LP value of the four: retaining traders is not the objective function.
+
+Reproduce any of it:
+
+```bash
+# the table, the year-by-year rows, and the parameter sweeps
+POINCARE_SWEEP=1 FOUNDRY_PROFILE=sweep forge test \
+    --match-path test/optimal/GammaFourYear.t.sol -vv
+
+# regenerate the figures from the same run
+FOUNDRY_PROFILE=sweep forge test --match-path test/optimal/GammaFourYear.t.sol \
+    --match-test test_dumpTimeseries
+python analysis/simulation/plot_fouryear.py
+```
+
 ## 10. Roadmap
 
 > **Status:** the MVP described above is **built and green**, 134 passing Foundry tests (unit,
@@ -532,13 +678,24 @@ external audit is still required before mainnet (item 5 below).
 
 **Next, to production:**
 
-1. **Real-data calibration:** replay a historical series for the target pair to pin `k, h (ARL₀), window, κ_max`; the engine is already data-ready.
+1. ~~**Real-data calibration**~~ **Done (2026-09).** Four years of ETH/USDC, every parameter
+   swept one at a time; `dFloor` and `κ_max` recalibrated, the rest confirmed already optimal.
+   Method, numbers and figures in [§9.3](#93-four-years-and-a-recalibration).
 2. **Adaptive-mode manipulation bound (OPEN_ITEMS V1):** the v2 detector is implemented and
    simulated against σ-inflation, but the quantitative worst-case bound must be derived before
    `adaptive = true` guards real value. Security params (`κ_max, Δκ_max`) stay fixed by design.
-3. ~~**Depth / curvature lever**~~ **Closed, not deferred.** The §3.1 offset design was built offline, made round-trip safe and split-invariant, and then measured across 7,776 real ETH/USDC 4h bars. In the more-trending half of that series the spread lever cuts arbitrage extraction 362bps at 8.61x LP value per unit of trader cost, against the depth lever's 41bps at 0.26x. Symmetric steepening taxes every trade while real months are mostly reversal, so the pool ends up leaning against flow that is about to turn. Write-up and data in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
+3. **Per-block re-validation of §9.3.** The recalibration ran on 4-hour bars; the hook samples
+   per block, four orders of magnitude apart in arrival rate. The *relationships* are
+   scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
+   wants re-deriving against block-cadence data.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
+
+> **Not on this roadmap, and deliberately:** a depth or curvature lever. It was built,
+> made round-trip safe and split-invariant, measured across four years, and lost by roughly
+> thirty to one. It is closed. There is no depth-asymmetry mode in the codebase, no
+> configuration that enables one, and no plan to add one. Evidence kept in
+> [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1 so the decision stays auditable.
 
 ## 11. Security review
 

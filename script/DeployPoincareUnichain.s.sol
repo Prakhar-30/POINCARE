@@ -100,14 +100,36 @@ contract DeployPoincareUnichain is Script {
     // Demo-pool config: engages quickly so the lean is visible on a testnet. Absolute
     // (non-adaptive) mode; vol fee on; base depth plain x*y=k so demo trades keep moving
     // the price enough to exercise the detector.
+    //
+    // dFloor AND kappaMax WERE RECALIBRATED after a four-year study on real ETH/USDC; see
+    // `test/optimal/GammaFourYear.t.sol` and README section 8. The short version:
+    //
+    //   dFloor 0.50 -> 0.25   D is |sum r| / sum |r|, whose no-trend expectation is
+    //                         1/sqrt(n) for n = 1/(1-lambda) effective samples. At
+    //                         lambda 0.9 that floor is 0.316, so the old gate demanded
+    //                         1.58 noise-widths of directionality and spent most real
+    //                         trends waiting. 0.25 asks for 0.79 and acts on them.
+    //
+    //   kappaMax 0.10 -> 0.05 NOT a second improvement, and not a loosening. Halving it
+    //                         is the control: the lower gate doubles how often kappa is
+    //                         engaged, which would otherwise raise the mean fee and push
+    //                         traders away. Halved, the pool posts the same 136bps mean
+    //                         fee it posted before, so the gain is the detector acting on
+    //                         more real trends rather than the pool being more expensive.
+    //                         It also HALVES the worst-case directional spread, so the
+    //                         manipulation bound of OPEN_ITEMS A3 gets tighter, not looser.
+    //
+    // k, h, sMax, lambda and clip are unchanged: the same study swept each one and found
+    // k and h already at a local optimum in both directions, sMax at its knee, and clip
+    // never binding on 4h data (it is a tail guard, not a tuning knob).
     int256 constant K = 1e15; // slack 0.001 (noise floor)
     int256 constant H = 5e15; // threshold 0.005
     int256 constant S_MAX = 2e16; // evidence cap 0.02
     uint256 constant KAPPA_MIN = 0; // symmetric when calm
-    uint256 constant KAPPA_MAX = 1e17; // 0.10 max directional spread
+    uint256 constant KAPPA_MAX = 5e16; // 0.05 max directional spread (was 0.10)
     uint256 constant D_MAX = 5e16; // kappa ramp rate / block
     uint256 constant LAMBDA = 9e17; // EWMA decay 0.9
-    uint256 constant D_FLOOR = 5e17; // directional-efficiency gate 0.5
+    uint256 constant D_FLOOR = 25e16; // directional-efficiency gate 0.25 (was 0.50)
     uint256 constant CLIP = 2e17; // Huber clip: 20% log-return per block
     uint256 constant FEE_GAMMA = 5e17; // fee = 0.5 * sigma,
     uint256 constant FEE_CAP = 3e15; // capped at 0.30%
@@ -180,6 +202,12 @@ contract DeployPoincareUnichain is Script {
             Currency.unwrap(c0),
             Currency.unwrap(c1)
         );
+    }
+
+    /// @dev The same config the deploy uses, readable from tests so the on-chain parameter
+    ///      set can be pinned rather than restated. See `test/DeployedConfig.t.sol`.
+    function exposedConfig() external pure returns (PoincareConfig memory) {
+        return _config();
     }
 
     function _config() internal pure returns (PoincareConfig memory cfg) {

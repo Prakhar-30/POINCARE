@@ -29,12 +29,12 @@ const CFG = {
   h: 5n * 10n ** 15n, //       threshold 0.005
   sMax: 2n * 10n ** 16n, //    evidence cap 0.02
   lambda: 9n * 10n ** 17n, //  EWMA decay 0.9
-  dFloor: 5n * 10n ** 17n, //  D gate 0.5
+  dFloor: 25n * 10n ** 16n, // D gate 0.25 (recalibrated; see README section 8)
   adaptive: false,
   sigmaFloor: 0n,
   clipWad: 2n * 10n ** 17n, // Huber clip 20%/block
   kappaMin: 0n,
-  kappaMax: 10n ** 17n, //     0.10 max directional spread
+  kappaMax: 5n * 10n ** 16n, // 0.05 max directional spread (recalibrated)
   dMax: 5n * 10n ** 16n, //    kappa ramp / block
   feeGamma: 5n * 10n ** 17n, // fee = 0.5 * sigma ...
   feeCap: 3n * 10n ** 15n, //  ... capped at 0.30%

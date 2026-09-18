@@ -1218,6 +1218,116 @@ contract GammaFourYearTest is Test {
         _sn(188e15, 15e17, 375e16, 250e15, 8e16);
     }
 
+    /// @notice THE DATASET HAS ONE HOLE, AND THIS CHECKS WHETHER IT MATTERS.
+    ///
+    ///         `eth_usdc_4h_4y.csv` spans four calendar years, 2022-09-19 to 2026-09-18, but
+    ///         holds 7,776 bars where a gapless 4h series would hold 8,766. All of the
+    ///         shortfall is one hole: 2022-09-29 to 2023-03-12, 3,940 hours, which the replay
+    ///         necessarily treats as a single 4h step from $1,338 to $1,552. That one bar
+    ///         hands the detector a 16% return and the arbitrageur a jump no real pool would
+    ///         ever have faced in one block.
+    ///
+    ///         It is one bar in 7,776, but it is exactly the kind of bar this mechanism is
+    ///         built around, so "small" is not good enough. Re-run from bar 60, past the hole,
+    ///         and compare the conclusion rather than the level.
+    function test_gapExcluded() public view {
+        uint256 t1 = prices.length;
+        uint256 ref = _row("  normal 30bps", 0, 0, 60, t1, 30e14);
+        uint256 live = _row("  LIVE        ", 5e17, 1e17, 60, t1, 0);
+        uint256 prop = _row("  PROPOSED    ", 250e15, 5e16, 60, t1, 0);
+        console2.log("  LIVE     vs 30bps (bps):", live >= ref ? ((live - ref) * 10_000) / ref : 0);
+        console2.log("  PROPOSED vs 30bps (bps):", prop >= ref ? ((prop - ref) * 10_000) / ref : 0);
+        console2.log("  PROPOSED vs LIVE  (bps):", prop >= live ? ((prop - live) * 10_000) / live : 0);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // TIMESERIES DUMP, for the README figures.
+    //
+    // Four pools stepped over the identical path, sampled every 12 bars (two days) so the CSV
+    // stays small enough to commit. Everything the plots need comes from one pass, so the
+    // figures cannot drift out of step with the numbers in the table.
+    string internal constant CSV = "analysis/simulation/realdata/fouryear_compare.csv";
+
+    struct Quad {
+        Pool a; // normal 5bps
+        Pool b; // normal 30bps
+        Pool c; // live
+        Pool d; // proposed
+    }
+
+    function _mk(uint256 staticFee_, uint256 dFloor_, uint256 kappaMax_)
+        internal
+        view
+        returns (Pool memory p)
+    {
+        _defaults(p);
+        p.r0 = R0;
+        p.r1 = FullMath.mulDiv(R0, WAD, prices[0]);
+        p.lastP = FullMath.mulDiv(p.r1, WAD, p.r0);
+        p.gamma = 5e17;
+        p.feeCapP = 3e15;
+        p.staticFee = staticFee_;
+        p.directional = staticFee_ == 0;
+        p.pDFloor = dFloor_;
+        p.pKappaMax = kappaMax_;
+    }
+
+    function test_dumpTimeseries() public {
+        Quad memory q;
+        q.a = _mk(5e14, 0, 0);
+        q.b = _mk(30e14, 0, 0);
+        q.c = _mk(0, 5e17, 1e17);
+        q.d = _mk(0, 250e15, 5e16);
+
+        vm.writeFile(CSV, "");
+        vm.writeLine(CSV, "bar,price,hodl,lp5,lp30,lpLive,lpProp,arb5,arb30,arbLive,arbProp,kLive,kProp");
+        for (uint256 t = 0; t < prices.length; t++) {
+            uint256 fair = _fairPool(t);
+            bool dir = (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0;
+            _step(q.a, fair, dir);
+            _step(q.b, fair, dir);
+            _step(q.c, fair, dir);
+            _step(q.d, fair, dir);
+            if (t % 12 == 0 || t == prices.length - 1) _writeRow(q, t, fair);
+        }
+        console2.log("wrote", CSV);
+    }
+
+    function _writeRow(Quad memory q, uint256 t, uint256 fair) internal {
+        Pool memory z = _mk(0, 0, 0);
+        string memory line = string.concat(
+            vm.toString(t),
+            ",",
+            vm.toString(prices[t]),
+            ",",
+            vm.toString(_lpValue(z, fair)),
+            ",",
+            vm.toString(_lpValue(q.a, fair)),
+            ",",
+            vm.toString(_lpValue(q.b, fair)),
+            ",",
+            vm.toString(_lpValue(q.c, fair)),
+            ",",
+            vm.toString(_lpValue(q.d, fair))
+        );
+        line = string.concat(
+            line,
+            ",",
+            vm.toString(q.a.lvr),
+            ",",
+            vm.toString(q.b.lvr),
+            ",",
+            vm.toString(q.c.lvr),
+            ",",
+            vm.toString(q.d.lvr),
+            ",",
+            vm.toString(q.c.kappa),
+            ",",
+            vm.toString(q.d.kappa)
+        );
+        vm.writeLine(CSV, line);
+    }
+
     // ------------------------------------------------------------------------------------
     // HEAD TO HEAD: THE LIVE CONFIGURATION AGAINST THE PROPOSED ONE.
     //
