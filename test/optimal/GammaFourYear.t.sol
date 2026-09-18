@@ -61,7 +61,18 @@ contract GammaFourYearTest is Test {
         uint256 kappa;
         Cusum.Trend trend;
         uint256 spreadSum;
+        // Avellaneda-Stoikov mode
+        bool avellaneda;
+        uint256 gammaRisk; // risk aversion
     }
+
+    /// @dev A-S horizon, in bars. For a perpetual pool there is no terminal time, so the
+    ///      horizon is the memory of the signal itself: with EWMA decay lambda the effective
+    ///      window is 1/(1-lambda), which at lambda = 0.9 is ten bars.
+    uint256 internal constant TAU = 10 * WAD;
+    /// @dev Order-arrival decay in the A-S liquidity term. Calibrated so the symmetric part
+    ///      lands in the basis-point range the fee sweep showed to be efficient.
+    uint256 internal constant K_ARRIVAL = 15e17;
 
     // detector configuration, as deployed
     int256 internal constant K_SLACK = 1e15;
@@ -94,11 +105,56 @@ contract GammaFourYearTest is Test {
         if (f > FEE_CAP) f = FEE_CAP;
     }
 
+    /// @dev THE AVELLANEDA-STOIKOV QUOTE, adapted to a pool.
+    ///
+    ///      The canonical market-making solution gives a reservation price shifted from mid by
+    ///      the inventory the maker is carrying, and a half-spread that splits into an
+    ///      inventory-risk premium and a liquidity term:
+    ///
+    ///          r  = mid - I * gamma * sigma^2 * tau
+    ///          d  = (gamma * sigma^2 * tau) / 2 + (1/gamma) * ln(1 + gamma/k)
+    ///
+    ///      Every input is already on this hook. `sigma` is the detector's own estimate.
+    ///      `tau` is the signal's effective memory, since a perpetual pool has no terminal
+    ///      time. And `I`, the inventory the pool is carrying away from its centre, is
+    ///      exactly `ewmaNet`: the decayed sum of log-returns, which in a constant-product
+    ///      pool IS the displacement of the reserves from where they have been sitting. No
+    ///      oracle appears anywhere, because in a CPMM inventory and price are the same fact.
+    ///
+    ///      What this replaces is the ad-hoc part. The deployed control law ramps kappa
+    ///      linearly between `h` and `sMax` and clamps it; the shape was chosen because it
+    ///      was monotone and bounded, not because anything implied it. A-S says the skew
+    ///      should be LINEAR IN INVENTORY and scale with variance and horizon, which is a
+    ///      different shape with a derivation behind it.
+    function _asQuote(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+        // sigma from mean-absolute-deviation: sigma = sigmaHat / sqrt(2/pi)
+        uint256 sigma = FullMath.mulDiv(sigmaHat, WAD, 7979e14);
+        uint256 var_ = FullMath.mulDiv(sigma, sigma, WAD);
+        uint256 gsT = FullMath.mulDiv(FullMath.mulDiv(p.gammaRisk, var_, WAD), TAU, WAD);
+
+        // A-S skew: linear in the inventory the pool is carrying away from its centre.
+        int256 inv = p.sig.ewmaNet;
+        uint256 skew = FullMath.mulDiv(gsT, inv >= 0 ? uint256(inv) : uint256(-inv), WAD);
+
+        // The base half-spread is the pool's existing volatility fee. A-S's liquidity term,
+        // (1/gamma)*ln(1 + gamma/k), is an ABSOLUTE price offset calibrated to an order-flow
+        // intensity, not a fractional fee; carrying it across units unconverted produced
+        // quotes of fifty percent and pinned the cap. What transfers cleanly is the skew,
+        // which is dimensionless because it is a log-price shift, and which is the part with
+        // no counterpart in the deployed control law anyway.
+        uint256 base = _fee(p);
+        bool pushesAway = inv >= 0 ? !zeroForOne : zeroForOne;
+        uint256 q = pushesAway ? base + skew : base;
+        return q > FEE_CAP ? FEE_CAP : q;
+    }
+
     /// @dev Total friction a swap in this direction faces: the symmetric fee, plus the
     ///      directional spread if this pool runs one AND the swap is pushing with the
     ///      detected trend. This is the whole asymmetry: toxic flow meets fee + kappa, benign
     ///      flow meets the fee alone.
     function _friction(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
+        if (p.avellaneda) return _asQuote(p, zeroForOne);
         uint256 f = _fee(p);
         if (!p.directional || p.kappa == 0) return f;
         bool withTrend =
@@ -138,7 +194,7 @@ contract GammaFourYearTest is Test {
     }
 
     function _step(Pool memory p, uint256 fair, bool buyToken1) internal pure {
-        p.feeSum += _fee(p);
+        p.feeSum += p.avellaneda ? _asQuote(p, true) : _fee(p);
         p.spreadSum += p.kappa;
         p.steps++;
 
@@ -192,6 +248,21 @@ contract GammaFourYearTest is Test {
 
     function _run(uint256 gamma) internal view returns (Pool memory p) {
         return _runWith(gamma, false);
+    }
+
+    function _runAS(uint256 gammaRisk) internal view returns (Pool memory p) {
+        return _runASFee(gammaRisk, 25e16);
+    }
+
+    /// @dev A-S skew layered on a volatility fee, so the comparison against the deployed
+    ///      "fee + directional spread" is like for like: same base, different skew shape.
+    function _runASFee(uint256 gammaRisk, uint256 feeGamma) internal view returns (Pool memory p) {
+        p = _seed(feeGamma);
+        p.avellaneda = true;
+        p.gammaRisk = gammaRisk;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, prices[t], (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
     }
 
     function _runWith(uint256 gamma, bool directional) internal view returns (Pool memory p) {
@@ -267,6 +338,40 @@ contract GammaFourYearTest is Test {
 
     function test_directional_gamma050() public view {
         _directionalAt(5e17);
+    }
+
+    /// @notice THE AVELLANEDA-STOIKOV QUOTE ON FOUR YEARS OF REAL DATA.
+    ///
+    ///         Reference points from the fee sweep on this identical series:
+    ///           gamma 0.10 -> 57.90% eliminated, benign     9,743, saved/cost 781
+    ///           gamma 0.25 -> 73.87% eliminated, benign    30,628, saved/cost 317
+    ///           gamma 0.50 -> 83.93% eliminated, benign    84,069, saved/cost 131
+    ///           gamma 1.00 -> 90.87% eliminated, benign   320,037, saved/cost  37
+    ///
+    ///         The question is whether a quote with a derivation behind it lands above that
+    ///         frontier, which is the only thing that would justify replacing a shape that
+    ///         works with a shape that is correct.
+    function _asAt(uint256 gammaRisk) internal view {
+        Pool memory base = _run(0);
+        Pool memory p = _runAS(gammaRisk);
+        uint256 saved = base.lvr > p.lvr ? base.lvr - p.lvr : 0;
+        console2.log("A-S risk aversion (wad):", gammaRisk);
+        console2.log("  eliminated (bps)     :", (saved * 10_000) / base.lvr);
+        console2.log("  cost to uninformed   :", p.benign);
+        console2.log("  saved per unit cost  :", p.benign > 0 ? saved / p.benign : 0);
+        console2.log("  mean quote (bps)     :", (p.feeSum / p.steps) / 1e14);
+    }
+
+    function test_as_g100() public view {
+        _asAt(100e18);
+    }
+
+    function test_as_g400() public view {
+        _asAt(400e18);
+    }
+
+    function test_as_g1200() public view {
+        _asAt(1200e18);
     }
 
     /// @notice The model predicts what fee this replay needs for 95%, and it is not the fee
