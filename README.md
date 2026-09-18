@@ -117,7 +117,7 @@ This is the design the figure below illustrates, and it is where we started.
 > **Why we did *not* ship raw direction-dependent offsets, and what we ship instead.**
 > Choosing *different depths* per swap direction and re-anchoring at the current reserves on every swap is **arbitrage-exploitable**. We reproduced it as a concrete round-trip drain: buy on the shallow branch, sell back on the deep branch, and walk away with pool value. The root cause is that depth-asymmetry shifts the **mid-price**, not just the spread, which opens a free round trip, a hole an MEV bot empties on day one.
 >
-> The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. The richer depth/curvature lever stays on the roadmap, gated on the manipulation-cost sizing it would require (§3.4, §7).
+> The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. The richer depth/curvature lever was subsequently built offline and measured against this one across four years of real ETH/USDC. It loses, and by a wide margin; the spread is not a compromise we settled for but the better mechanism on the evidence. See [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
 
 ![The asymmetric bonding curve](public/fig1_asymmetric_curve.png)
 
@@ -337,7 +337,7 @@ The asymmetric-curve idea alone would resemble the directional-fee family (Nezlo
 
 | Axis | Existing hooks | **Poincaré** |
 |---|---|---|
-| Lever | fee / spread / static curve | **asymmetric geometry: a directional, trend-gated spread (arb-safe); depth/curvature lever on the roadmap** |
+| Lever | fee / spread / static curve | **asymmetric geometry: a directional, trend-gated spread, arb-safe by construction and measured against the depth alternative over four years of real data** |
 | Trigger | fixed window / threshold / oracle | **CUSUM stopping time (data-dependent)** |
 | Optimality | heuristic | **Lorden minimax-optimal detection** |
 | Manipulation | hopes the signal is hard to fake | **bounded prize (soft-gain ≡ 0) + arbitrage punishment; robust-QCD on the roadmap** |
@@ -536,7 +536,7 @@ external audit is still required before mainnet (item 5 below).
 2. **Adaptive-mode manipulation bound (OPEN_ITEMS V1):** the v2 detector is implemented and
    simulated against σ-inflation, but the quantitative worst-case bound must be derived before
    `adaptive = true` guards real value. Security params (`κ_max, Δκ_max`) stay fixed by design.
-3. **Depth / curvature lever** (the §3.1 offset design), *only* once the manipulation-cost sizing that keeps it arb-safe is derived; the spread lever ships first because it is safe by construction.
+3. ~~**Depth / curvature lever**~~ **Closed, not deferred.** The §3.1 offset design was built offline, made round-trip safe and split-invariant, and then measured across 7,776 real ETH/USDC 4h bars. In the more-trending half of that series the spread lever cuts arbitrage extraction 362bps at 8.61x LP value per unit of trader cost, against the depth lever's 41bps at 0.26x. Symmetric steepening taxes every trade while real months are mostly reversal, so the pool ends up leaning against flow that is about to turn. Write-up and data in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
 

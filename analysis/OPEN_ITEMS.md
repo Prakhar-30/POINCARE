@@ -43,8 +43,8 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 |---|------|-------|--------|-------|
 | A1 | **Single-block / flash manipulation of the detector.** §4.2 requires sampling so *one block cannot move the statistic*. | hook | ✅ | **Implemented** in `_sampleAndUpdateDetector` (samples once per block off pre-swap reserves) AND **tested** end-to-end: `test/manipulation/Manipulation.t.sol::test_singleBlockFlash_doesNotMoveDetector` dumps 30 ether and buys it back in one block and asserts κ stays 0 / the sampled price tracks the settled price, not the spike. Holding a move across a block boundary is still possible (the intended, arbitraged cost). |
 | A2 | **Curvature-only asymmetry is arb-exploitable.** Proven by a concrete buy-shallow/sell-deep round-trip counterexample. | `AsymmetricCurve` | ✅ (mitigated) | Resolved by implementing the asymmetry as a **non-negative directional spread on a symmetric-depth base** (arb-safe by construction; round-trip fuzz gate). See E1 for the deferred curvature lever. |
-| A3 | **`κ_max` security-sizing: resolved for the spread lever, open for the depth lever.** | `ControlLaw` cfg | ✅ (spread) / 🟠 (depth E1) | For the **spread** lever shipped in the MVP the §4.2 inequality holds *by construction*: the soft (against-trend) side trades at the base constant-product price, so `max_soft_gain ≡ 0 < min_trigger_cost` with margin = the entire trigger cost (proven in `test/backtest/Backtest.t.sol`). `κ_max` therefore need not be security-sized for the spread lever; it is a pure tuning/seam cap. The sizing IS required before deploying the depth/curvature lever (E1), which would create a non-zero soft-side prize. |
-| A4 | **Manipulation simulation: present (spread lever).** | `test/backtest/` + `test/manipulation/` | ✅ (spread) / 🟠 (depth E1) | `Backtest.t.sol::test_manipulation_softGainIsZero_triggerCostPositive` proves soft-side output == constant-product output (no prize) + positive trigger cost. `Manipulation.t.sol` adds two END-TO-END (real PoolManager) sims: a fake-trend round trip loses money (`test_fakeTrendRoundTrip_isUnprofitable`), and the single-block flash guard (A1). The depth-lever adversarial suite is deferred with E1. |
+| A3 | **`κ_max` security-sizing: resolved for the spread lever.** | `ControlLaw` cfg | ✅ | For the **spread** lever shipped in the MVP the §4.2 inequality holds *by construction*: the soft (against-trend) side trades at the base constant-product price, so `max_soft_gain ≡ 0 < min_trigger_cost` with margin = the entire trigger cost (proven in `test/backtest/Backtest.t.sol`). `κ_max` therefore need not be security-sized for the spread lever; it is a pure tuning/seam cap. The sizing IS required before deploying the depth/curvature lever (E1), which would create a non-zero soft-side prize. |
+| A4 | **Manipulation simulation: present (spread lever).** | `test/backtest/` + `test/manipulation/` | ✅ | `Backtest.t.sol::test_manipulation_softGainIsZero_triggerCostPositive` proves soft-side output == constant-product output (no prize) + positive trigger cost. `Manipulation.t.sol` adds two END-TO-END (real PoolManager) sims: a fake-trend round trip loses money (`test_fakeTrendRoundTrip_isUnprofitable`), and the single-block flash guard (A1). The depth lever is no longer a roadmap item: it was built, fuzzed and measured, and rejected on the evidence (E1). |
 | A5 | **PriceLib reverts on zero reserve / zero price.** | `PriceLib` / hook | ✅ (mitigated) | Reserves provably stay > 0 under the constant-product base: `swapExactIn` output is always strictly `< reserve` (math), `swapExactOut` rejects impossible requests (A7), and the `MINIMUM_LIQUIDITY` lock (A10) leaves a dust floor `removeLiquidity` cannot withdraw. Confirmed empirically by `invariant_reservesStayPositive` (384k ops). The `require(r0>0 && r1>0)` guard means the only revert is the legitimate "swap into an empty pool" case, not a detector-induced one, so §4.5 holds. (Residual: an extreme-imbalance pool with `r1 > 1e6·r0` could round a dust reserve to 0 → clean `require` revert, not a fund loss; not reachable for sane pairs like ETH/USDC.) |
 | A6 | **`Cusum.update` (uncapped) can overflow-revert** under sustained drift on the hot path. | `Cusum` | ✅ (mitigated) | Hook MUST use `updateCapped` (or `step`) on-chain; plain `update` is back-test only. Enforced by convention (see D1). |
 | A7 | **Swap feasibility.** | `AsymmetricCurve` / hook | ✅ | On the shipped `a=b=0` base the "infeasible output" case **cannot occur**: `swapExactIn` gives `amountOut = Y − ⌈XY/(X+amountIn)⌉ < Y` (strictly less than the output reserve), and the spread haircut only shrinks it further. `swapExactOut` reverting when the requested output ≥ reserve is **correct AMM behaviour** (you cannot buy more than the pool holds; the router's `amountInMax` also bounds it), so it is the AMM's revert, not a detector/§4.5 revert. Exercised by the invariant handler (random exact-in/out) and the Lens + manipulation exact-out tests, all with feasible amounts succeeding. |
@@ -96,7 +96,43 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
   New feasibility guards reject outputs ≥ the REAL reserve (the virtual reserve is larger, A7
   extended to exact-in). Covered by unit + fuzz + the full-feature invariant flavor. The Lens
   reads `baseOffsets()` live, so quotes keep matching.
-- **E1. Curvature / depth-asymmetry lever (§3.1, §10).** The brief's headline lever (small vs large offsets) is arb-unsafe alone (A2). Deploying it safely needs the manipulation-cost sizing (A4) to bound the depth-arb with a dominating spread. Deferred until §4.2 analysis exists. Current MVP uses the spread lever, which is safe and still implements the bid-ask asymmetry.
+- **E1. Curvature / depth-asymmetry lever (§3.1, §10).** ✅ **Evaluated and rejected (2026-09),
+  with data.** This was the brief's headline lever and the spread was always described as the
+  safe fallback to it. It has now been built offline and measured rather than left deferred,
+  and it does not earn its place. Work preserved on the `feat/curvature-lever` branch; nothing
+  merged.
+
+  * **The safety objection was solvable.** Scaling both virtual legs by one multiplier,
+    `X = (x+a)·m`, `Y = (y+b)·m`, leaves the marginal price `Y/X` independent of `m`, so every
+    direction prices on a curve with an identical mid and a different curvature. A round-trip
+    fuzzer at independently-chosen depth pairs, both orders, two-leg and split three-leg, finds
+    no profitable sequence. The drain that killed the first attempt (A2) was depth moving the
+    MID, not depth itself.
+  * **Per-swap re-anchoring is path-dependent, and splitting defeats it.** Re-scaling the curve
+    on every trade lets a searcher re-anchor it in their favour; a 90% depth cut degraded to a
+    31% extraction cut once the arbitrageur was allowed to split. The
+    [path-independence characterisation](https://arxiv.org/pdf/2604.28017) explains it: a
+    modifier must depend on the invariant or price, never on `x` and `y` separately. Fixed by
+    carrying depth as persistent anchored offsets re-anchored once per block, verified
+    split-invariant to 18 wei on 1.8e22.
+  * **It still loses, by thirty to one.** Across 7,776 real ETH/USDC 4h bars (2022-09 to
+    2026-09), windows classified by the external price's own directional efficiency: in the
+    more-trending half the spread lever cuts extraction 362bps at 8.61x LP value per unit of
+    trader cost, while symmetric persistent depth cuts 41bps at 0.26x. In the chop half,
+    394bps at 5.83x against 57bps at 0.28x. Symmetric steepening taxes every trade, and real
+    months are mostly reversal, so the pool is steepened against flow that is about to turn.
+  * **A synthetic path said the opposite, loudly, and was wrong.** On a hand-built path of
+    clean sustained drifts, persistent depth measured 5.7x against the spread's 2.0x. Real
+    months never look like that: measured directional efficiency of the market runs 0.0009 to
+    0.257, median 0.082, where a synthetic trend sits near 1. **Any future curve-shape result
+    quoted off a synthetic path should be treated as unproven until it survives this series.**
+  * **Also established on the way, and still open as a general limit:** gross extraction cannot
+    be driven to zero by curve shape alone under drift. Anything that slows the arbitrageur
+    makes the pool stale, the gap then accumulates monotonically, and arbitrage profit is
+    convex in displacement, so the eventual trade costs more than the many small ones it
+    replaced. Measured: a directional band roughly doubles gross extraction through a trend
+    while still leaving LPs ahead, because the haircut is retained. The spread lever taxes the
+    arbitrageur; it does not stop them, and nothing shaped like a curve does.
 - **E2. Robust / heavy-tailed CUSUM increment (§1.4).** ✅ **Shipped (2026-07)**: an always-on
   Huber clip (`clipWad`, injected; absolute units in fixed mode, σ-units in adaptive mode) bounds
   any single block's influence on the signal, σ̂ AND the evidence. Doubles as the σ-inflation
@@ -137,7 +173,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 - ✅ Invariant suite (`test/invariant/PoincareInvariant.t.sol`): solvency/no-leak + bounds across 384k randomized ops.
 - ✅ Hook integration coverage now includes exact-output via router (Lens + manipulation tests), multiple LPs / fair dilution (invariant handler add/remove), and the delta-accounting rounding direction (A8). NOT yet covered: native-ETH pairs.
 - ✅ G1 resolved (D gates the asymmetry, implemented + tested). ✅ B3 resolved (reserves = 6909 balances).
-- ✅ Manipulation sim for the spread lever (A4); depth-lever suite deferred with E1.
+- ✅ Manipulation sim for the spread lever (A4). The depth lever was evaluated and rejected (E1), so there is no outstanding depth-lever suite.
 - ✅ Back-test (LVR reduction vs CPMM and vs vol-fee) via `test/backtest/Backtest.t.sol` (M6 done on
   synthetic path; real-data calibration pending a price series).
 - ✅ Integration via PoolManager + gas profiling (`test/Gas.t.sol`; ~120k/block detector overhead, see G8).
