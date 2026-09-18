@@ -80,9 +80,9 @@ before mainnet.
 ## Deployment
 
 Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
-`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`, Lens `0x1ca28a5de680109513ce26c861e049116a2643c2`,
-from block 57598397 (19 July 2026, the Olympix-fixed build; an earlier build ran there from
-3 July 2026). Not on mainnet; no live funds at risk.
+`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`, Lens `0x5d360309c7564270c5604067d7fa85e7d2508e02`,
+from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
+ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
 
 ## Contact
 

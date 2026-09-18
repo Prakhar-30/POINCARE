@@ -99,10 +99,10 @@ Unichain Sepolia (chain id 1301), testnet only:
 
 | | |
 |---|---|
-| Hook | [`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`](https://sepolia.uniscan.xyz/address/0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88) |
-| Lens | `0x1ca28a5de680109513ce26c861e049116a2643c2` |
+| Hook | [`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`](https://sepolia.uniscan.xyz/address/0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88) |
+| Lens | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` (canonical v4) |
-| Deployed | block 57598397 |
+| Deployed | block 62883477 |
 
 Every sampled block emits a `DetectorSample` event carrying the full detector trace (price, `r`,
 S⁺/S⁻, D, σ̂, κ, trend, fee), so the frontend in `frontend/` charts the *real* on-chain statistic

@@ -42,8 +42,8 @@ rather than sitting alongside it. Line numbers are against the current `main`.
 
 | | |
 |---|---|
-| Hook | `0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88` |
-| Lens (quoter) | `0x1ca28a5de680109513ce26c861e049116a2643c2` |
+| Hook | `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88` |
+| Lens (quoter) | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
 | App | https://poincare-beta.vercel.app |
 
 Developer feedback on the v4 stack, as required by the Uniswap Stack Contribution prize:
@@ -661,8 +661,8 @@ python analysis/simulation/plot_fouryear.py
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
-`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`, Lens `0x1ca28a5de680109513ce26c861e049116a2643c2`,
-deployed at block 57598397 against the canonical v4 `PoolManager`
+`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`, Lens `0x5d360309c7564270c5604067d7fa85e7d2508e02`,
+deployed at block 62883477 against the canonical v4 `PoolManager`
 `0x00B036B58a818B1BC34d502D3fE730Db729e62AC`, with a demo WETH/USDC pool, a faucet, and a
 web app (`frontend/`) that trades, provides liquidity, and charts the detector's real
 `DetectorSample` trace block by block. Addresses of record:

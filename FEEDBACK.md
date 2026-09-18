@@ -153,4 +153,4 @@ The two files that matter most:
 
 Repository: https://github.com/Prakhar-30/POINCARE
 Live app: https://poincare-beta.vercel.app
-Hook on Unichain Sepolia: `0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`
+Hook on Unichain Sepolia: `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`

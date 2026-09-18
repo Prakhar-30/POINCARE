@@ -7,8 +7,26 @@
 //
 //   PK=0x.. node deploy.mjs
 //
-// Reads artifacts from ../out (build with FOUNDRY_PROFILE=deploy first) and writes
-// ../deployments/unichain-sepolia.json (including the hook's deploy block).
+// Reads artifacts from ../out and writes ../deployments/unichain-sepolia.json (including the
+// hook's deploy block).
+//
+// BUILD THE ARTIFACTS LIKE THIS, and mind the second flag:
+//
+//   FOUNDRY_PROFILE=deploy forge build --skip "test/**" --out out-deploy --cache-path cache-deploy
+//   rm -rf out && cp -r out-deploy out
+//
+// Two things bite otherwise. First, `forge test` leaves out/ full of UNOPTIMIZED artifacts and
+// the hook is 35KB that way, over the 24.5KB EIP-170 limit; tests never notice because
+// `deployCodeTo` bypasses the limit, so the failure only shows up at deploy time. The deploy
+// profile's optimizer + IR brings it to ~17KB.
+//
+// Second, and this is the one that wastes an afternoon: forge compiles the project as ONE
+// via-IR unit on a single solc process, so a full build pins one core for over half an hour
+// while the other eleven idle. 27 of the 122 files are test contracts that a deployment does
+// not need. Skipping them takes the same build to about two minutes.
+//
+// If you ever kill a build midway, kill `solc` too, not just `forge`. Orphaned solc children
+// survive their parent and will quietly starve the next build of CPU.
 import fs from "node:fs";
 import {
   createPublicClient, createWalletClient, http, defineChain, formatEther,
