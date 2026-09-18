@@ -1268,7 +1268,17 @@ contract GammaFourYearTest is Test {
     ///         so a good or bad start does not carry forward and each row is its own
     ///         experiment. If the gate change is real it should win in most years rather than
     ///         winning enormously in one.
+    /// @dev `staticFee` non-zero runs an ordinary constant-fee pool instead of the hook, on
+    ///      the identical path, so the three sit in one table rather than three.
     function _slice(uint256 dFloor_, uint256 kappaMax_, uint256 t0, uint256 t1)
+        internal
+        view
+        returns (uint256 lp, uint256 arb, uint256 flow)
+    {
+        return _sliceFee(dFloor_, kappaMax_, t0, t1, 0);
+    }
+
+    function _sliceFee(uint256 dFloor_, uint256 kappaMax_, uint256 t0, uint256 t1, uint256 staticFee_)
         internal
         view
         returns (uint256 lp, uint256 arb, uint256 flow)
@@ -1280,7 +1290,8 @@ contract GammaFourYearTest is Test {
         p.lastP = FullMath.mulDiv(p.r1, WAD, p.r0);
         p.gamma = 5e17;
         p.feeCapP = 3e15;
-        p.directional = true;
+        p.staticFee = staticFee_;
+        p.directional = staticFee_ == 0;
         p.pDFloor = dFloor_;
         p.pKappaMax = kappaMax_;
         for (uint256 t = t0; t < t1; t++) {
@@ -1289,6 +1300,56 @@ contract GammaFourYearTest is Test {
         lp = _lpValue(p, _fairPool(t1 - 1));
         arb = p.lvr;
         flow = (p.vol * 10_000) / (NU * p.steps);
+    }
+
+    /// @notice THE THREE POOLS SIDE BY SIDE, year by year, on one path.
+    ///
+    ///         "Normal" is an ordinary constant-fee Uniswap position. Both 5bps and 30bps are
+    ///         shown because ETH/USDC liquidity really sits in both, and the two bracket what
+    ///         an LP would otherwise have been holding.
+    function _year3way(uint256 n) internal view {
+        uint256 per = prices.length / 4;
+        uint256 t0 = n * per;
+        uint256 t1 = n == 3 ? prices.length : t0 + per;
+        console2.log("YEAR:", n);
+        console2.log("  price:", prices[t0], prices[t1 - 1]);
+        _row("  normal  5bps", 0, 0, t0, t1, 5e14);
+        uint256 ref = _row("  normal 30bps", 0, 0, t0, t1, 30e14);
+        uint256 live = _row("  LIVE        ", 5e17, 1e17, t0, t1, 0);
+        uint256 prop = _row("  PROPOSED    ", 250e15, 5e16, t0, t1, 0);
+        console2.log("  LIVE     vs 30bps (bps):", live >= ref ? ((live - ref) * 10_000) / ref : 0);
+        console2.log("  PROPOSED vs 30bps (bps):", prop >= ref ? ((prop - ref) * 10_000) / ref : 0);
+    }
+
+    /// @dev Runs one slice and prints it, so the caller never holds four sets of three
+    ///      return values on the stack at once.
+    function _row(
+        string memory name,
+        uint256 dFloor_,
+        uint256 kappaMax_,
+        uint256 t0,
+        uint256 t1,
+        uint256 staticFee_
+    ) internal view returns (uint256) {
+        (uint256 lp, uint256 arb, uint256 flow) = _sliceFee(dFloor_, kappaMax_, t0, t1, staticFee_);
+        console2.log(string.concat(name, " LP/arb/flow:"), lp, arb, flow);
+        return lp;
+    }
+
+    function test_year3way_0() public view {
+        _year3way(0);
+    }
+
+    function test_year3way_1() public view {
+        _year3way(1);
+    }
+
+    function test_year3way_2() public view {
+        _year3way(2);
+    }
+
+    function test_year3way_3() public view {
+        _year3way(3);
     }
 
     function _year(uint256 n) internal view {
