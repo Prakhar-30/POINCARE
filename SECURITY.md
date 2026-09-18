@@ -21,25 +21,36 @@ All contracts under `src/` — 7 files, ~685 source lines (cloc), Solidity 0.8.3
 
 ## Key invariants (violations are findings)
 
-1. **Solvency.** The hook's ERC-6909 claim balances always cover what LP shares can withdraw; reserves are read from claim balances, never a shadow variable.
+1. **Solvency.** Reserves are shadow-accounted: the hook books every amount it settles rather than reading a live balance. The shadow must never exceed the ERC-6909 claims backing it, so every payout is covered. Absent donations the two are exactly equal, which `invariant_shadowReservesBackedByClaims` asserts across randomized sequences.
 2. **No value creation.** No swap sequence (including round trips) may extract more than it puts in, net of fees. Rounding is always against the trader: fee rounds up, output rounds down, exact-out input rounds up. Output must stay strictly below the real reserve.
 3. **Offset anchoring.** Virtual depth offsets are anchored at the first deposit and scale only with LP share supply (homothetically, preserving the mid). They must never be re-anchored to current reserves — a per-swap re-anchoring variant is round-trip drainable and was removed by design.
 4. **Once-per-block sampling.** The detector samples at most once per block, on pre-swap reserves, so an atomic push-and-unwind within one block can never feed it.
 5. **Bounded asymmetry.** The spread intensity kappa stays within `[kappaMin, kappaMax]` and moves at most `dMax` per block; the vol fee is capped at `feeCap`.
 6. **Quote fidelity.** `PoincareLens` quotes through the same libraries and per-block projection (`previewSpread` / `previewDetector`) as the swap path and must match execution exactly, including in a fresh block before the first swap.
 
-## Known, bounded residual (documented, not a fix)
+## Claim donations: closed by shadow accounting
 
-Reserves are the hook's ERC-6909 claim balances. Raw ERC20 transfers to the hook are
-ignored, but ERC-6909 claims are themselves transferable, so a claim donation *can* move
-`_reserves()` outside the add-liquidity path. This is bounded, not free: donated claims
-become pool reserves owned pro-rata by all LP shares, so the donor forfeits them and only
-recovers their own share fraction — the same "manipulation must move real value at real
-cost" property the detector relies on. Share pricing was hardened to price off the scarcer
-funded side (rejecting zero-counterpart adds). Fully removing this surface needs
-shadow-accounted reserves, a core-model change intentionally deferred to the paid audit
-(a shadow reserve diverging from real claims would be a worse, solvency-class bug).
-Reviewers should size the shadow-accounting trade-off explicitly.
+Reserves used to be read live from the hook's ERC-6909 claim balances. Raw ERC20 transfers
+were ignored, but claims are themselves transferable, so a donation could move `_reserves()`
+outside the add-liquidity path — and therefore move the price the detector samples once per
+block, and the divisor share pricing uses, without the donor ever trading.
+
+Reserves are now **shadow-accounted**: `_res0` / `_res1` record every amount the hook itself
+settles, applied in `_settleReserves` (swaps) and `_bookLiquidity` (add/remove), each using
+the exact amount `BaseCustomCurve` settles in the same call. Anything the hook did not settle
+is invisible to pricing, to the detector, and to redemption.
+
+What reviewers should check, since this is the risk the change introduces: the shadow can only
+be wrong by drifting from the claims that back it. Three things guard that. The shadow moves in
+exactly two private functions and through one checked write path (`_writeReserves`). It can only
+ever be **below** the claim balance, which is the safe direction, because the only unbooked
+inflow is a donation. And `invariant_shadowReservesBackedByClaims` asserts equality across
+128k randomized calls in both invariant flavours, so drift fails a test rather than becoming a
+silent solvency gap. `claimReserves()` exposes the live balances for comparison.
+
+Consequence worth stating plainly: donated claims are now **stranded**. They back the pool,
+they are owned by nobody, and nothing can withdraw them, because withdrawals are priced off
+the shadow. That is intended — it leaves no reason to donate at all.
 
 ## Prior review
 

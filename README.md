@@ -508,7 +508,7 @@ validate it.
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 131 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 134 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
 > regression test per finding from the **Olympix security review**, all fixed). The
@@ -558,7 +558,7 @@ passes now, in `test/regression/OlympixFindings.t.sol` plus the log-domain cases
 | Medium | LP shares were priced off token0 while the token1 counterpart floored down, minting claims token1 never backed | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected |
 | Low | The Lens returned a quote for a zero amount that a real swap reverts on | The Lens mirrors the PoolManager's `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful |
 | Low ×2 | An extreme move could push `lnWad` outside its domain, letting the detector revert a swap and violating the never-revert rule (§4.5) | The ratio is clamped into the safe domain, and a mid that floors to zero skips the sample instead of reverting |
-| Low ×2 | The docs claimed full donation resistance, but ERC-6909 claims are transferable, so a claim donation can move `_reserves()` | Claim corrected; the residual is bounded, because donated claims accrue pro-rata to all LPs and the donor forfeits them. Recorded in [`SECURITY.md`](./SECURITY.md) |
+| Low ×2 | The docs claimed full donation resistance, but ERC-6909 claims are transferable, so a claim donation can move `_reserves()` | **Closed.** Reserves are now shadow-accounted: the hook books every amount it settles, so a donation moves nothing it prices from. See [`SECURITY.md`](./SECURITY.md) |
 | Low | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio, opening an arb seam | Seeds where either offset rounds to zero are rejected |
 | Low | Exact-out routing could dodge part of the directional spread, because marking up the input undercharges on a convex curve | Exact-out reimplemented as the exact inverse of the exact-in haircut |
 

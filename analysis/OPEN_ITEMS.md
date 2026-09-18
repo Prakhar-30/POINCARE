@@ -49,7 +49,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 | A6 | **`Cusum.update` (uncapped) can overflow-revert** under sustained drift on the hot path. | `Cusum` | ✅ (mitigated) | Hook MUST use `updateCapped` (or `step`) on-chain; plain `update` is back-test only. Enforced by convention (see D1). |
 | A7 | **Swap feasibility.** | `AsymmetricCurve` / hook | ✅ | On the shipped `a=b=0` base the "infeasible output" case **cannot occur**: `swapExactIn` gives `amountOut = Y − ⌈XY/(X+amountIn)⌉ < Y` (strictly less than the output reserve), and the spread haircut only shrinks it further. `swapExactOut` reverting when the requested output ≥ reserve is **correct AMM behaviour** (you cannot buy more than the pool holds; the router's `amountInMax` also bounds it), so it is the AMM's revert, not a detector/§4.5 revert. Exercised by the invariant handler (random exact-in/out) and the Lens + manipulation exact-out tests, all with feasible amounts succeeding. |
 | A8 | **Rounding direction preserved end-to-end.** | hook | ✅ | The invariant suite (`test/invariant/`) drives 384k randomized swaps/liquidity ops and asserts (a) the hook's reserves equal independent ghost accounting to the wei (no favorable rounding leak), and (b) the constant-product invariant never decreases on a swap (no value creation by traders). |
-| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | 🟠 (external audit only) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual is the **standard external security audit before mainnet**, which is not self-certifiable, so it is kept open for that reason alone. |
+| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | 🟠 (external audit only) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual is the **standard external security audit before mainnet**, which is not self-certifiable, so it is kept open for that reason alone. |
 | A10 | **First-deposit / share-inflation.** | hook | ✅ | Resolved: a fixed `MINIMUM_LIQUIDITY = 1000` is locked to `0xdead` on the first mint (UniV2-standard guard), so the share supply can never be driven to dust. Also note reserves are ERC-6909 **claims** (not raw `balanceOf`), so a plain token donation cannot skew them. |
 
 ## B. Conceptual / design decisions (settled vs open)
@@ -190,6 +190,25 @@ Two things are worth keeping from it, because they were real and are cheap to re
 Analytics screen, and its `ai_notes` cache. `detector_configs` and `detector_samples.wad` existed
 only for the Lab and are dropped by `frontend/supabase/migration_005_drop_lab.sql`.
 
+## K. Shadow-accounted reserves (2026-09, closes the UHI10 judge's note)
+
+The UHI10 hookathon judge's single improvement (scores: 4.35/5 overall) was that `_reserves()`
+read live ERC-6909 claim balances, which anyone can move by transferring claims to the hook,
+biasing the once-per-block detector sample without touching share supply. Their prescription was
+specific: keep shadow reserves in storage, update them in the swap and mint/burn paths, and have
+`invariant_reservesMatchGhostAccounting` compare them against the claim balances.
+
+Implemented, with one deviation and one simplification worth recording.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| K1 | **Shadow reserves.** `_res0`/`_res1`, one packed slot, moved only by `_settleReserves` (swaps) and `_bookLiquidity` (add/remove) through a single checked write path. | ✅ | Each applies the exact amount `BaseCustomCurve` settles in the same call, so the shadow tracks the claims rather than predicting them. `_bookLiquidity` applies `-callerDelta`, which is the flow that actually settled rather than the one we asked for, and makes add and remove one line of arithmetic instead of two branches that could disagree. |
+| K2 | **The invariant the judge asked for.** | ✅ | Added as `invariant_shadowReservesBackedByClaims` rather than folded into the existing ghost check, because the two assert different things: the ghost check is "did we account for every flow", this is "is what we price from backed by what we hold". Asserts `shadow <= claims` (the safety direction) *and* exact equality, since the handler never donates. Runs in both invariant flavours at 128k calls. |
+| K3 | **The exact-out fee replay had to go.** | ✅ | `_getSwapFeeAmount` recovered the fee by re-running the pricing, which required `_reserves()` to still hold its pre-swap value. With the shadow updated during pricing, that replay would read post-swap state and report a wrong fee in `HookSwap`. The pricing already returns the exact split, so it is now carried across in a transient variable. Strictly better: one less place for the event to drift from reality. |
+| K4 | **Gas went down, not up.** | ✅ | Per-block detector overhead 96k → **94.7k**. Two external `balanceOf` staticcalls per reserve read became one packed SLOAD, and the exact-out replay disappeared. |
+| K5 | **Donated claims are now stranded, not gifted.** | 🟡 (behaviour change, intended) | Previously a donation accrued pro-rata to existing LPs. Now nothing can withdraw it, because redemption is priced off the shadow. This is the stronger position: it removes any reason to donate. The regression test `test_L3_claimDonation_cannotMoveReservesOrDetector` asserts the claims really arrive, and that reserves, the sampled price, share pricing and redemption are all unmoved. |
+| K6 | **The risk this introduces.** | 🟡 (guarded) | A shadow that drifts from real claims would be a worse, solvency-class bug than the donation surface it replaces — which is exactly why it was deferred before. Guards: the shadow moves in two functions through one checked write; it can only ever sit *below* the claims, which is the safe direction, since the only unbooked inflow is a donation; and equality is asserted across 384k randomized ops. `claimReserves()` exposes the live balances so the two can always be compared on-chain. |
+
 ---
 
 ## H. Olympix security review (2026-07, all findings fixed)
@@ -204,7 +223,7 @@ and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceL
 | M-2 | LP mint priced off token0 while the token1 counterpart floored down, minting claims token1 never backed. | ✅ | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected. |
 | L-1 | Lens returned a quote for a zero amount that a real swap would revert on. | ✅ | Lens mirrors the PoolManager `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful. |
 | L-2 / L-4 | Log-return domain: an extreme move could make `lnWad` revert, i.e. the detector could revert a swap (violating §4.5). | ✅ | Ratio clamped into the safe domain; a mid that floors to zero skips the sample instead of reverting. |
-| L-3 / L-6 | Docs claimed full donation-resistance; ERC-6909 claims are transferable, so a claim donation can move `_reserves()`. | ✅ (documented) | Claim corrected; the residual is bounded (donated claims accrue pro-rata to all LPs, so the donor forfeits them) and recorded in `SECURITY.md`. Shadow accounting deferred to the paid audit. |
+| L-3 / L-6 | Docs claimed full donation-resistance; ERC-6909 claims are transferable, so a claim donation can move `_reserves()`. | ✅ **closed (2026-09)** | Originally documented as a bounded residual. Now **fixed**: reserves are shadow-accounted, so a donation moves nothing the hook prices from. See K below. |
 | L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 

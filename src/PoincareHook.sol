@@ -154,6 +154,22 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint128 private _b0;
     uint256 private _supply0; // post-seed LP share supply the offsets are anchored to
 
+    /// @dev Shadow-accounted reserves: the hook's own record of every amount it has
+    ///      settled, rather than what it happens to hold. See `_reserves`. uint128 holds
+    ///      3.4e20 whole tokens at 18 decimals, so the pair packs into one slot with room
+    ///      the supply of any real pair cannot approach.
+    uint128 private _res0;
+    uint128 private _res1;
+
+    /// @dev The vol fee charged by this swap, carried from `_getUnspecifiedAmount` to
+    ///      `_getSwapFeeAmount` for the `HookSwap` event. Transient: one swap, one value.
+    ///      Previously the fee was recovered by replaying the pricing, which needed
+    ///      `_reserves()` to still hold its pre-swap value; shadow reserves are updated
+    ///      during pricing, so the replay would now read post-swap state and report a
+    ///      wrong fee. Carrying the number the pricing already returned is both exact and
+    ///      cheaper than recomputing it.
+    uint256 private transient _swapFeeAmount;
+
     /// @dev Held across add/remove liquidity incl. settlement; `_beforeSwap` reverts while
     ///      set, so a native/callback payout recipient cannot reenter a swap mid-withdrawal
     ///      and price against half-settled reserves. Transient: lives within one tx.
@@ -271,47 +287,55 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         bool exactInput = params.amountSpecified < 0;
         uint256 specifiedAmount = exactInput ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
 
+        uint256 feeAmount;
         if (exactInput) {
-            (unspecifiedAmount,) = AsymmetricCurve.swapExactInPriced(
+            (unspecifiedAmount, feeAmount) = AsymmetricCurve.swapExactInPriced(
                 r0, r1, s.offsetA, s.offsetB, specifiedAmount, params.zeroForOne, spread, feeWad
             );
         } else {
-            (unspecifiedAmount,) = AsymmetricCurve.swapExactOutPriced(
+            (unspecifiedAmount, feeAmount) = AsymmetricCurve.swapExactOutPriced(
                 r0, r1, s.offsetA, s.offsetB, specifiedAmount, params.zeroForOne, spread, feeWad
             );
         }
+        _swapFeeAmount = feeAmount;
+
+        // Book the flow the caller is about to settle. `BaseCustomCurve._beforeSwap` takes
+        // the input and settles the output immediately after this returns, for exactly
+        // these two amounts, so the shadow moves with the claim balances rather than
+        // predicting them. `zeroForOne` fixes which side is which: token0 in, token1 out.
+        (uint256 amountIn, uint256 amountOut) =
+            exactInput ? (specifiedAmount, unspecifiedAmount) : (unspecifiedAmount, specifiedAmount);
+        _settleReserves(params.zeroForOne, amountIn, amountOut);
+    }
+
+    /// @dev Apply one swap's flow to the shadow reserves. The output is always strictly
+    ///      below the reserve it leaves (`AsymmetricCurve` rejects anything else), so the
+    ///      subtraction cannot underflow and the reserve cannot reach zero.
+    function _settleReserves(bool zeroForOne, uint256 amountIn, uint256 amountOut) private {
+        (uint256 r0, uint256 r1) = _reserves();
+        (r0, r1) = zeroForOne ? (r0 + amountIn, r1 - amountOut) : (r0 - amountOut, r1 + amountIn);
+        _writeReserves(r0, r1);
+    }
+
+    /// @dev The single write path for the shadow, so the downcast is checked in one place.
+    function _writeReserves(uint256 r0, uint256 r1) private {
+        require(r0 <= type(uint128).max && r1 <= type(uint128).max, "reserve overflow");
+        _res0 = uint128(r0);
+        _res1 = uint128(r1);
     }
 
     /// @inheritdoc BaseCustomCurve
     /// @dev Reports the vol-fee amount for the `HookSwap` event only; the fee itself is
-    ///      charged inside `_getUnspecifiedAmount` and stays in reserves. Called after
-    ///      `_getUnspecifiedAmount` in the same frame, so the detector has already sampled
-    ///      this block and replaying the deterministic pricing recovers the exact split.
-    function _getSwapFeeAmount(SwapParams calldata params, uint256)
+    ///      charged inside `_getUnspecifiedAmount` and stays in reserves. That is also
+    ///      where the number comes from: pricing already returns the exact split, so it is
+    ///      carried across rather than recomputed.
+    function _getSwapFeeAmount(SwapParams calldata, uint256)
         internal
         view
         override
         returns (uint256 swapFeeAmount)
     {
-        uint256 feeWad = _storedFeeWad();
-        if (feeWad == 0) return 0;
-
-        if (params.amountSpecified < 0) {
-            return FullMath.mulDivRoundingUp(uint256(-params.amountSpecified), feeWad, WAD);
-        }
-        return _replayExactOutFee(params.zeroForOne, uint256(params.amountSpecified), feeWad);
-    }
-
-    /// @dev Replay the deterministic exact-out pricing to recover the fee split (event only).
-    function _replayExactOutFee(bool zeroForOne, uint256 amountOut, uint256 feeWad)
-        internal
-        view
-        returns (uint256 feeAmount)
-    {
-        uint256 spread = _spreadGiven(_kappa, _trend, zeroForOne);
-        (uint256 r0, uint256 r1) = _reserves();
-        (uint256 a, uint256 b) = _baseOffsets();
-        (, feeAmount) = AsymmetricCurve.swapExactOutPriced(r0, r1, a, b, amountOut, zeroForOne, spread, feeWad);
+        return _swapFeeAmount;
     }
 
     // detector core
@@ -506,7 +530,13 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         amount1 = FullMath.mulDiv(shares, r1, supply);
     }
 
-    function _mint(AddLiquidityParams memory, BalanceDelta, BalanceDelta, uint256 shares) internal override {
+    /// @dev Called after `_modifyLiquidity` has already settled, so `callerDelta` is the
+    ///      flow that actually happened rather than the one we asked for.
+    function _mint(AddLiquidityParams memory, BalanceDelta callerDelta, BalanceDelta, uint256 shares)
+        internal
+        override
+    {
+        _bookLiquidity(callerDelta);
         if (totalSupply() == 0) {
             _mint(address(0xdead), MINIMUM_LIQUIDITY);
             _mint(msg.sender, shares - MINIMUM_LIQUIDITY);
@@ -515,28 +545,61 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         }
     }
 
-    function _burn(RemoveLiquidityParams memory, BalanceDelta, BalanceDelta, uint256 shares) internal override {
+    function _burn(RemoveLiquidityParams memory, BalanceDelta callerDelta, BalanceDelta, uint256 shares)
+        internal
+        override
+    {
+        _bookLiquidity(callerDelta);
         _burn(msg.sender, shares);
+    }
+
+    /// @dev Apply a settled liquidity modification to the shadow reserves.
+    ///
+    ///      `callerDelta` is signed from the CALLER's side: negative means they paid it in,
+    ///      positive means they took it out. The hook's reserve therefore moves by the
+    ///      negation, which makes adds and removes the same line of arithmetic rather than
+    ///      two branches that could disagree. `BaseCustomCurve` always reports a zero fee
+    ///      delta, so `callerDelta` is pure principal.
+    function _bookLiquidity(BalanceDelta callerDelta) private {
+        (uint256 r0, uint256 r1) = _reserves();
+        _writeReserves(
+            uint256(int256(r0) - int256(callerDelta.amount0())),
+            uint256(int256(r1) - int256(callerDelta.amount1()))
+        );
     }
 
     // views
 
-    /// @notice Current reserves = the hook's ERC-6909 claim balances of each currency.
-    /// @dev Reserves are live claim balances, so a raw ERC20 donation is ignored (we read
-    ///      claim balances, not token.balanceOf). Claim tokens are themselves transferable,
-    ///      though, so anyone can credit claims here and inflate reserves outside the hook's
-    ///      accounting. This is bounded, not free: donated claims mint no shares and accrue
-    ///      pro-rata to existing LPs, so the donor forfeits them. Biasing the once-per-block
-    ///      detector sample this way therefore costs real, gifted capital (the same
-    ///      manipulation-cost moat the design rests on) and is strictly worse for the
-    ///      attacker than a swap, which arbitrage can reverse. Share pricing is hardened off
-    ///      the scarcer side (see `_getAmountIn`). Fully closing it needs shadow-accounted
-    ///      reserves, deferred to the paid audit: a shadow value drifting from real claims
-    ///      would be a worse, solvency-class bug.
+    /// @notice Current reserves: the hook's own record of what it has settled.
+    /// @dev Shadow-accounted rather than read from the chain. The hook holds its reserves
+    ///      as ERC-6909 claims, and claims are transferable, so anyone could send claims to
+    ///      this contract and move what a live `balanceOf` reports. That mattered: the
+    ///      detector samples the reserve-implied price once per block, so a donation was a
+    ///      way to nudge the statistic without trading, and share pricing read the same
+    ///      number. Booking every settled amount instead makes both immune to anything the
+    ///      hook did not itself settle.
+    ///
+    ///      The shadow only ever moves in `_settleReserves` (swaps) and `_bookLiquidity`
+    ///      (add/remove), each applying the exact amount `BaseCustomCurve` settles in the
+    ///      same call. It can therefore never exceed the real claim balance, which is the
+    ///      safe direction: a payout is always backed. `invariant_reservesMatchGhostAccounting`
+    ///      asserts the two agree across randomized op sequences, so any drift fails a test
+    ///      rather than becoming a silent solvency gap.
+    ///
+    ///      Consequence worth stating: donated claims are now stranded rather than accruing
+    ///      pro-rata to LPs. Nothing can withdraw them, because withdrawals are priced off
+    ///      the shadow. That removes the reason to donate at all, which is the point.
     function _reserves() internal view returns (uint256 r0, uint256 r1) {
+        return (_res0, _res1);
+    }
+
+    /// @notice The hook's live ERC-6909 claim balances, which back the shadow reserves.
+    /// @dev Exposed so the invariant suite, and anyone auditing, can compare the two. A
+    ///      difference is donated claims: harmless, unusable, and not counted anywhere.
+    function claimReserves() public view returns (uint256 c0, uint256 c1) {
         PoolKey memory key = poolKey();
-        r0 = poolManager.balanceOf(address(this), key.currency0.toId());
-        r1 = poolManager.balanceOf(address(this), key.currency1.toId());
+        c0 = poolManager.balanceOf(address(this), key.currency0.toId());
+        c1 = poolManager.balanceOf(address(this), key.currency1.toId());
     }
 
     /// @dev Current base offsets: the seed anchor scaled by the LP share supply.
