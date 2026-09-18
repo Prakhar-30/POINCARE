@@ -62,6 +62,7 @@ contract GammaFourYearTest is Test {
         uint256 lvr;
         uint256 benign;
         uint256 feeSum;
+        uint256 vol; // uninformed notional that actually traded, token0
         uint256 steps;
         // detector: only populated when the directional spread is enabled
         bool directional;
@@ -81,6 +82,7 @@ contract GammaFourYearTest is Test {
         bool aci;
         uint256 fAci; // the tracked fee itself, WAD
         uint256 aciStep; // step size, in fee units per bar
+        uint256 aciTarget; // tolerated pickoff frequency, WAD
         uint256 covered; // bars on which the fee covered the move
         uint256 tried;
     }
@@ -204,10 +206,11 @@ contract GammaFourYearTest is Test {
         // up by step*(1 - alpha) on a miss, down by step*alpha otherwise: the asymmetry IS
         // the quantile level, and it is the whole of the calibration.
         uint256 f = p.fAci;
+        uint256 target = p.aciTarget;
         if (missed) {
-            f += FullMath.mulDiv(p.aciStep, WAD - ACI_TARGET, WAD);
+            f += FullMath.mulDiv(p.aciStep, WAD - target, WAD);
         } else {
-            uint256 d = FullMath.mulDiv(p.aciStep, ACI_TARGET, WAD);
+            uint256 d = FullMath.mulDiv(p.aciStep, target, WAD);
             f = f > d ? f - d : 0;
         }
         if (f < ACI_MIN) f = ACI_MIN;
@@ -411,7 +414,7 @@ contract GammaFourYearTest is Test {
     }
 
     function _step(Pool memory p, uint256 fair, bool buyToken1) internal pure {
-        p.feeSum += p.avellaneda ? _asQuote(p, true) : _fee(p);
+        p.feeSum += _friction(p, true);
         p.spreadSum += p.kappa;
         p.steps++;
 
@@ -424,6 +427,7 @@ contract GammaFourYearTest is Test {
         uint256 notional = FullMath.mulDiv(NU, elastic, WAD);
         uint256 amountIn = buyToken1 ? notional : FullMath.mulDiv(notional, p.r1, p.r0);
         if (amountIn == 0) return;
+        p.vol += notional;
         uint256 baseOut = AsymmetricCurve.swapExactIn(p.r0, p.r1, 0, 0, amountIn, buyToken1);
         uint256 got = AsymmetricCurve.swapExactInWithSpread(p.r0, p.r1, 0, 0, amountIn, buyToken1, s);
         if (baseOut > got) {
@@ -531,9 +535,18 @@ contract GammaFourYearTest is Test {
     }
 
     function _runACIWith(uint256 step, bool directional) internal view returns (Pool memory p) {
+        return _runACITuned(step, directional, ACI_TARGET);
+    }
+
+    function _runACITuned(uint256 step, bool directional, uint256 target)
+        internal
+        view
+        returns (Pool memory p)
+    {
         p = _seed(0);
         p.aci = true;
         p.directional = directional;
+        p.aciTarget = target;
         p.aciStep = step;
         p.fAci = 30e14; // start where an ordinary pool starts, at 30bps
         for (uint256 t = 0; t < prices.length; t++) {
@@ -714,6 +727,138 @@ contract GammaFourYearTest is Test {
         _compare("Poincare gamma 4  ", _runWith(4e18, true));
     }
 
+    // ------------------------------------------------------------------------------------
+    // THE UPGRADE REPORT: what replacing the deployed hook with the tracked quantile is
+    // worth, in dollars, on four years of real ETH/USDC.
+    //
+    // The pool is seeded with 1,000,000 token0 and the matching amount of token1 at the
+    // opening price. token0 is the quote asset, so `_lpValue` is denominated in it and every
+    // figure printed by these tests is dollars on a $2,000,000 position.
+    //
+    // THREE REFERENCE POINTS, and the third is the one that matters to a liquidity provider:
+    //   1. the deployed Poincare configuration, gamma 0.5 with the directional lever
+    //   2. an ordinary Uniswap pool at 30bps, the thing most LPs are actually in
+    //   3. BUY AND HOLD. An LP that ends below the value of simply keeping the two assets
+    //      has done worse than doing nothing, whatever its fee revenue looked like. Almost
+    //      every real position fails this test over a stretch where the volatile asset ran.
+    //      ETH went from 1,308 to 2,481 across this window, so it is a demanding benchmark
+    //      and the honest one.
+
+    /// @dev Value of simply keeping the seeded assets, marked at the closing price.
+    function _hodl() internal view returns (uint256) {
+        Pool memory z = _seed(0);
+        return _lpValue(z, _fairPool(prices.length - 1));
+    }
+
+    function _report(string memory name, Pool memory p) internal view {
+        uint256 fair = _fairPool(prices.length - 1);
+        uint256 v = _lpValue(p, fair);
+        uint256 h = _hodl();
+        console2.log(string.concat("== ", name));
+        console2.log("   LP value at fair   :", v);
+        console2.log("   arb extracted      :", p.lvr);
+        console2.log("   cost to benign     :", p.benign);
+        console2.log("   mean fee (bps)     :", (p.feeSum / p.steps) / 1e14);
+        console2.log("   benign volume      :", p.vol);
+        console2.log("   vs max volume (bps):", (p.vol * 10_000) / (NU * p.steps));
+        _delta("   vs Uniswap 30bps   :", v, UNI30_LP);
+        _delta("   vs Poincare live   :", v, DEPLOYED_LP);
+        _delta("   vs buy and hold    :", v, h);
+    }
+
+    function _delta(string memory label, uint256 v, uint256 ref) internal pure {
+        if (v >= ref) {
+            console2.log(string.concat(label, " +"), v - ref, (((v - ref) * 10_000) / ref));
+        } else {
+            console2.log(string.concat(label, " -"), ref - v, (((ref - v) * 10_000) / ref));
+        }
+    }
+
+    function test_report_hodl() public view {
+        console2.log("buy and hold value  :", _hodl());
+        console2.log("starting value      :", _lpValue(_seed(0), _fairPool(0)));
+        console2.log("open price          :", prices[0]);
+        console2.log("close price         :", prices[prices.length - 1]);
+    }
+
+    function test_report_uni30() public view {
+        Pool memory p = _runStatic(30e14);
+        assertEq(_lpValue(p, _fairPool(prices.length - 1)), UNI30_LP, "UNI30_LP is stale");
+        _report("Uniswap 30bps        ", p);
+    }
+
+    function test_report_deployed() public view {
+        Pool memory p = _runWith(5e17, true);
+        assertEq(_lpValue(p, _fairPool(prices.length - 1)), DEPLOYED_LP, "DEPLOYED_LP is stale");
+        _report("Poincare as deployed ", p);
+    }
+
+    function test_report_tracked() public view {
+        _report("Tracked quantile     ", _runACIWith(2e14, false));
+    }
+
+    function test_report_trackedDirectional() public view {
+        _report("Tracked + directional", _runACIWith(2e14, true));
+    }
+
+    // ------------------------------------------------------------------------------------
+    // MATCHING THE OPERATING POINT, WHICH IS THE ONLY FAIR COMPARISON.
+    //
+    // At alpha = 0.20 the tracker posts a 231bps mean fee and retains 0.27% of uninformed
+    // flow against the deployed hook's 32%. It "wins" on LP value by becoming a pool almost
+    // nobody trades with, and that is not a win: this harness has a captive LP with no
+    // competing venue, so a pool that drives flow away looks profitable here and would
+    // simply be abandoned in reality.
+    //
+    // The cause is regime, not mechanism. alpha is the frequency of being picked off PER
+    // SAMPLE, and a sample here is a four-hour bar. Tolerating a pickoff on only one bar in
+    // five, when each bar carries four hours of price movement, demands an enormous fee. The
+    // live hook samples once per block, where the per-sample move is tiny and the same alpha
+    // costs almost nothing. The file header already puts that gap at four orders of
+    // magnitude in lambda.
+    //
+    // So alpha has to be re-targeted for the replay before any dollar figure means anything.
+    // Swept here against the operating point the deployed hook actually occupies.
+    function _sweepTarget(uint256 target) internal view {
+        Pool memory p = _runACITuned(2e14, true, target);
+        uint256 v = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log("alpha (wad)          :", target);
+        console2.log("   mean fee (bps)    :", (p.feeSum / p.steps) / 1e14);
+        console2.log("   flow retained(bps):", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   LP value at fair  :", v);
+        console2.log("   arb extracted     :", p.lvr);
+        console2.log("   cost to benign    :", p.benign);
+        _delta("   vs Poincare live  :", v, DEPLOYED_LP);
+    }
+
+    function test_target_a20() public view {
+        _sweepTarget(2e17);
+    }
+
+    function test_target_a50() public view {
+        _sweepTarget(5e17);
+    }
+
+    /// @dev The deployed hook retains 32.00% of uninformed flow. This is the tracker setting
+    ///      that sits on the same operating point, so the dollar difference between the two
+    ///      is attributable to the mechanism rather than to one of them having chased its
+    ///      traders off.
+    function test_target_a60_matchedToDeployed() public view {
+        _sweepTarget(6e17);
+    }
+
+    function test_target_a70() public view {
+        _sweepTarget(7e17);
+    }
+
+    function test_target_a85() public view {
+        _sweepTarget(85e16);
+    }
+
+    function test_target_a95() public view {
+        _sweepTarget(95e16);
+    }
+
     /// @notice QUANTILE TRACKING ON FOUR YEARS, AT THREE STEP SIZES.
     ///
     ///         The step size is the only knob, and it trades adaptability against stability
@@ -796,6 +941,7 @@ contract GammaFourYearTest is Test {
     ///      fee on a fixed path, so its result is deterministic: it is the figure
     ///      `test_lpsSaved_uni30` prints, asserted there and quoted here.
     uint256 internal constant UNI30_LP = 2_872_414_578_985_274_455_176_819;
+    uint256 internal constant DEPLOYED_LP = 2_991_384_658_770_946_124_952_051;
 
     function test_lpsSaved_learner() public view {
         uint256 fair = _fairPool(prices.length - 1);
