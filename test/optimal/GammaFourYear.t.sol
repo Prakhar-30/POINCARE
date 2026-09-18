@@ -63,6 +63,20 @@ contract GammaFourYearTest is Test {
         uint256 benign;
         uint256 feeSum;
         uint256 vol; // uninformed notional that actually traded, token0
+        uint256 feeCapP; // per-pool vol-fee cap; 0 means use FEE_CAP
+        uint256 sigSum; // running sum of sigma-hat, for reporting
+        // SELF-NORMALISED CUSUM: when set, k and h are read as MULTIPLES of sigma-hat rather
+        // than as absolute log-return units, which makes the detector scale-free.
+        bool selfNorm;
+        // every detector parameter, per pool, so each can be swept on its own
+        int256 pK; // CUSUM slack
+        int256 pH; // CUSUM threshold / kappa ramp start
+        int256 pSMax; // CUSUM cap / kappa ramp saturation
+        uint256 pLambda; // EWMA decay
+        uint256 pDFloor; // directional-efficiency gate
+        uint256 pClip; // Huber clip on the log return
+        uint256 pKappaMax; // max directional spread
+        uint256 pDMax; // max kappa change per bar
         uint256 steps;
         // detector: only populated when the directional spread is enabled
         bool directional;
@@ -120,6 +134,7 @@ contract GammaFourYearTest is Test {
     uint256 internal constant D_FLOOR = 5e17;
     uint256 internal constant KAPPA_MAX = 1e17;
     uint256 internal constant D_MAX = 5e16;
+    uint256 internal constant CLIP = 2e17; // Huber clip on the per-bar log return
 
     function setUp() public {
         while (true) {
@@ -140,7 +155,21 @@ contract GammaFourYearTest is Test {
         return FullMath.mulDiv(WAD, WAD, prices[t]);
     }
 
+    /// @dev Defaults are the LIVE configuration, so a sweep that changes nothing reproduces
+    ///      the deployed pool exactly and every delta below is attributable to one parameter.
+    function _defaults(Pool memory p) internal pure {
+        p.pK = K_SLACK;
+        p.pH = H;
+        p.pSMax = S_MAX;
+        p.pLambda = LAMBDA;
+        p.pDFloor = D_FLOOR;
+        p.pClip = CLIP;
+        p.pKappaMax = KAPPA_MAX;
+        p.pDMax = D_MAX;
+    }
+
     function _seed(uint256 gamma) internal view returns (Pool memory p) {
+        _defaults(p);
         p.r0 = R0;
         p.r1 = FullMath.mulDiv(R0, WAD, prices[0]);
         p.lastP = FullMath.mulDiv(p.r1, WAD, p.r0);
@@ -219,8 +248,9 @@ contract GammaFourYearTest is Test {
     }
 
     function _fee(Pool memory p) internal pure returns (uint256 f) {
-        f = FullMath.mulDiv(p.gamma, DirectionalSignal.sigmaWad(p.sig, LAMBDA), WAD);
-        if (f > FEE_CAP) f = FEE_CAP;
+        f = FullMath.mulDiv(p.gamma, DirectionalSignal.sigmaWad(p.sig, p.pLambda), WAD);
+        uint256 cap = p.feeCapP == 0 ? FEE_CAP : p.feeCapP;
+        if (f > cap) f = cap;
     }
 
     /// @dev THE AVELLANEDA-STOIKOV QUOTE, adapted to a pool.
@@ -245,7 +275,7 @@ contract GammaFourYearTest is Test {
     ///      should be LINEAR IN INVENTORY and scale with variance and horizon, which is a
     ///      different shape with a derivation behind it.
     function _asQuote(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
-        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, p.pLambda);
         // sigma from mean-absolute-deviation: sigma = sigmaHat / sqrt(2/pi)
         uint256 sigma = FullMath.mulDiv(sigmaHat, WAD, 7979e14);
         uint256 var_ = FullMath.mulDiv(sigma, sigma, WAD);
@@ -272,7 +302,7 @@ contract GammaFourYearTest is Test {
     ///      move, so there is no step for anyone to trade across.
     function _blendedFee(Pool memory p) internal pure returns (uint256 f) {
         uint256[N_EXPERTS] memory e = _experts();
-        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, p.pLambda);
         uint256 tot;
         for (uint256 i = 0; i < N_EXPERTS; i++) {
             f += FullMath.mulDiv(p.w[i], FullMath.mulDiv(e[i], sigmaHat, WAD), WAD);
@@ -322,7 +352,7 @@ contract GammaFourYearTest is Test {
     ///      setting.
     function _learn(Pool memory p, uint256 fair, uint256 notional) internal pure {
         uint256[N_EXPERTS] memory e = _experts();
-        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, p.pLambda);
 
         // THE PAYOFF IS SIGNED, AND THAT IS NOT A DETAIL. Clamping it at zero looks
         // harmless and is not: on a bar with a real price move every expert loses more to
@@ -380,6 +410,8 @@ contract GammaFourYearTest is Test {
         bool withTrend =
             (p.trend == Cusum.Trend.Up && !zeroForOne) || (p.trend == Cusum.Trend.Down && zeroForOne);
         if (!withTrend) return f;
+        // on chain `feeCap` bounds the vol fee and `kappaMax` bounds the spread, separately;
+        // there is no cap on the sum, so the sum is what the trader pays
         uint256 total = f + p.kappa;
         return total > FEE_CAP ? FEE_CAP : total;
     }
@@ -449,15 +481,42 @@ contract GammaFourYearTest is Test {
         uint256 pNow = FullMath.mulDiv(p.r1, WAD, p.r0);
         if (p.lastP != 0 && pNow != 0) {
             int256 r = FixedPointMathLib.lnWad(int256(FullMath.mulDiv(pNow, WAD, p.lastP)));
-            int256 cap = int256(uint256(2e17));
+            int256 cap = int256(p.pClip);
             if (r > cap) r = cap;
             else if (r < -cap) r = -cap;
-            p.sig = DirectionalSignal.update(p.sig, r, LAMBDA);
+            p.sig = DirectionalSignal.update(p.sig, r, p.pLambda);
+            p.sigSum += DirectionalSignal.sigmaWad(p.sig, p.pLambda);
 
             if (p.directional) _detect(p, r);
             if (p.learning) _learn(p, fair, NU);
         }
         p.lastP = pNow;
+    }
+
+    /// @dev The CUSUM slack, threshold and evidence cap actually in force this bar.
+    ///
+    ///      ABSOLUTE THRESHOLDS ARE A BUG WAITING FOR A VOLATILITY REGIME. k = 0.001 and
+    ///      h = 0.005 are log-return units, so what they mean depends entirely on how large
+    ///      returns happen to be. Double the volatility and the same k stops filtering
+    ///      anything, the statistic accumulates on noise, and the false-alarm rate the
+    ///      threshold was calibrated to is gone. Halve it and the detector never fires at all.
+    ///      The calibration is only valid at the volatility it was calibrated on.
+    ///
+    ///      Normalising by the pool's own sigma-hat removes the dependence: k and h are then
+    ///      read as multiples of the current noise scale, the standardised increment has the
+    ///      same distribution whatever the regime, and the false-alarm rate is invariant.
+    ///      This is the self-normalisation idea from the sequential-analysis literature
+    ///      (arXiv:2509.07112 for locally stationary series; arXiv:2210.17353 for the
+    ///      data-adaptive CUSUM variant), and it costs one multiply.
+    function _thresholds(Pool memory p) internal pure returns (int256 k_, int256 h_, int256 s_) {
+        if (!p.selfNorm) return (p.pK, p.pH, p.pSMax);
+        int256 sg = int256(DirectionalSignal.sigmaWad(p.sig, p.pLambda));
+        if (sg == 0) return (p.pK, p.pH, p.pSMax);
+        k_ = (p.pK * sg) / int256(WAD);
+        h_ = (p.pH * sg) / int256(WAD);
+        s_ = (p.pSMax * sg) / int256(WAD);
+        if (h_ <= 0) h_ = 1;
+        if (s_ <= h_) s_ = h_ + 1;
     }
 
     /// @dev The arbitrage leg and the tracker update, lifted out of `_step` so the stack fits.
@@ -476,13 +535,15 @@ contract GammaFourYearTest is Test {
     /// @dev One detector step, lifted out of `_step` purely so the stack fits.
     function _detect(Pool memory p, int256 r) internal pure {
         uint256 d = DirectionalSignal.signal(p.sig);
-        Cusum.State memory cs = Cusum.updateCapped(Cusum.State(p.sPos, p.sNeg), r, K_SLACK, S_MAX);
+        (int256 k_, int256 h_, int256 sm_) = _thresholds(p);
+        Cusum.State memory cs = Cusum.updateCapped(Cusum.State(p.sPos, p.sNeg), r, k_, sm_);
         p.sPos = cs.sPos;
         p.sNeg = cs.sNeg;
         (Cusum.Trend dir, int256 ev) =
             cs.sPos >= cs.sNeg ? (Cusum.Trend.Up, cs.sPos) : (Cusum.Trend.Down, cs.sNeg);
-        int256 gated = d >= D_FLOOR ? ev : int256(0);
-        p.kappa = ControlLaw.step(p.kappa, gated, ControlLaw.Config(H, S_MAX, 0, KAPPA_MAX, D_MAX));
+        int256 gated = d >= p.pDFloor ? ev : int256(0);
+        p.kappa =
+            ControlLaw.step(p.kappa, gated, ControlLaw.Config(h_, sm_, 0, p.pKappaMax, p.pDMax));
         if (gated > 0) p.trend = dir;
     }
 
@@ -555,7 +616,18 @@ contract GammaFourYearTest is Test {
     }
 
     function _runWith(uint256 gamma, bool directional) internal view returns (Pool memory p) {
+        return _runCapped(gamma, directional, 0);
+    }
+
+    /// @dev `feeCapW` = 0 leaves the cap non-binding, as every earlier run on this branch
+    ///      did. The DEPLOYED hook caps the vol fee at 30bps, which binds constantly.
+    function _runCapped(uint256 gamma, bool directional, uint256 feeCapW)
+        internal
+        view
+        returns (Pool memory p)
+    {
         p = _seed(gamma);
+        p.feeCapP = feeCapW;
         p.directional = directional;
         for (uint256 t = 0; t < prices.length; t++) {
             _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
@@ -787,6 +859,16 @@ contract GammaFourYearTest is Test {
         _report("Uniswap 30bps        ", p);
     }
 
+    /// @notice THE CONFIGURATION THAT IS ACTUALLY ON CHAIN.
+    ///
+    ///         `frontend/deploy.mjs` sets feeCap = 3e15, so the live vol fee is bounded at
+    ///         30bps and that bound binds nearly all the time. Every earlier run on this
+    ///         branch left the cap at 50%, which is not a cap at all, and so reported a hook
+    ///         charging a 146bps mean fee. That pool has never existed.
+    function test_report_deployedTrue() public view {
+        _report("Poincare TRUE deployed", _runCapped(5e17, true, 3e15));
+    }
+
     function test_report_deployed() public view {
         Pool memory p = _runWith(5e17, true);
         assertEq(_lpValue(p, _fairPool(prices.length - 1)), DEPLOYED_LP, "DEPLOYED_LP is stale");
@@ -799,6 +881,429 @@ contract GammaFourYearTest is Test {
 
     function test_report_trackedDirectional() public view {
         _report("Tracked + directional", _runACIWith(2e14, true));
+    }
+
+    // ------------------------------------------------------------------------------------
+    // ONE PARAMETER AT A TIME, AGAINST THE LIVE CONFIGURATION.
+    //
+    // Every run below is the deployed pool with exactly one number changed, so each line is
+    // that parameter's partial derivative on four years of real ETH/USDC. Reported alongside
+    // LP value is the flow retained, because a configuration that gains LP value purely by
+    // charging more and keeping fewer traders has not improved anything, as the alpha sweep
+    // showed. A parameter change is only interesting if it moves LP value at roughly
+    // unchanged flow.
+
+    /// @dev The parameter sweeps below run three to four full four-year replays each, which
+    ///      needs the lifted gas and memory caps of the `sweep` profile. They are no-ops under
+    ///      a plain `forge test` so the suite stays honest about gas everywhere else. Run them
+    ///      with:
+    ///        POINCARE_SWEEP=1 FOUNDRY_PROFILE=sweep forge test --match-path test/optimal/GammaFourYear.t.sol
+    modifier sweepOnly() {
+        if (!vm.envOr("POINCARE_SWEEP", false)) return;
+        _;
+    }
+
+    /// @dev Which single parameter a sweep varies.
+    enum P {
+        K, // CUSUM slack
+        H_, // CUSUM threshold
+        SMAX, // evidence cap
+        LAMBDA_, // EWMA decay
+        DFLOOR, // directional-efficiency gate
+        CLIP_, // Huber clip
+        KAPPAMAX, // max directional spread
+        DMAX, // kappa ramp rate
+        GAMMA, // vol-fee multiplier
+        FEECAP // vol-fee cap
+    }
+
+    function _apply(Pool memory p, P which, uint256 v) internal pure {
+        if (which == P.K) p.pK = int256(v);
+        else if (which == P.H_) p.pH = int256(v);
+        else if (which == P.SMAX) p.pSMax = int256(v);
+        else if (which == P.LAMBDA_) p.pLambda = v;
+        else if (which == P.DFLOOR) p.pDFloor = v;
+        else if (which == P.CLIP_) p.pClip = v;
+        else if (which == P.KAPPAMAX) p.pKappaMax = v;
+        else if (which == P.DMAX) p.pDMax = v;
+        else if (which == P.GAMMA) p.gamma = v;
+        else p.feeCapP = v;
+    }
+
+    /// @dev The live pool with one parameter overridden.
+    function _runOne(P which, uint256 v) internal view returns (Pool memory p) {
+        p = _seed(5e17); // feeGamma 0.5, as deployed
+        p.feeCapP = 3e15; // 30bps cap, as deployed
+        p.directional = true;
+        _apply(p, which, v);
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+    }
+
+    function _oat(string memory name, P which, uint256 v) internal view {
+        Pool memory p = _runOne(which, v);
+        uint256 lp = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log(name, v);
+        console2.log("   LP  :", lp);
+        console2.log("   arb :", p.lvr);
+        console2.log("   flow:", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   fee :", (p.feeSum / p.steps) / 1e14);
+        if (lp >= TRUE_LP) console2.log("   d-LP: +", lp - TRUE_LP, ((lp - TRUE_LP) * 10_000) / TRUE_LP);
+        else console2.log("   d-LP: -", TRUE_LP - lp, ((TRUE_LP - lp) * 10_000) / TRUE_LP);
+    }
+
+    uint256 internal constant TRUE_LP = 2_981_485_301_196_350_242_224_691;
+
+    function test_oat_baseline() public view {
+        _oat("baseline (no change), gamma", P.GAMMA, 5e17);
+    }
+
+    function test_oat_k() public view sweepOnly {
+        _oat("k =", P.K, 5e14);
+        _oat("k =", P.K, 1e15);
+        _oat("k =", P.K, 2e15);
+        _oat("k =", P.K, 4e15);
+    }
+
+    function test_oat_h() public view sweepOnly {
+        _oat("h =", P.H_, 2e15);
+        _oat("h =", P.H_, 5e15);
+        _oat("h =", P.H_, 1e16);
+        _oat("h =", P.H_, 2e16);
+    }
+
+    function test_oat_sMax() public view sweepOnly {
+        _oat("sMax =", P.SMAX, 1e16);
+        _oat("sMax =", P.SMAX, 2e16);
+        _oat("sMax =", P.SMAX, 4e16);
+        _oat("sMax =", P.SMAX, 8e16);
+    }
+
+    function test_oat_lambda() public view sweepOnly {
+        _oat("lambda =", P.LAMBDA_, 7e17);
+        _oat("lambda =", P.LAMBDA_, 9e17);
+        _oat("lambda =", P.LAMBDA_, 95e16);
+        _oat("lambda =", P.LAMBDA_, 98e16);
+    }
+
+    function test_oat_dFloor() public view sweepOnly {
+        _oat("dFloor =", P.DFLOOR, 25e16);
+        _oat("dFloor =", P.DFLOOR, 5e17);
+        _oat("dFloor =", P.DFLOOR, 7e17);
+        _oat("dFloor =", P.DFLOOR, 9e17);
+    }
+
+    function test_oat_clip() public view sweepOnly {
+        _oat("clip =", P.CLIP_, 5e16);
+        _oat("clip =", P.CLIP_, 1e17);
+        _oat("clip =", P.CLIP_, 2e17);
+        _oat("clip =", P.CLIP_, 4e17);
+    }
+
+    function test_oat_kappaMax() public view sweepOnly {
+        _oat("kappaMax =", P.KAPPAMAX, 25e15);
+        _oat("kappaMax =", P.KAPPAMAX, 5e16);
+        _oat("kappaMax =", P.KAPPAMAX, 1e17);
+        _oat("kappaMax =", P.KAPPAMAX, 2e17);
+    }
+
+    function test_oat_dMax() public view sweepOnly {
+        _oat("dMax =", P.DMAX, 1e16);
+        _oat("dMax =", P.DMAX, 5e16);
+        _oat("dMax =", P.DMAX, 2e17);
+        _oat("dMax =", P.DMAX, 1e18);
+    }
+
+    function test_oat_gamma() public view sweepOnly {
+        _oat("gamma =", P.GAMMA, 25e16);
+        _oat("gamma =", P.GAMMA, 5e17);
+        _oat("gamma =", P.GAMMA, 1e18);
+        _oat("gamma =", P.GAMMA, 2e18);
+    }
+
+    function test_oat_feeCap() public view sweepOnly {
+        _oat("feeCap =", P.FEECAP, 1e15);
+        _oat("feeCap =", P.FEECAP, 3e15);
+        _oat("feeCap =", P.FEECAP, 1e16);
+        _oat("feeCap =", P.FEECAP, 5e16);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // dFloor AND lambda ARE NOT TWO PARAMETERS. THEY ARE ONE.
+    //
+    // The one-at-a-time sweep says lambda is worth +105bps at 0.70 and -371bps at 0.98, and
+    // dFloor is worth +382bps at 0.25 and -388bps at 0.90. Both look like strong independent
+    // levers. They are not independent, and the reason is a two-line calculation.
+    //
+    // D is |sum of returns| / sum of |returns|. For an iid symmetric series of n samples the
+    // numerator is the absolute value of a random walk, E|S_n| = sigma*sqrt(2n/pi), and the
+    // denominator is n*E|r| = n*sigma*sqrt(2/pi). So under NO TREND
+    //
+    //     E[D] = sqrt(2n/pi) / (n*sqrt(2/pi)) = 1/sqrt(n)
+    //
+    // and with EWMA decay lambda the effective sample count is n = 1/(1-lambda). A gate at a
+    // fixed dFloor therefore does not mean a fixed thing: it means whatever it happens to
+    // mean relative to the noise floor that lambda sets. The quantity with meaning is the
+    // ratio of the gate to that floor,
+    //
+    //     r = dFloor / E[D] = dFloor * sqrt(n) = dFloor / sqrt(1 - lambda)
+    //
+    // which is how many noise-widths of directionality the detector demands before it will
+    // act. The live pool sits at r = 0.50/sqrt(0.10) = 1.58.
+    //
+    // THE PREDICTION, and it is falsifiable. If r is the only thing that matters then every
+    // (lambda, dFloor) pair sharing an r should perform alike, and the whole of the lambda
+    // sensitivity above is just r moving while dFloor stood still. The four pairs below all
+    // hold r = 0.79 across lambda from 0.70 to 0.98, a sixteen-fold change in effective
+    // window. If they land together the two parameters collapse into one.
+    function _pair(uint256 lambda_, uint256 dFloor_) internal view {
+        Pool memory p = _seed(5e17);
+        p.feeCapP = 3e15;
+        p.directional = true;
+        p.pLambda = lambda_;
+        p.pDFloor = dFloor_;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 lp = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log("lambda / dFloor:", lambda_, dFloor_);
+        console2.log("   LP  :", lp);
+        console2.log("   arb :", p.lvr);
+        console2.log("   flow:", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   fee :", (p.feeSum / p.steps) / 1e14);
+    }
+
+    /// @dev r = 0.79 held fixed while the effective window moves from 3.3 samples to 50.
+    function test_collapse_r079() public view sweepOnly {
+        _pair(7e17, 433e15); // n = 3.33
+        _pair(9e17, 250e15); // n = 10
+        _pair(95e16, 177e15); // n = 20
+        _pair(98e16, 112e15); // n = 50
+    }
+
+    /// @dev The same four windows at the LIVE ratio r = 1.58, which should be uniformly worse
+    ///      and, more to the point, uniformly worse by about the same amount.
+    function test_collapse_r158() public view sweepOnly {
+        _pair(7e17, 866e15);
+        _pair(9e17, 5e17);
+        _pair(95e16, 354e15);
+        _pair(98e16, 224e15);
+    }
+
+    /// @dev A ratio sweep at fixed lambda, to locate the optimum in r.
+    function test_collapse_rSweep() public view sweepOnly {
+        _pair(9e17, 158e15); // r = 0.50
+        _pair(9e17, 250e15); // r = 0.79
+        _pair(9e17, 316e15); // r = 1.00
+        _pair(9e17, 474e15); // r = 1.50
+    }
+
+    /// @dev Lowering r raises LP value, but it also raises the fee and sheds flow, and the
+    ///      alpha sweep already showed how easily that masquerades as an improvement. To
+    ///      separate the two, r is lowered and kappaMax lowered with it until the pool sits
+    ///      back on the live flow retention of 34.12%. Whatever LP value survives at matched
+    ///      flow is attributable to the detector gating better, not to the pool charging more.
+    function _grid(uint256 dFloor_, uint256 kappaMax_) internal view {
+        Pool memory p = _seed(5e17);
+        p.feeCapP = 3e15;
+        p.directional = true;
+        p.pDFloor = dFloor_;
+        p.pKappaMax = kappaMax_;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 lp = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log("dFloor / kappaMax:", dFloor_, kappaMax_);
+        console2.log("   LP  :", lp);
+        console2.log("   arb :", p.lvr);
+        console2.log("   flow:", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   fee :", (p.feeSum / p.steps) / 1e14);
+    }
+
+    function test_matched_r050() public view sweepOnly {
+        _grid(158e15, 3e16);
+        _grid(158e15, 4e16);
+        _grid(158e15, 5e16);
+        _grid(158e15, 7e16);
+    }
+
+    function test_matched_r030() public view sweepOnly {
+        _grid(95e15, 2e16);
+        _grid(95e15, 3e16);
+        _grid(95e15, 4e16);
+        _grid(95e15, 5e16);
+    }
+
+    function test_matched_r079() public view sweepOnly {
+        _grid(250e15, 4e16);
+        _grid(250e15, 5e16);
+        _grid(250e15, 6e16);
+        _grid(250e15, 8e16);
+    }
+
+    /// @dev What sigma-hat actually is on this tape, so k and h can be restated in units of
+    ///      it rather than in units of nothing in particular.
+    function test_sigmaScale() public view {
+        Pool memory p = _seed(5e17);
+        p.feeCapP = 3e15;
+        p.directional = true;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 meanSigma = p.sigSum / p.steps;
+        console2.log("mean sigma-hat (wad) :", meanSigma);
+        console2.log("mean sigma-hat (bps) :", meanSigma / 1e14);
+        console2.log("live k as multiple   :", (uint256(K_SLACK) * WAD) / meanSigma);
+        console2.log("live h as multiple   :", (uint256(H) * WAD) / meanSigma);
+        console2.log("live sMax as multiple:", (uint256(S_MAX) * WAD) / meanSigma);
+    }
+
+    /// @dev The self-normalised detector. k, h and sMax are passed as MULTIPLES of sigma-hat.
+    ///      The live pool's absolute values correspond to 0.188, 0.938 and 3.75 at the mean
+    ///      sigma-hat of this tape, so those multiples are the like-for-like starting point.
+    function _sn(uint256 cK, uint256 cH, uint256 cS, uint256 dFloor_, uint256 kMax_)
+        internal
+        view
+    {
+        Pool memory p = _seed(5e17);
+        p.feeCapP = 3e15;
+        p.directional = true;
+        p.selfNorm = true;
+        p.pK = int256(cK);
+        p.pH = int256(cH);
+        p.pSMax = int256(cS);
+        p.pDFloor = dFloor_;
+        p.pKappaMax = kMax_;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 lp = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log("cK/cH/cS:", cK, cH, cS);
+        console2.log("   dFloor/kappaMax:", dFloor_, kMax_);
+        console2.log("   LP  :", lp);
+        console2.log("   arb :", p.lvr);
+        console2.log("   flow:", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   fee :", (p.feeSum / p.steps) / 1e14);
+    }
+
+    /// @dev Like-for-like: the live configuration restated in sigma units, changing nothing
+    ///      else. Any difference is the self-normalisation alone.
+    function test_sn_likeForLike() public view {
+        _sn(188e15, 938e15, 375e16, 5e17, 1e17);
+    }
+
+    function test_sn_hSweep() public view sweepOnly {
+        _sn(188e15, 5e17, 375e16, 5e17, 1e17);
+        _sn(188e15, 938e15, 375e16, 5e17, 1e17);
+        _sn(188e15, 15e17, 375e16, 5e17, 1e17);
+        _sn(188e15, 25e17, 375e16, 5e17, 1e17);
+    }
+
+    function test_sn_kSweep() public view sweepOnly {
+        _sn(5e16, 938e15, 375e16, 5e17, 1e17);
+        _sn(188e15, 938e15, 375e16, 5e17, 1e17);
+        _sn(4e17, 938e15, 375e16, 5e17, 1e17);
+        _sn(8e17, 938e15, 375e16, 5e17, 1e17);
+    }
+
+    /// @dev Self-normalisation combined with the two findings that survived the matched-flow
+    ///      control: the gate at r = 0.79 and a kappaMax reduced to keep the operating point.
+    function test_sn_combined() public view sweepOnly {
+        _sn(188e15, 938e15, 375e16, 250e15, 5e16);
+        _sn(188e15, 938e15, 375e16, 250e15, 8e16);
+        _sn(188e15, 5e17, 375e16, 250e15, 8e16);
+        _sn(188e15, 15e17, 375e16, 250e15, 8e16);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // DO THE FINDINGS COMPOSE?
+    //
+    // Three changes survived the matched-flow control on their own: the gate dropped to
+    // r = 0.79 (dFloor 0.25 at lambda 0.9), the kappa ramp slowed to dMax 0.01, and the vol
+    // fee cap raised from 30bps to 100bps. Each was measured with everything else held at the
+    // live value, so nothing yet says they can be applied together. They interact through the
+    // same kappa, so they might well cancel.
+    struct Cfg {
+        uint256 dFloor;
+        uint256 dMax;
+        uint256 kappaMax;
+        uint256 feeCap;
+        uint256 gamma;
+    }
+
+    function _cfg(string memory name, Cfg memory c) internal view {
+        Pool memory p = _seed(c.gamma);
+        p.feeCapP = c.feeCap;
+        p.directional = true;
+        p.pDFloor = c.dFloor;
+        p.pDMax = c.dMax;
+        p.pKappaMax = c.kappaMax;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 lp = _lpValue(p, _fairPool(prices.length - 1));
+        console2.log(name);
+        console2.log("   LP  :", lp);
+        console2.log("   arb :", p.lvr);
+        console2.log("   flow:", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   fee :", (p.feeSum / p.steps) / 1e14);
+    }
+
+    function _live() internal pure returns (Cfg memory) {
+        return Cfg(5e17, 5e16, 1e17, 3e15, 5e17);
+    }
+
+    function test_compose_live() public view {
+        _cfg("live", _live());
+    }
+
+    function test_compose_dMaxOnly() public view {
+        Cfg memory c = _live();
+        c.dMax = 1e16;
+        _cfg("dMax 0.01", c);
+    }
+
+    function test_compose_gateOnly() public view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.kappaMax = 5e16;
+        _cfg("gate r=0.79 + kappaMax 0.05", c);
+    }
+
+    function test_compose_gatePlusDMax() public view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.kappaMax = 5e16;
+        c.dMax = 1e16;
+        _cfg("gate + dMax", c);
+    }
+
+    function test_compose_all() public view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.kappaMax = 5e16;
+        c.dMax = 1e16;
+        c.feeCap = 1e16;
+        _cfg("gate + dMax + feeCap 1%", c);
+    }
+
+    function test_compose_allTunedKappa() public view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.dMax = 1e16;
+        c.feeCap = 1e16;
+        c.kappaMax = 7e16;
+        _cfg("gate + dMax + feeCap, kappaMax 0.07", c);
+    }
+
+    function test_compose_allLowFlow() public view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.dMax = 1e16;
+        c.feeCap = 1e16;
+        c.kappaMax = 3e16;
+        _cfg("gate + dMax + feeCap, kappaMax 0.03", c);
     }
 
     // ------------------------------------------------------------------------------------

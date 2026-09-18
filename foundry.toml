@@ -38,3 +38,11 @@ unichain_sepolia = "https://sepolia.unichain.org"
 [lint]
 exclude_lints = ["screaming-snake-case-immutable", "screaming-snake-case-const"]
 lint_on_build = false
+
+# Profile for the four-year parameter sweeps in test/optimal. Each replay is 7,776 bars and a
+# sweep runs several per test, which outgrows the default 2^30 gas / 128MB memory caps. Lift
+# both here only, so `forge test` stays honest about gas everywhere else.
+# Run: FOUNDRY_PROFILE=sweep forge test --match-path test/optimal/GammaFourYear.t.sol
+[profile.sweep]
+gas_limit = "18446744073709551615"
+memory_limit = 4294967296
