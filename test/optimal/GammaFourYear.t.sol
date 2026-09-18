@@ -65,6 +65,7 @@ contract GammaFourYearTest is Test {
         uint256 vol; // uninformed notional that actually traded, token0
         uint256 feeCapP; // per-pool vol-fee cap; 0 means use FEE_CAP
         uint256 sigSum; // running sum of sigma-hat, for reporting
+        uint256 trendBars; // bars on which kappa was engaged
         // SELF-NORMALISED CUSUM: when set, k and h are read as MULTIPLES of sigma-hat rather
         // than as absolute log-return units, which makes the detector scale-free.
         bool selfNorm;
@@ -545,6 +546,7 @@ contract GammaFourYearTest is Test {
         p.kappa =
             ControlLaw.step(p.kappa, gated, ControlLaw.Config(h_, sm_, 0, p.pKappaMax, p.pDMax));
         if (gated > 0) p.trend = dir;
+        if (p.kappa > 0) p.trendBars++;
     }
 
     function _run(uint256 gamma) internal view returns (Pool memory p) {
@@ -1214,6 +1216,109 @@ contract GammaFourYearTest is Test {
         _sn(188e15, 938e15, 375e16, 250e15, 8e16);
         _sn(188e15, 5e17, 375e16, 250e15, 8e16);
         _sn(188e15, 15e17, 375e16, 250e15, 8e16);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // HEAD TO HEAD: THE LIVE CONFIGURATION AGAINST THE PROPOSED ONE.
+    //
+    // Everything identical except two numbers:
+    //     dFloor    0.50 -> 0.25   (the gate, r = 1.58 -> 0.79)
+    //     kappaMax  0.10 -> 0.05   (halved, to hold the operating point)
+    //
+    // kappaMax is halved deliberately and is not a second improvement. Dropping the gate
+    // alone makes kappa engage far more often, which raises the mean fee and sheds flow, and
+    // a pool that gains LP value by charging more has not improved. Halving the cap puts the
+    // mean fee back where the live pool has it, so what is left is attributable to the
+    // detector gating better rather than to the pool being more expensive.
+    function _head(string memory name, uint256 dFloor_, uint256 kappaMax_) internal view {
+        Pool memory p = _seed(5e17); // feeGamma 0.5, as deployed
+        p.feeCapP = 3e15; // 30bps vol-fee cap, as deployed
+        p.directional = true;
+        p.pDFloor = dFloor_;
+        p.pKappaMax = kappaMax_;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        uint256 fair = _fairPool(prices.length - 1);
+        uint256 v = _lpValue(p, fair);
+        console2.log(string.concat("== ", name));
+        console2.log("   dFloor / kappaMax :", dFloor_, kappaMax_);
+        console2.log("   LP value at fair  :", v);
+        console2.log("   arb extracted     :", p.lvr);
+        console2.log("   cost to benign    :", p.benign);
+        console2.log("   mean fee (bps)    :", (p.feeSum / p.steps) / 1e14);
+        console2.log("   flow retained(bps):", (p.vol * 10_000) / (NU * p.steps));
+        console2.log("   bars in trend(bps):", (p.trendBars * 10_000) / p.steps);
+        _delta("   vs Uniswap 30bps  :", v, UNI30_LP);
+        _delta("   vs buy and hold   :", v, _hodl());
+        _delta("   vs live config    :", v, TRUE_LP);
+    }
+
+    function test_head_deployed() public view {
+        _head("LIVE as deployed  ", 5e17, 1e17);
+    }
+
+    function test_head_proposed() public view {
+        _head("PROPOSED          ", 250e15, 5e16);
+    }
+
+    /// @notice YEAR BY YEAR, because one four-year number can be a single lucky episode.
+    ///
+    ///         Each year is run as an INDEPENDENT pool seeded at that year's opening price,
+    ///         so a good or bad start does not carry forward and each row is its own
+    ///         experiment. If the gate change is real it should win in most years rather than
+    ///         winning enormously in one.
+    function _slice(uint256 dFloor_, uint256 kappaMax_, uint256 t0, uint256 t1)
+        internal
+        view
+        returns (uint256 lp, uint256 arb, uint256 flow)
+    {
+        Pool memory p;
+        _defaults(p);
+        p.r0 = R0;
+        p.r1 = FullMath.mulDiv(R0, WAD, prices[t0]);
+        p.lastP = FullMath.mulDiv(p.r1, WAD, p.r0);
+        p.gamma = 5e17;
+        p.feeCapP = 3e15;
+        p.directional = true;
+        p.pDFloor = dFloor_;
+        p.pKappaMax = kappaMax_;
+        for (uint256 t = t0; t < t1; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+        lp = _lpValue(p, _fairPool(t1 - 1));
+        arb = p.lvr;
+        flow = (p.vol * 10_000) / (NU * p.steps);
+    }
+
+    function _year(uint256 n) internal view {
+        uint256 per = prices.length / 4;
+        uint256 t0 = n * per;
+        uint256 t1 = n == 3 ? prices.length : t0 + per;
+        (uint256 lpL, uint256 arbL, uint256 fL) = _slice(5e17, 1e17, t0, t1);
+        (uint256 lpP, uint256 arbP, uint256 fP) = _slice(250e15, 5e16, t0, t1);
+        console2.log("year (0-indexed):", n);
+        console2.log("   start / end price:", prices[t0], prices[t1 - 1]);
+        console2.log("   LIVE      LP/arb/flow:", lpL, arbL, fL);
+        console2.log("   PROPOSED  LP/arb/flow:", lpP, arbP, fP);
+        if (lpP >= lpL) console2.log("   PROPOSED ahead by (bps):", ((lpP - lpL) * 10_000) / lpL);
+        else console2.log("   PROPOSED BEHIND by (bps):", ((lpL - lpP) * 10_000) / lpL);
+    }
+
+    function test_year0() public view {
+        _year(0);
+    }
+
+    function test_year1() public view {
+        _year(1);
+    }
+
+    function test_year2() public view {
+        _year(2);
+    }
+
+    function test_year3() public view {
+        _year(3);
     }
 
     // ------------------------------------------------------------------------------------
