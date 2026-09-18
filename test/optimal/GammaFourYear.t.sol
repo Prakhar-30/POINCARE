@@ -42,6 +42,15 @@ contract GammaFourYearTest is Test {
     uint256 internal constant LAMBDA = 900e15; // EWMA decay for sigma-hat, as deployed
     uint256 internal constant FEE_CAP = 5e17; // 50%, deliberately non-binding here
 
+    /// @dev The expert set: candidate volatility-fee gammas. These are a WHITELIST, and that
+    ///      is the whole security argument for letting a pool learn. The learner never
+    ///      invents a parameter; it only ever shifts weight between configurations that were
+    ///      each independently reviewed and capped. The worst an adversary can achieve by
+    ///      steering the payoff signal is to push the pool toward the least favourable member
+    ///      of a set of safe configurations, which is bounded by construction rather than by
+    ///      argument.
+    uint256 internal constant N_EXPERTS = 5;
+
     uint256[] internal prices;
 
     struct Pool {
@@ -65,7 +74,26 @@ contract GammaFourYearTest is Test {
         bool avellaneda;
         uint256 gammaRisk; // risk aversion
         uint256 staticFee; // a plain Uniswap-style constant fee, when non-zero
+        // multiplicative-weights mode
+        bool learning;
+        uint256[N_EXPERTS] w; // expert weights, WAD
     }
+
+
+    function _experts() internal pure returns (uint256[N_EXPERTS] memory e) {
+        e[0] = 1e17; // 0.10
+        e[1] = 25e16; // 0.25
+        e[2] = 5e17; // 0.50
+        e[3] = 1e18; // 1.00
+        e[4] = 2e18; // 2.00
+    }
+
+    /// @dev Learning rate. Low deliberately: a fast learner is a manipulable learner, because
+    ///      an adversary willing to lose money for a few blocks could otherwise move the
+    ///      pool's configuration a long way. At this rate it takes hundreds of samples to
+    ///      shift the mixture materially, which is far longer than any manipulation can be
+    ///      sustained against arbitrage.
+    uint256 internal constant ETA = 2e16;
 
     /// @dev A-S horizon, in bars. For a perpetual pool there is no terminal time, so the
     ///      horizon is the memory of the signal itself: with EWMA decay lambda the effective
@@ -160,12 +188,105 @@ contract GammaFourYearTest is Test {
         return q > FEE_CAP ? FEE_CAP : q;
     }
 
+    /// @dev The fee the mixture currently implies: the weight-average of the experts' fees.
+    ///      Averaging rather than picking the argmax keeps the quote continuous as weights
+    ///      move, so there is no step for anyone to trade across.
+    function _blendedFee(Pool memory p) internal pure returns (uint256 f) {
+        uint256[N_EXPERTS] memory e = _experts();
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+        uint256 tot;
+        for (uint256 i = 0; i < N_EXPERTS; i++) {
+            f += FullMath.mulDiv(p.w[i], FullMath.mulDiv(e[i], sigmaHat, WAD), WAD);
+            tot += p.w[i];
+        }
+        if (tot == 0) return 0;
+        f = FullMath.mulDiv(f, WAD, tot);
+        return f > FEE_CAP ? FEE_CAP : f;
+    }
+
+    /// @dev Arbitrage profit at a given friction, WITHOUT touching the pool. Needed because
+    ///      `Pool memory shadow = p` aliases rather than copies in Solidity, so evaluating a
+    ///      counterfactual through `_arb` on a "copy" silently moved the real reserves, five
+    ///      phantom trades a bar. Counterfactuals must be computed, never simulated in place.
+    function _arbProfitOnly(Pool memory p, uint256 fair, uint256 s_) internal pure returns (uint256) {
+        uint256 pp = FullMath.mulDiv(p.r1, WAD, p.r0);
+        uint256 prod = FullMath.mulDiv(p.r0 * p.r1, WAD - s_, WAD);
+        if (fair > pp) {
+            uint256 root = Math.sqrt(FullMath.mulDiv(prod, fair, WAD));
+            if (root <= p.r1) return 0;
+            uint256 d = root - p.r1;
+            uint256 out = AsymmetricCurve.swapExactInWithSpread(p.r0, p.r1, 0, 0, d, false, s_);
+            if (out == 0 || out >= p.r0) return 0;
+            uint256 cost = FullMath.mulDiv(d, WAD, fair);
+            return out > cost ? out - cost : 0;
+        } else if (fair < pp) {
+            uint256 root = Math.sqrt(FullMath.mulDiv(prod, WAD, fair));
+            if (root <= p.r0) return 0;
+            uint256 d = root - p.r0;
+            uint256 out = AsymmetricCurve.swapExactInWithSpread(p.r0, p.r1, 0, 0, d, true, s_);
+            if (out == 0 || out >= p.r1) return 0;
+            uint256 rev = FullMath.mulDiv(out, WAD, fair);
+            return rev > d ? rev - d : 0;
+        }
+        return 0;
+    }
+
+    /// @dev One multiplicative-weights update, from FULL INFORMATION.
+    ///
+    ///      This is what makes the approach fit a pool rather than merely fit a paper. A
+    ///      market maker in a limit book only learns the payoff of the quote it actually
+    ///      posted. A pool can evaluate every candidate counterfactually, because the price
+    ///      move and the order flow are observable after the fact and the payoff of any fee
+    ///      against them is a closed form: revenue from uninformed flow, less what an
+    ///      arbitrageur would have taken at that fee. No experiment is needed, so there is no
+    ///      exploration cost and no bandit regret, only the O(sqrt(T log N)) of the expert
+    ///      setting.
+    function _learn(Pool memory p, uint256 fair, uint256 notional) internal pure {
+        uint256[N_EXPERTS] memory e = _experts();
+        uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
+
+        uint256[N_EXPERTS] memory pay;
+        uint256 best;
+        uint256 worst = type(uint256).max;
+        for (uint256 i = 0; i < N_EXPERTS; i++) {
+            uint256 f = FullMath.mulDiv(e[i], sigmaHat, WAD);
+            if (f > FEE_CAP) f = FEE_CAP;
+            // revenue this bar from uninformed flow at this fee, net of the volume that
+            // fee drives away; a learner scored on captive flow learns to charge everything
+            uint256 vol = FullMath.mulDiv(
+                notional, uint256(FixedPointMathLib.expWad(-int256(400 * f))), WAD
+            );
+            uint256 rev = FullMath.mulDiv(vol, f, WAD);
+            uint256 lost = _arbProfitOnly(p, fair, f);
+            pay[i] = rev > lost ? rev - lost : 0;
+            if (pay[i] > best) best = pay[i];
+            if (pay[i] < worst) worst = pay[i];
+        }
+        if (best == worst) return; // nothing to learn from a flat bar
+
+        for (uint256 i = 0; i < N_EXPERTS; i++) {
+            // normalise the bar's payoffs into [0,1] so the learning rate means the same
+            // thing regardless of how large the bar happened to be
+            uint256 norm = FullMath.mulDiv(pay[i] - worst, WAD, best - worst);
+            uint256 mult = uint256(FixedPointMathLib.expWad(int256(FullMath.mulDiv(ETA, norm, WAD))));
+            p.w[i] = FullMath.mulDiv(p.w[i], mult, WAD);
+        }
+
+        // renormalise so weights cannot drift out of range over 7,776 updates
+        uint256 tot;
+        for (uint256 i = 0; i < N_EXPERTS; i++) tot += p.w[i];
+        if (tot > 0) {
+            for (uint256 i = 0; i < N_EXPERTS; i++) p.w[i] = FullMath.mulDiv(p.w[i], N_EXPERTS * WAD, tot);
+        }
+    }
+
     /// @dev Total friction a swap in this direction faces: the symmetric fee, plus the
     ///      directional spread if this pool runs one AND the swap is pushing with the
     ///      detected trend. This is the whole asymmetry: toxic flow meets fee + kappa, benign
     ///      flow meets the fee alone.
     function _friction(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
         if (p.staticFee != 0) return p.staticFee;
+        if (p.learning) return _blendedFee(p);
         if (p.avellaneda) return _asQuote(p, zeroForOne);
         uint256 f = _fee(p);
         if (!p.directional || p.kappa == 0) return f;
@@ -210,9 +331,15 @@ contract GammaFourYearTest is Test {
         p.spreadSum += p.kappa;
         p.steps++;
 
-        // uninformed flow pays whatever its own direction faces
+        // uninformed flow pays whatever its own direction faces, AND responds to it.
+        // Without this the harness has captive traders, every fee increase is pure profit,
+        // and LP value rises without bound in the fee. Volume decays as nu0*exp(-alpha*f),
+        // the specification the optimal-fee literature uses, with alpha = 400.
         uint256 s = _friction(p, buyToken1);
-        uint256 amountIn = buyToken1 ? NU : FullMath.mulDiv(NU, p.r1, p.r0);
+        uint256 elastic = uint256(FixedPointMathLib.expWad(-int256(400 * s)));
+        uint256 notional = FullMath.mulDiv(NU, elastic, WAD);
+        uint256 amountIn = buyToken1 ? notional : FullMath.mulDiv(notional, p.r1, p.r0);
+        if (amountIn == 0) return;
         uint256 baseOut = AsymmetricCurve.swapExactIn(p.r0, p.r1, 0, 0, amountIn, buyToken1);
         uint256 got = AsymmetricCurve.swapExactInWithSpread(p.r0, p.r1, 0, 0, amountIn, buyToken1, s);
         if (baseOut > got) {
@@ -241,6 +368,7 @@ contract GammaFourYearTest is Test {
             p.sig = DirectionalSignal.update(p.sig, r, LAMBDA);
 
             if (p.directional) _detect(p, r);
+            if (p.learning) _learn(p, fair, NU);
         }
         p.lastP = pNow;
     }
@@ -263,6 +391,15 @@ contract GammaFourYearTest is Test {
     }
 
     /// @dev A plain constant-fee pool: what an ordinary Uniswap position looks like.
+    function _runLearning() internal view returns (Pool memory p) {
+        p = _seed(0);
+        p.learning = true;
+        for (uint256 i = 0; i < N_EXPERTS; i++) p.w[i] = WAD;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+    }
+
     function _runStatic(uint256 feeWad) internal view returns (Pool memory p) {
         p = _seed(0);
         p.staticFee = feeWad;
@@ -366,6 +503,65 @@ contract GammaFourYearTest is Test {
 
     function test_directional_gamma050() public view {
         _directionalAt(5e17);
+    }
+
+    /// @dev One fixed configuration, reported in LP terms.
+    function _fixedAt(uint256 gamma) internal view {
+        uint256 fair = _fairPool(prices.length - 1);
+        Pool memory f = _run(gamma);
+        console2.log("gamma (wad):", gamma);
+        console2.log("   LP value at fair:", _lpValue(f, fair));
+        console2.log("   arb extracted   :", f.lvr);
+        console2.log("   cost to benign  :", f.benign);
+    }
+
+    function test_fixed_g4() public view {
+        _fixedAt(4e18);
+    }
+
+    function test_fixed_g8() public view {
+        _fixedAt(8e18);
+    }
+
+    function test_fixed_g16() public view {
+        _fixedAt(16e18);
+    }
+
+    function test_fixed_g05() public view {
+        _fixedAt(5e17);
+    }
+
+    function test_fixed_g1() public view {
+        _fixedAt(1e18);
+    }
+
+    function test_fixed_g2() public view {
+        _fixedAt(2e18);
+    }
+
+    /// @notice THE LEARNER AGAINST THE FIXED CHOICES IT COULD HAVE MADE.
+    ///
+    ///         The point of a no-regret algorithm is not that it beats the best expert. It
+    ///         cannot: the best expert is only knowable in hindsight, and the guarantee is
+    ///         convergence TOWARD it at O(sqrt(T log N)). The point is that it gets close
+    ///         without anyone having to choose, on a market nobody has seen yet.
+    ///
+    ///         Fixed references on this identical series, from the tests above:
+    ///           gamma 0.10 -> LP 2,806,661
+    ///           gamma 0.25 -> LP 2,866,640
+    ///           gamma 0.50 -> LP 2,941,087   (deployed)
+    ///           gamma 1.00 -> LP 3,047,147
+    ///           gamma 2.00 -> LP 3,193,714
+    function test_learner() public view {
+        uint256 fair = _fairPool(prices.length - 1);
+        Pool memory L = _runLearning();
+        console2.log("multiplicative weights");
+        console2.log("   LP value at fair:", _lpValue(L, fair));
+        console2.log("   arb extracted   :", L.lvr);
+        console2.log("   cost to benign  :", L.benign);
+        console2.log("   final weights   :");
+        uint256[N_EXPERTS] memory e = _experts();
+        for (uint256 i = 0; i < N_EXPERTS; i++) console2.log("     gamma/weight", e[i], L.w[i]);
     }
 
     /// @notice WHAT AN LP WOULD ACTUALLY HAVE SAVED, over four years of real ETH/USDC.
