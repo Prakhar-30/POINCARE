@@ -64,6 +64,7 @@ contract GammaFourYearTest is Test {
         // Avellaneda-Stoikov mode
         bool avellaneda;
         uint256 gammaRisk; // risk aversion
+        uint256 staticFee; // a plain Uniswap-style constant fee, when non-zero
     }
 
     /// @dev A-S horizon, in bars. For a perpetual pool there is no terminal time, so the
@@ -89,6 +90,16 @@ contract GammaFourYearTest is Test {
             prices.push(vm.parseUint(line));
         }
         require(prices.length > 1000, "run: DAYS=1460 python analysis/simulation/fetch_realdata.py");
+    }
+
+    /// @dev The price series is USDC per ETH. The pool's own marginal price is r1/r0, which
+    ///      with token0 = USDC and token1 = ETH is ETH per USDC, the reciprocal. Feeding the
+    ///      series in raw put the external price about 1.7 million times above the pool's,
+    ///      so the arbitrageur pushed one direction on every single bar and drained the pool
+    ///      to nothing: four years of "LVR" worth thirteen times the pool. Every real-data
+    ///      number produced before this conversion existed was measuring that drain.
+    function _fairPool(uint256 t) internal view returns (uint256) {
+        return FullMath.mulDiv(WAD, WAD, prices[t]);
     }
 
     function _seed(uint256 gamma) internal view returns (Pool memory p) {
@@ -154,6 +165,7 @@ contract GammaFourYearTest is Test {
     ///      detected trend. This is the whole asymmetry: toxic flow meets fee + kappa, benign
     ///      flow meets the fee alone.
     function _friction(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
+        if (p.staticFee != 0) return p.staticFee;
         if (p.avellaneda) return _asQuote(p, zeroForOne);
         uint256 f = _fee(p);
         if (!p.directional || p.kappa == 0) return f;
@@ -250,6 +262,22 @@ contract GammaFourYearTest is Test {
         return _runWith(gamma, false);
     }
 
+    /// @dev A plain constant-fee pool: what an ordinary Uniswap position looks like.
+    function _runStatic(uint256 feeWad) internal view returns (Pool memory p) {
+        p = _seed(0);
+        p.staticFee = feeWad;
+        for (uint256 t = 0; t < prices.length; t++) {
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+        }
+    }
+
+    /// @dev LP value in token0 terms, marked at the external fair price. This nets everything:
+    ///      fees earned, spread retained, arbitrage lost, inventory carried. It is the only
+    ///      number an LP experiences.
+    function _lpValue(Pool memory p, uint256 fair) internal pure returns (uint256) {
+        return p.r0 + FullMath.mulDiv(p.r1, WAD, fair);
+    }
+
     function _runAS(uint256 gammaRisk) internal view returns (Pool memory p) {
         return _runASFee(gammaRisk, 25e16);
     }
@@ -261,7 +289,7 @@ contract GammaFourYearTest is Test {
         p.avellaneda = true;
         p.gammaRisk = gammaRisk;
         for (uint256 t = 0; t < prices.length; t++) {
-            _step(p, prices[t], (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
         }
     }
 
@@ -269,7 +297,7 @@ contract GammaFourYearTest is Test {
         p = _seed(gamma);
         p.directional = directional;
         for (uint256 t = 0; t < prices.length; t++) {
-            _step(p, prices[t], (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
+            _step(p, _fairPool(t), (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
         }
     }
 
@@ -338,6 +366,52 @@ contract GammaFourYearTest is Test {
 
     function test_directional_gamma050() public view {
         _directionalAt(5e17);
+    }
+
+    /// @notice WHAT AN LP WOULD ACTUALLY HAVE SAVED, over four years of real ETH/USDC.
+    ///
+    ///         Everything before this measured arbitrage extraction, which is the mechanism's
+    ///         own scoreboard rather than the LP's. This reports LP value marked at the
+    ///         external fair price, which nets fees earned, spread retained, arbitrage lost
+    ///         and inventory carried into the one number a liquidity provider experiences.
+    ///
+    ///         The baseline is deliberately not a zero-fee pool. Nobody runs one. An ordinary
+    ///         Uniswap position charges a static fee, so the comparison that means anything is
+    ///         against 5bps and 30bps static pools holding the same assets over the same path.
+    function test_whatLpsWouldHaveSaved() public view {
+        uint256 fair = _fairPool(prices.length - 1);
+        uint256 start = _lpValue(_seed(0), _fairPool(0));
+
+        Pool memory cpmm = _run(0);
+        Pool memory uni05 = _runStatic(5e14); // 5bps
+        Pool memory uni30 = _runStatic(30e14); // 30bps
+        Pool memory deployed = _runWith(5e17, true); // vol fee 0.5 + directional spread
+        Pool memory tuned = _runASFee(100e18, 25e16); // A-S skew on a 0.25 vol fee
+
+        console2.log("bars:", prices.length, " ETH start/end:", prices[0]);
+        console2.log("end price:", fair);
+        console2.log("starting LP value (token0):", start);
+        console2.log("");
+        _lp("zero-fee CPMM     ", cpmm, fair, uni30);
+        _lp("Uniswap 5bps      ", uni05, fair, uni30);
+        _lp("Uniswap 30bps     ", uni30, fair, uni30);
+        _lp("Poincare deployed ", deployed, fair, uni30);
+        _lp("Poincare A-S tuned", tuned, fair, uni30);
+    }
+
+    function _lp(string memory name, Pool memory p, uint256 fair, Pool memory ref) internal pure {
+        uint256 v = _lpValue(p, fair);
+        uint256 r = _lpValue(ref, fair);
+        console2.log(string.concat("== ", name));
+        console2.log("   LP value at fair :", v);
+        console2.log("   arb extracted    :", p.lvr);
+        if (v >= r) {
+            console2.log("   vs Uniswap 30bps : +", v - r);
+            console2.log("   as bps of pool   : +", ((v - r) * 10_000) / r);
+        } else {
+            console2.log("   vs Uniswap 30bps : -", r - v);
+            console2.log("   as bps of pool   : -", ((r - v) * 10_000) / r);
+        }
     }
 
     /// @notice THE AVELLANEDA-STOIKOV QUOTE ON FOUR YEARS OF REAL DATA.
