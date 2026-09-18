@@ -49,7 +49,7 @@ contract GammaFourYearTest is Test {
     ///      steering the payoff signal is to push the pool toward the least favourable member
     ///      of a set of safe configurations, which is bounded by construction rather than by
     ///      argument.
-    uint256 internal constant N_EXPERTS = 5;
+    uint256 internal constant N_EXPERTS = 7;
 
     uint256[] internal prices;
 
@@ -83,9 +83,11 @@ contract GammaFourYearTest is Test {
     function _experts() internal pure returns (uint256[N_EXPERTS] memory e) {
         e[0] = 1e17; // 0.10
         e[1] = 25e16; // 0.25
-        e[2] = 5e17; // 0.50
+        e[2] = 5e17; // 0.50  (deployed)
         e[3] = 1e18; // 1.00
         e[4] = 2e18; // 2.00
+        e[5] = 4e18; // 4.00
+        e[6] = 8e18; // 8.00
     }
 
     /// @dev Learning rate. Low deliberately: a fast learner is a manipulable learner, because
@@ -245,9 +247,15 @@ contract GammaFourYearTest is Test {
         uint256[N_EXPERTS] memory e = _experts();
         uint256 sigmaHat = DirectionalSignal.sigmaWad(p.sig, LAMBDA);
 
-        uint256[N_EXPERTS] memory pay;
-        uint256 best;
-        uint256 worst = type(uint256).max;
+        // THE PAYOFF IS SIGNED, AND THAT IS NOT A DETAIL. Clamping it at zero looks
+        // harmless and is not: on a bar with a real price move every expert loses more to
+        // arbitrage than it earns in fees, so a clamped payoff reports a flat tie and the
+        // learner discards the bar. Those are precisely the bars on which a high fee earns
+        // its keep. A learner that only sees calm bars learns that fees drive volume away,
+        // which is true, and never sees what they bought.
+        int256[N_EXPERTS] memory pay;
+        int256 best = type(int256).min;
+        int256 worst = type(int256).max;
         for (uint256 i = 0; i < N_EXPERTS; i++) {
             uint256 f = FullMath.mulDiv(e[i], sigmaHat, WAD);
             if (f > FEE_CAP) f = FEE_CAP;
@@ -258,7 +266,7 @@ contract GammaFourYearTest is Test {
             );
             uint256 rev = FullMath.mulDiv(vol, f, WAD);
             uint256 lost = _arbProfitOnly(p, fair, f);
-            pay[i] = rev > lost ? rev - lost : 0;
+            pay[i] = int256(rev) - int256(lost);
             if (pay[i] > best) best = pay[i];
             if (pay[i] < worst) worst = pay[i];
         }
@@ -267,7 +275,7 @@ contract GammaFourYearTest is Test {
         for (uint256 i = 0; i < N_EXPERTS; i++) {
             // normalise the bar's payoffs into [0,1] so the learning rate means the same
             // thing regardless of how large the bar happened to be
-            uint256 norm = FullMath.mulDiv(pay[i] - worst, WAD, best - worst);
+            uint256 norm = FullMath.mulDiv(uint256(pay[i] - worst), WAD, uint256(best - worst));
             uint256 mult = uint256(FixedPointMathLib.expWad(int256(FullMath.mulDiv(ETA, norm, WAD))));
             p.w[i] = FullMath.mulDiv(p.w[i], mult, WAD);
         }
@@ -574,25 +582,60 @@ contract GammaFourYearTest is Test {
     ///         The baseline is deliberately not a zero-fee pool. Nobody runs one. An ordinary
     ///         Uniswap position charges a static fee, so the comparison that means anything is
     ///         against 5bps and 30bps static pools holding the same assets over the same path.
-    function test_whatLpsWouldHaveSaved() public view {
+    ///         Split one config per test. Five four-year replays in one call exhausts
+    ///         the EVM memory limit in the harness, and a run that dies halfway reports
+    ///         nothing at all.
+    function test_lpsSaved_zeroFee() public view {
+        _compare("zero-fee CPMM     ", _run(0));
+    }
+
+    function test_lpsSaved_uni05() public view {
+        _compare("Uniswap 5bps      ", _runStatic(5e14));
+    }
+
+    function test_lpsSaved_uni30() public view {
+        Pool memory p = _runStatic(30e14);
+        assertEq(_lpValue(p, _fairPool(prices.length - 1)), UNI30_LP, "UNI30_LP is stale");
+        _compare("Uniswap 30bps     ", p);
+    }
+
+    function test_lpsSaved_deployed() public view {
+        _compare("Poincare deployed ", _runWith(5e17, true));
+    }
+
+    function test_lpsSaved_tunedG2() public view {
+        _compare("Poincare gamma 2  ", _runWith(2e18, true));
+    }
+
+    function test_lpsSaved_tunedG4() public view {
+        _compare("Poincare gamma 4  ", _runWith(4e18, true));
+    }
+
+    /// @dev The learner evaluates seven counterfactuals a bar, so running the 30bps
+    ///      baseline alongside it in one call runs out of gas. The baseline is a constant
+    ///      fee on a fixed path, so its result is deterministic: it is the figure
+    ///      `test_lpsSaved_uni30` prints, asserted there and quoted here.
+    uint256 internal constant UNI30_LP = 2_872_414_578_985_274_455_176_819;
+
+    function test_lpsSaved_learner() public view {
+        uint256 fair = _fairPool(prices.length - 1);
+        Pool memory p = _runLearning();
+        uint256 v = _lpValue(p, fair);
+        console2.log("== Poincare learner  ");
+        console2.log("   LP value at fair :", v);
+        console2.log("   arb extracted    :", p.lvr);
+        console2.log("   vs Uniswap 30bps : +", v - UNI30_LP);
+        console2.log("   as bps of pool   : +", ((v - UNI30_LP) * 10_000) / UNI30_LP);
+    }
+
+    /// @notice One replay against the 30bps baseline, both on the same path.
+    function _compare(string memory name, Pool memory p) internal view {
         uint256 fair = _fairPool(prices.length - 1);
         uint256 start = _lpValue(_seed(0), _fairPool(0));
-
-        Pool memory cpmm = _run(0);
-        Pool memory uni05 = _runStatic(5e14); // 5bps
-        Pool memory uni30 = _runStatic(30e14); // 30bps
-        Pool memory deployed = _runWith(5e17, true); // vol fee 0.5 + directional spread
-        Pool memory tuned = _runASFee(100e18, 25e16); // A-S skew on a 0.25 vol fee
-
-        console2.log("bars:", prices.length, " ETH start/end:", prices[0]);
-        console2.log("end price:", fair);
+        Pool memory ref = _runStatic(30e14);
+        console2.log("bars:", prices.length);
         console2.log("starting LP value (token0):", start);
-        console2.log("");
-        _lp("zero-fee CPMM     ", cpmm, fair, uni30);
-        _lp("Uniswap 5bps      ", uni05, fair, uni30);
-        _lp("Uniswap 30bps     ", uni30, fair, uni30);
-        _lp("Poincare deployed ", deployed, fair, uni30);
-        _lp("Poincare A-S tuned", tuned, fair, uni30);
+        _lp(name, p, fair, ref);
     }
 
     function _lp(string memory name, Pool memory p, uint256 fair, Pool memory ref) internal pure {
