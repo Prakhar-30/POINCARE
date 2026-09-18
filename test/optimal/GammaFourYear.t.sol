@@ -8,6 +8,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 import {DirectionalSignal} from "../../src/libraries/DirectionalSignal.sol";
+import {Cusum} from "../../src/libraries/Cusum.sol";
+import {ControlLaw} from "../../src/libraries/ControlLaw.sol";
 import {AsymmetricCurve} from "../../src/libraries/AsymmetricCurve.sol";
 
 /// @title GammaFourYear: does the derived gamma hold on four years of real returns?
@@ -52,7 +54,22 @@ contract GammaFourYearTest is Test {
         uint256 benign;
         uint256 feeSum;
         uint256 steps;
+        // detector: only populated when the directional spread is enabled
+        bool directional;
+        int256 sPos;
+        int256 sNeg;
+        uint256 kappa;
+        Cusum.Trend trend;
+        uint256 spreadSum;
     }
+
+    // detector configuration, as deployed
+    int256 internal constant K_SLACK = 1e15;
+    int256 internal constant H = 5e15;
+    int256 internal constant S_MAX = 2e16;
+    uint256 internal constant D_FLOOR = 5e17;
+    uint256 internal constant KAPPA_MAX = 1e17;
+    uint256 internal constant D_MAX = 5e16;
 
     function setUp() public {
         while (true) {
@@ -75,6 +92,20 @@ contract GammaFourYearTest is Test {
     function _fee(Pool memory p) internal pure returns (uint256 f) {
         f = FullMath.mulDiv(p.gamma, DirectionalSignal.sigmaWad(p.sig, LAMBDA), WAD);
         if (f > FEE_CAP) f = FEE_CAP;
+    }
+
+    /// @dev Total friction a swap in this direction faces: the symmetric fee, plus the
+    ///      directional spread if this pool runs one AND the swap is pushing with the
+    ///      detected trend. This is the whole asymmetry: toxic flow meets fee + kappa, benign
+    ///      flow meets the fee alone.
+    function _friction(Pool memory p, bool zeroForOne) internal pure returns (uint256) {
+        uint256 f = _fee(p);
+        if (!p.directional || p.kappa == 0) return f;
+        bool withTrend =
+            (p.trend == Cusum.Trend.Up && !zeroForOne) || (p.trend == Cusum.Trend.Down && zeroForOne);
+        if (!withTrend) return f;
+        uint256 total = f + p.kappa;
+        return total > FEE_CAP ? FEE_CAP : total;
     }
 
     /// @dev Profit-maximising arbitrage to the band edge, through the real curve, with the fee
@@ -107,11 +138,12 @@ contract GammaFourYearTest is Test {
     }
 
     function _step(Pool memory p, uint256 fair, bool buyToken1) internal pure {
-        uint256 s = _fee(p);
-        p.feeSum += s;
+        p.feeSum += _fee(p);
+        p.spreadSum += p.kappa;
         p.steps++;
 
-        // uninformed flow, charged the same symmetric fee
+        // uninformed flow pays whatever its own direction faces
+        uint256 s = _friction(p, buyToken1);
         uint256 amountIn = buyToken1 ? NU : FullMath.mulDiv(NU, p.r1, p.r0);
         uint256 baseOut = AsymmetricCurve.swapExactIn(p.r0, p.r1, 0, 0, amountIn, buyToken1);
         uint256 got = AsymmetricCurve.swapExactInWithSpread(p.r0, p.r1, 0, 0, amountIn, buyToken1, s);
@@ -127,7 +159,9 @@ contract GammaFourYearTest is Test {
             p.r0 -= got;
         }
 
-        p.lvr += _arb(p, fair, s);
+        // the arbitrageur faces the friction on the side it needs to trade
+        uint256 pMid = FullMath.mulDiv(p.r1, WAD, p.r0);
+        p.lvr += _arb(p, fair, _friction(p, fair < pMid));
 
         // advance sigma-hat on the pool's own price, as the hook does
         uint256 pNow = FullMath.mulDiv(p.r1, WAD, p.r0);
@@ -137,12 +171,32 @@ contract GammaFourYearTest is Test {
             if (r > cap) r = cap;
             else if (r < -cap) r = -cap;
             p.sig = DirectionalSignal.update(p.sig, r, LAMBDA);
+
+            if (p.directional) _detect(p, r);
         }
         p.lastP = pNow;
     }
 
+    /// @dev One detector step, lifted out of `_step` purely so the stack fits.
+    function _detect(Pool memory p, int256 r) internal pure {
+        uint256 d = DirectionalSignal.signal(p.sig);
+        Cusum.State memory cs = Cusum.updateCapped(Cusum.State(p.sPos, p.sNeg), r, K_SLACK, S_MAX);
+        p.sPos = cs.sPos;
+        p.sNeg = cs.sNeg;
+        (Cusum.Trend dir, int256 ev) =
+            cs.sPos >= cs.sNeg ? (Cusum.Trend.Up, cs.sPos) : (Cusum.Trend.Down, cs.sNeg);
+        int256 gated = d >= D_FLOOR ? ev : int256(0);
+        p.kappa = ControlLaw.step(p.kappa, gated, ControlLaw.Config(H, S_MAX, 0, KAPPA_MAX, D_MAX));
+        if (gated > 0) p.trend = dir;
+    }
+
     function _run(uint256 gamma) internal view returns (Pool memory p) {
+        return _runWith(gamma, false);
+    }
+
+    function _runWith(uint256 gamma, bool directional) internal view returns (Pool memory p) {
         p = _seed(gamma);
+        p.directional = directional;
         for (uint256 t = 0; t < prices.length; t++) {
             _step(p, prices[t], (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0);
         }
@@ -171,6 +225,48 @@ contract GammaFourYearTest is Test {
             uint256 saved = base.lvr > p.lvr ? base.lvr - p.lvr : 0;
             console2.log("   saved per unit cost   :", p.benign > 0 ? saved / p.benign : 0);
         }
+    }
+
+    /// @notice CAN THE DIRECTIONAL SPREAD BREAK THE SYMMETRIC CEILING?
+    ///
+    ///         The symmetric fee saturates near 92% elimination and its efficiency falls
+    ///         monotonically, because every basis point that widens the no-arbitrage band is
+    ///         also charged to the traders who pay for the pool. That ceiling is a statement
+    ///         about uninformed-flow elasticity, not about arbitrage, so a mechanism that
+    ///         charges asymmetrically should not be bound by it.
+    ///
+    ///         The comparison has to be AT MATCHED ELIMINATION, not at matched gamma. Adding
+    ///         a spread on top of a fee raises both elimination and cost, so of course it
+    ///         "beats" the same fee alone. The question is whether it beats the symmetric fee
+    ///         that reaches the SAME elimination, which is the only comparison that says
+    ///         anything about the mechanism rather than about the dose.
+    ///
+    ///         Fee-only reference points, from test_gammaSweep_fourYear on this same series:
+    ///           gamma 0.10 -> 57.90% eliminated, benign     9,743, saved/cost 781
+    ///           gamma 0.25 -> 73.87% eliminated, benign    30,628, saved/cost 317
+    ///           gamma 0.50 -> 83.93% eliminated, benign    84,069, saved/cost 131
+    ///           gamma 1.00 -> 90.87% eliminated, benign   320,037, saved/cost  37
+    function _directionalAt(uint256 gamma) internal view {
+        Pool memory base = _run(0);
+        Pool memory p = _runWith(gamma, true);
+        uint256 saved = base.lvr > p.lvr ? base.lvr - p.lvr : 0;
+        console2.log("gamma (wad)            :", gamma);
+        console2.log("  fee + spread elim(bps):", (saved * 10_000) / base.lvr);
+        console2.log("  cost to uninformed    :", p.benign);
+        console2.log("  saved per unit cost   :", p.benign > 0 ? saved / p.benign : 0);
+        console2.log("  mean kappa (bps)      :", (p.spreadSum / p.steps) / 1e14);
+    }
+
+    function test_directional_gamma010() public view {
+        _directionalAt(1e17);
+    }
+
+    function test_directional_gamma025() public view {
+        _directionalAt(25e16);
+    }
+
+    function test_directional_gamma050() public view {
+        _directionalAt(5e17);
     }
 
     /// @notice The model predicts what fee this replay needs for 95%, and it is not the fee
