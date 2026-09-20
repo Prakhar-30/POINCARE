@@ -55,7 +55,10 @@ the shadow. That is intended — it leaves no reason to donate at all.
 ## Prior review
 
 Poincaré was selected by the **Uniswap Foundation Security Fund**, which sponsored a security
-review by **Olympix**, run before the current deployment. The review reports only what it can
+review by **Olympix**, run on the 2026-07 build. The currently deployed build carries one
+piece of contract logic added after that review — shadow-accounted reserves — which exists to
+close the claim-donation finding below; the 2026-09 parameter recalibration changed no contract
+code, only constructor arguments. The review reports only what it can
 demonstrate: each finding arrives as a runnable Foundry proof of concept. Nine findings were
 reported, none high-severity. Every one was fixed, and each fix carries a regression test that
 fails on the pre-fix code and passes now:
@@ -75,7 +78,7 @@ before mainnet.
 
 ## Existing coverage
 
-131 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 3 invariants x 128k randomized calls, 0 reverts), fork simulations, adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
+228 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), fork simulations, adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
 
 ## Deployment
 

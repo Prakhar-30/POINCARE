@@ -21,7 +21,7 @@ on the with-trend (toxic) side while the stabilising side keeps trading at the b
 ## Run it
 
 ```bash
-forge test                      # 131 tests: unit, fuzz, invariant, manipulation, calibration, regression
+forge test                      # 228 tests: unit, fuzz, invariant, manipulation, calibration, regression
 forge test --match-path test/invariant/PoincareInvariant.t.sol -vv    # 3 x 128k randomized ops, 0 reverts
 forge test --match-path test/calibration/RealDataCalibration.t.sol -vv # ARL0 + delay on real ETH/USDC returns
 forge test --match-path test/manipulation/Manipulation.t.sol -vv      # fake-trend attacks must lose money

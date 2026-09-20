@@ -39,7 +39,9 @@ export function Analytics() {
       : "Waiting for the first detector samples — one is recorded per traded block.",
     auto: true,
   });
-  const kappaMax = cfg.kappaMax || 0.1;
+  // Gauge scale fallback only, used before the on-chain config resolves; the real value is
+  // read from the hook. Kept in step with the deployed kappaMax so the gauge does not jump.
+  const kappaMax = cfg.kappaMax || 0.05;
   const narrow = useIsNarrow();
 
   return (
@@ -103,7 +105,7 @@ export function Analytics() {
           <ParamRow sym="sMax" name="Statistic cap" desc="evidence level where κ saturates" value={cfg.sMax.toFixed(4)} />
           <ParamRow sym="λ" name="EWMA decay" desc={`signal memory ≈ ${cfg.effWindow ? fmtNum(cfg.effWindow, 1) : "—"} steps`} value={cfg.lambda.toFixed(3)} />
           <ParamRow sym="D_floor" name="Efficiency floor" desc="min directional-efficiency to engage" value={fmtPct(cfg.dFloor)} />
-          <ParamRow sym="κ_max" name="Lean cap (security)" desc="hard ceiling on curve asymmetry" value={fmtPct(cfg.kappaMax)} />
+          <ParamRow sym="κ_max" name="Lean cap (security)" desc="hard ceiling on the directional spread" value={fmtPct(cfg.kappaMax)} />
           <ParamRow sym="d_max" name="Spread ceiling" desc="max directional spread charged" value={fmtPct(cfg.dMax)} last />
 
           <div className="mt-4 flex items-center justify-between" style={{ fontSize: 11, color: "var(--faint)" }}>

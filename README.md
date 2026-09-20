@@ -654,7 +654,7 @@ python analysis/simulation/plot_fouryear.py
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 134 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 228 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
 > regression test per finding from the **Olympix security review**, all fixed). The
@@ -708,6 +708,25 @@ concept rather than a pattern match.
 shared a root cause. Every fix ships with a regression test that fails on the pre-fix code and
 passes now, in `test/regression/OlympixFindings.t.sol` plus the log-domain cases in
 `PriceLib.t.sol`.
+
+**What the review covered, and what came after it.** The review ran on the 2026-07 build. Two
+things changed in the repository since, and the distinction matters when reading "reviewed"
+above:
+
+- **Shadow-accounted reserves** are a genuine change to contract logic, made *after* the review
+  and not covered by it. They exist *because* of the review: they close the Low-severity claim
+  donation finding below. The risk the change itself introduces is set out in
+  [`SECURITY.md`](./SECURITY.md), and `invariant_shadowReservesBackedByClaims` asserts the
+  shadow never exceeds the ERC-6909 claims backing it across 128k randomized calls.
+- **The 2026-09 recalibration changed no contract code at all.** `dFloor` and `κ_max` are
+  constructor arguments; the deployed bytecode's logic is unchanged by them, and the new values
+  sit strictly inside the bounds the existing `isValidConfig` check already enforced. Halving
+  `κ_max` in particular *reduces* the worst-case directional spread, so it tightens the
+  manipulation bound rather than relaxing it.
+
+So: the contracts were reviewed, every finding was fixed, and the currently deployed build
+carries one post-review logic change that was itself a fix. None of that substitutes for an
+independent audit, which is still required before mainnet.
 
 | Severity | Finding | Fix |
 |---|---|---|
