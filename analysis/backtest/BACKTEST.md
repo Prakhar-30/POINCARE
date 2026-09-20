@@ -119,7 +119,7 @@ the entire trigger cost*:
   **~0.045 token0** of impact, to reach `h`, and that buys them nothing.
 
 Since `0 < min_trigger_cost`, faking a trend is strictly unprofitable. **Caveat (honest):** this
-argument is specific to the **spread** lever. The deferred **depth/curvature** lever (OPEN_ITEMS
+argument is specific to the **spread** lever. A **depth/curvature** lever (OPEN_ITEMS
 E1) *would* create a soft-side discount and a real prize, and deploying it safely requires the
 quantitative `κ_max` sizing the inequality demands. That is precisely why the MVP ships the spread
 lever and defers the depth lever until the sizing exists.

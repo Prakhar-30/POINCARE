@@ -109,7 +109,7 @@ running in a terminal before you start recording (see *Before you record*). Edit
 
 ### Slide 7 · Close
 
-> So: a working hook, live on chain. A hundred and thirty-one Foundry tests, invariants at a
+> So: a working hook, live on chain. A hundred and thirty-four Foundry tests, invariants at a
 > hundred and twenty-eight thousand calls, quotes matching execution to the wei.
 >
 > The curve is the actuator. The detector is the contribution. Thank you.

@@ -48,7 +48,8 @@ export function Dashboard() {
   const narrow = useIsNarrow();
   const mobile = useIsMobile();
   const tvl = fromWei(s.r0, "USDC") * 2; // balanced pool, both legs ≈ r0 in USDC terms
-  const kappaMax = cfg.kappaMax || 0.1;
+  // Gauge scale fallback only; the real value is read from the hook (see Analytics).
+  const kappaMax = cfg.kappaMax || 0.05;
 
   return (
     <div className="px-4 sm:px-6 pb-8">

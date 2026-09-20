@@ -129,26 +129,64 @@ contract OlympixFindingsTest is PoincareTestBase {
         assertGe(outIfPaid, amountOut, "quoted input must buy the requested post-spread output");
     }
 
-    // L-3 / L-6 (4.2.3 / 4.2.6): a claim donation is forfeited to existing LPs, not profitable.
+    // L-3 / L-6 (4.2.3 / 4.2.6) and the UHI10 judge's note: reserves are shadow-accounted,
+    // so a claim donation cannot reach the detector, the price, or anyone's redemption.
 
-    function test_L3_claimDonation_isForfeitedToLPs() public {
-        (uint256 r0Before,) = hook.reserves();
+    function test_L3_claimDonation_cannotMoveReservesOrDetector() public {
+        (uint256 r0Before, uint256 r1Before) = hook.reserves();
+        (uint256 c0Before,) = hook.claimReserves();
         uint256 myShares = hook.balanceOf(address(this));
         uint256 redeemable0Before = FullMath.mulDiv(myShares, r0Before, hook.totalSupply());
+        uint256 priceBefore = FullMath.mulDiv(r1Before, WAD, r0Before);
 
+        // Before the shadow existed, `_reserves()` read the live claim balance, so this
+        // transfer moved the number the detector samples once per block and the number
+        // share pricing divides by, without the donor ever trading.
         ClaimDonationAttacker attacker = new ClaimDonationAttacker(poolManager);
         uint256 donation = 50 ether;
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(attacker), donation);
         attacker.donateClaimByTransfer(currency0, address(hook), donation);
 
-        // Documented, accepted behavior: a claim donation does raise reserves...
-        (uint256 r0After,) = hook.reserves();
-        assertEq(r0After, r0Before + donation, "claim donation raises reserves (known, bounded)");
-        // ...but mints the donor no LP shares, so the donation is forfeited...
+        // The claims really did land: this is a genuine donation, not a no-op transfer.
+        (uint256 c0After,) = hook.claimReserves();
+        assertEq(c0After, c0Before + donation, "the claims did arrive at the hook");
+
+        // And none of it is visible to anything that matters.
+        (uint256 r0After, uint256 r1After) = hook.reserves();
+        assertEq(r0After, r0Before, "a donation must not move reserve0");
+        assertEq(r1After, r1Before, "a donation must not move reserve1");
+        assertEq(
+            FullMath.mulDiv(r1After, WAD, r0After), priceBefore, "a donation must not move the sampled price"
+        );
         assertEq(hook.balanceOf(address(attacker)), 0, "donor is credited no LP shares");
-        // ...and accrues pro-rata to existing LPs, who can now redeem strictly more token0.
-        uint256 redeemable0After = FullMath.mulDiv(myShares, r0After, hook.totalSupply());
-        assertGt(redeemable0After, redeemable0Before, "donation accrues to existing LPs, not the donor");
+        assertEq(
+            FullMath.mulDiv(myShares, r0After, hook.totalSupply()),
+            redeemable0Before,
+            "a donation must not change what existing LPs can redeem"
+        );
+
+        // The donated claims are stranded: backing the pool, owned by nobody, unreachable.
+        // That is the intended end state, because it leaves no reason to donate at all.
+        assertGt(c0After, r0After, "donated claims sit above the shadow, unusable");
+    }
+
+    /// @notice The shadow is what the hook prices from, so it must never exceed the claims
+    ///         backing it, or a payout would be unbacked. Checked here after a real swap as
+    ///         well as at rest; the invariant suite checks it across randomized sequences.
+    function test_shadowReserves_stayBackedByClaims() public {
+        (uint256 r0, uint256 r1) = hook.reserves();
+        (uint256 c0, uint256 c1) = hook.claimReserves();
+        assertEq(r0, c0, "shadow tracks claims exactly at rest");
+        assertEq(r1, c1, "shadow tracks claims exactly at rest");
+
+        swapRouter.swapExactTokensForTokens(
+            1 ether, 0, true, poolKey, Constants.ZERO_BYTES, address(this), block.timestamp + 1
+        );
+
+        (r0, r1) = hook.reserves();
+        (c0, c1) = hook.claimReserves();
+        assertEq(r0, c0, "shadow tracks claims exactly after a swap");
+        assertEq(r1, c1, "shadow tracks claims exactly after a swap");
     }
 }
 

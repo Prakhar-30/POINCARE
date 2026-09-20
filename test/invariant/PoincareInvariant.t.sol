@@ -182,6 +182,20 @@ abstract contract PoincareInvariantBase is PoincareTestBase {
         assertEq(r1, handler.expR1(), "reserve1 must equal net token1 flow");
     }
 
+    /// @notice The shadow reserves the hook prices from must never exceed the ERC-6909
+    ///         claims that back them, or a payout would be unbacked. The handler never
+    ///         donates claims, so here the two must be exactly equal: any drift between
+    ///         what the hook booked and what it actually holds is an accounting bug, which
+    ///         is the failure mode shadow accounting introduces and this is what catches it.
+    function invariant_shadowReservesBackedByClaims() public view {
+        (uint256 r0, uint256 r1) = hook.reserves();
+        (uint256 c0, uint256 c1) = hook.claimReserves();
+        assertLe(r0, c0, "shadow reserve0 must be backed by claims");
+        assertLe(r1, c1, "shadow reserve1 must be backed by claims");
+        assertEq(r0, c0, "shadow reserve0 must track claims exactly absent donations");
+        assertEq(r1, c1, "shadow reserve1 must track claims exactly absent donations");
+    }
+
     /// @notice The pool can never be fully drained: both reserves stay strictly positive, so
     ///         pricing and the detector never hit a zero-reserve revert. With the deep-base
     ///         deep base this additionally exercises the new output-feasibility guard.

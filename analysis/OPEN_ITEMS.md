@@ -42,14 +42,14 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 | # | Item | Where | Status | Notes |
 |---|------|-------|--------|-------|
 | A1 | **Single-block / flash manipulation of the detector.** §4.2 requires sampling so *one block cannot move the statistic*. | hook | ✅ | **Implemented** in `_sampleAndUpdateDetector` (samples once per block off pre-swap reserves) AND **tested** end-to-end: `test/manipulation/Manipulation.t.sol::test_singleBlockFlash_doesNotMoveDetector` dumps 30 ether and buys it back in one block and asserts κ stays 0 / the sampled price tracks the settled price, not the spike. Holding a move across a block boundary is still possible (the intended, arbitraged cost). |
-| A2 | **Curvature-only asymmetry is arb-exploitable.** Proven by a concrete buy-shallow/sell-deep round-trip counterexample. | `AsymmetricCurve` | ✅ (mitigated) | Resolved by implementing the asymmetry as a **non-negative directional spread on a symmetric-depth base** (arb-safe by construction; round-trip fuzz gate). See E1 for the deferred curvature lever. |
-| A3 | **`κ_max` security-sizing: resolved for the spread lever, open for the depth lever.** | `ControlLaw` cfg | ✅ (spread) / 🟠 (depth E1) | For the **spread** lever shipped in the MVP the §4.2 inequality holds *by construction*: the soft (against-trend) side trades at the base constant-product price, so `max_soft_gain ≡ 0 < min_trigger_cost` with margin = the entire trigger cost (proven in `test/backtest/Backtest.t.sol`). `κ_max` therefore need not be security-sized for the spread lever; it is a pure tuning/seam cap. The sizing IS required before deploying the depth/curvature lever (E1), which would create a non-zero soft-side prize. |
-| A4 | **Manipulation simulation: present (spread lever).** | `test/backtest/` + `test/manipulation/` | ✅ (spread) / 🟠 (depth E1) | `Backtest.t.sol::test_manipulation_softGainIsZero_triggerCostPositive` proves soft-side output == constant-product output (no prize) + positive trigger cost. `Manipulation.t.sol` adds two END-TO-END (real PoolManager) sims: a fake-trend round trip loses money (`test_fakeTrendRoundTrip_isUnprofitable`), and the single-block flash guard (A1). The depth-lever adversarial suite is deferred with E1. |
+| A2 | **Curvature-only asymmetry is arb-exploitable.** Proven by a concrete buy-shallow/sell-deep round-trip counterexample. | `AsymmetricCurve` | ✅ (mitigated) | Resolved by implementing the asymmetry as a **non-negative directional spread on a symmetric-depth base** (arb-safe by construction; round-trip fuzz gate). The curvature lever is closed, not deferred; see E1. |
+| A3 | **`κ_max` security-sizing: resolved for the spread lever.** | `ControlLaw` cfg | ✅ | For the **spread** lever shipped in the MVP the §4.2 inequality holds *by construction*: the soft (against-trend) side trades at the base constant-product price, so `max_soft_gain ≡ 0 < min_trigger_cost` with margin = the entire trigger cost (proven in `test/backtest/Backtest.t.sol`). `κ_max` therefore need not be security-sized for the spread lever; it is a pure tuning/seam cap. That sizing would only be required for a depth/curvature lever, which is closed (E1) and not in the codebase, so it is not outstanding. Note that the 2026-09 recalibration HALVED `κ_max` from 0.10 to 0.05, which tightens this bound rather than loosening it. |
+| A4 | **Manipulation simulation: present (spread lever).** | `test/backtest/` + `test/manipulation/` | ✅ | `Backtest.t.sol::test_manipulation_softGainIsZero_triggerCostPositive` proves soft-side output == constant-product output (no prize) + positive trigger cost. `Manipulation.t.sol` adds two END-TO-END (real PoolManager) sims: a fake-trend round trip loses money (`test_fakeTrendRoundTrip_isUnprofitable`), and the single-block flash guard (A1). The depth lever is not a roadmap item: it was built, fuzzed, measured and rejected (E1), and no depth-asymmetry mode exists in the codebase. |
 | A5 | **PriceLib reverts on zero reserve / zero price.** | `PriceLib` / hook | ✅ (mitigated) | Reserves provably stay > 0 under the constant-product base: `swapExactIn` output is always strictly `< reserve` (math), `swapExactOut` rejects impossible requests (A7), and the `MINIMUM_LIQUIDITY` lock (A10) leaves a dust floor `removeLiquidity` cannot withdraw. Confirmed empirically by `invariant_reservesStayPositive` (384k ops). The `require(r0>0 && r1>0)` guard means the only revert is the legitimate "swap into an empty pool" case, not a detector-induced one, so §4.5 holds. (Residual: an extreme-imbalance pool with `r1 > 1e6·r0` could round a dust reserve to 0 → clean `require` revert, not a fund loss; not reachable for sane pairs like ETH/USDC.) |
 | A6 | **`Cusum.update` (uncapped) can overflow-revert** under sustained drift on the hot path. | `Cusum` | ✅ (mitigated) | Hook MUST use `updateCapped` (or `step`) on-chain; plain `update` is back-test only. Enforced by convention (see D1). |
 | A7 | **Swap feasibility.** | `AsymmetricCurve` / hook | ✅ | On the shipped `a=b=0` base the "infeasible output" case **cannot occur**: `swapExactIn` gives `amountOut = Y − ⌈XY/(X+amountIn)⌉ < Y` (strictly less than the output reserve), and the spread haircut only shrinks it further. `swapExactOut` reverting when the requested output ≥ reserve is **correct AMM behaviour** (you cannot buy more than the pool holds; the router's `amountInMax` also bounds it), so it is the AMM's revert, not a detector/§4.5 revert. Exercised by the invariant handler (random exact-in/out) and the Lens + manipulation exact-out tests, all with feasible amounts succeeding. |
 | A8 | **Rounding direction preserved end-to-end.** | hook | ✅ | The invariant suite (`test/invariant/`) drives 384k randomized swaps/liquidity ops and asserts (a) the hook's reserves equal independent ghost accounting to the wei (no favorable rounding leak), and (b) the constant-product invariant never decreases on a swap (no value creation by traders). |
-| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | 🟠 (external audit only) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual is the **standard external security audit before mainnet**, which is not self-certifiable, so it is kept open for that reason alone. |
+| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | 🟠 (external audit only) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual is the **standard external security audit before mainnet**, which is not self-certifiable, so it is kept open for that reason alone. |
 | A10 | **First-deposit / share-inflation.** | hook | ✅ | Resolved: a fixed `MINIMUM_LIQUIDITY = 1000` is locked to `0xdead` on the first mint (UniV2-standard guard), so the share supply can never be driven to dust. Also note reserves are ERC-6909 **claims** (not raw `balanceOf`), so a plain token donation cannot skew them. |
 
 ## B. Conceptual / design decisions (settled vs open)
@@ -61,7 +61,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 | B3 | Price source = **hook reserves**, not PoolManager `slot0`. | ✅ settled | Confirmed in M5 and used throughout: reserves = `poolManager.balanceOf(hook, currencyId)` (ERC-6909 claims); `slot0` is bypassed by the custom curve. Exercised by the integration, invariant, and both fork simulations. |
 | B4 | **Reset-on-fire vs accumulate-for-κ** (the Cusum policy tension). | ✅ settled | κ is driven by `updateCapped` (accumulate, capped at `sMax`) so the statistic *magnitude* persists for `ControlLaw`. CUSUM `reset` is used only to end a trend episode, not per-fire. The hook owns this. |
 | B5 | With/against-trend mapping per swap. | ✅ settled | Implemented in `_spreadFor`: up-trend ⇒ `oneForZero` (buying token0) is with-trend; down-trend ⇒ `zeroForOne` (selling token0) is. Tested in `PoincareHook` / `PoincareLens` (asymmetric spreads) / `Manipulation` and re-verified in the M7 review. |
-| B6 | Asymmetry realized as **directional spread** (this turn), not yet curvature. | 🟠 see E1 | Faithful to §3.1/§4.1 "bid-ask spread"; the §10 "curvature lever" is deferred (E1). |
+| B6 | Asymmetry realized as a **directional spread**. | ✅ | Faithful to §3.1/§4.1 "bid-ask spread". The §10 "curvature lever" is **closed**, not deferred: built, measured over four years, rejected (E1). The spread is the actuator, and the only one. |
 
 ## C. Hardcoded / placeholder values
 
@@ -96,7 +96,45 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
   New feasibility guards reject outputs ≥ the REAL reserve (the virtual reserve is larger, A7
   extended to exact-in). Covered by unit + fuzz + the full-feature invariant flavor. The Lens
   reads `baseOffsets()` live, so quotes keep matching.
-- **E1. Curvature / depth-asymmetry lever (§3.1, §10).** The brief's headline lever (small vs large offsets) is arb-unsafe alone (A2). Deploying it safely needs the manipulation-cost sizing (A4) to bound the depth-arb with a dominating spread. Deferred until §4.2 analysis exists. Current MVP uses the spread lever, which is safe and still implements the bid-ask asymmetry.
+- **E1. Curvature / depth-asymmetry lever (§3.1, §10).** ❌ **CLOSED — rejected on evidence
+  (2026-09).** This was the brief's headline lever and the spread was always described as the
+  safe fallback to it. It was built offline, measured, and it does not earn its place. **The
+  idea is now retired from the project**: there is no depth-asymmetry mode in the codebase, no
+  configuration that enables one, no branch, and no plan to revisit. `test/DeployedConfig.t.sol`
+  asserts `alphaWad == 0` so curve shaping cannot be switched on by accident. The findings below
+  are kept as evidence so the decision stays auditable, not as a roadmap item.
+
+  * **The safety objection was solvable.** Scaling both virtual legs by one multiplier,
+    `X = (x+a)·m`, `Y = (y+b)·m`, leaves the marginal price `Y/X` independent of `m`, so every
+    direction prices on a curve with an identical mid and a different curvature. A round-trip
+    fuzzer at independently-chosen depth pairs, both orders, two-leg and split three-leg, finds
+    no profitable sequence. The drain that killed the first attempt (A2) was depth moving the
+    MID, not depth itself.
+  * **Per-swap re-anchoring is path-dependent, and splitting defeats it.** Re-scaling the curve
+    on every trade lets a searcher re-anchor it in their favour; a 90% depth cut degraded to a
+    31% extraction cut once the arbitrageur was allowed to split. The
+    [path-independence characterisation](https://arxiv.org/pdf/2604.28017) explains it: a
+    modifier must depend on the invariant or price, never on `x` and `y` separately. Fixed by
+    carrying depth as persistent anchored offsets re-anchored once per block, verified
+    split-invariant to 18 wei on 1.8e22.
+  * **It still loses, by thirty to one.** Across 7,776 real ETH/USDC 4h bars (2022-09 to
+    2026-09), windows classified by the external price's own directional efficiency: in the
+    more-trending half the spread lever cuts extraction 362bps at 8.61x LP value per unit of
+    trader cost, while symmetric persistent depth cuts 41bps at 0.26x. In the chop half,
+    394bps at 5.83x against 57bps at 0.28x. Symmetric steepening taxes every trade, and real
+    months are mostly reversal, so the pool is steepened against flow that is about to turn.
+  * **A synthetic path said the opposite, loudly, and was wrong.** On a hand-built path of
+    clean sustained drifts, persistent depth measured 5.7x against the spread's 2.0x. Real
+    months never look like that: measured directional efficiency of the market runs 0.0009 to
+    0.257, median 0.082, where a synthetic trend sits near 1. **Any future curve-shape result
+    quoted off a synthetic path should be treated as unproven until it survives this series.**
+  * **Also established on the way, and still open as a general limit:** gross extraction cannot
+    be driven to zero by curve shape alone under drift. Anything that slows the arbitrageur
+    makes the pool stale, the gap then accumulates monotonically, and arbitrage profit is
+    convex in displacement, so the eventual trade costs more than the many small ones it
+    replaced. Measured: a directional band roughly doubles gross extraction through a trend
+    while still leaving LPs ahead, because the haircut is retained. The spread lever taxes the
+    arbitrageur; it does not stop them, and nothing shaped like a curve does.
 - **E2. Robust / heavy-tailed CUSUM increment (§1.4).** ✅ **Shipped (2026-07)**: an always-on
   Huber clip (`clipWad`, injected; absolute units in fixed mode, σ-units in adaptive mode) bounds
   any single block's influence on the signal, σ̂ AND the evidence. Doubles as the σ-inflation
@@ -115,7 +153,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
   Back-test DONE: `test/backtest/Backtest.t.sol` + `analysis/backtest/BACKTEST.md`. On the synthetic
   regime path, Poincaré reduces LVR **14.3 %** vs constant-product (vs 11.5 % for a same-spread
   symmetric vol-fee) while taxing uninformed flow **~2× less**; detection delay 6 blocks; §4.2
-  inequality demonstrated for the spread lever. Real-data calibration of `k,h,window,κ` still
+  inequality demonstrated for the spread lever. Real-data calibration of `k,h,window,κ` is now done (L); the line below is kept for history and no longer
   pending a price series (the engine is data-ready, just drop into `_pathReturn`).
 
 ## G. Pre-M5 self-review (adversarial pass over all libraries)
@@ -137,7 +175,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 - ✅ Invariant suite (`test/invariant/PoincareInvariant.t.sol`): solvency/no-leak + bounds across 384k randomized ops.
 - ✅ Hook integration coverage now includes exact-output via router (Lens + manipulation tests), multiple LPs / fair dilution (invariant handler add/remove), and the delta-accounting rounding direction (A8). NOT yet covered: native-ETH pairs.
 - ✅ G1 resolved (D gates the asymmetry, implemented + tested). ✅ B3 resolved (reserves = 6909 balances).
-- ✅ Manipulation sim for the spread lever (A4); depth-lever suite deferred with E1.
+- ✅ Manipulation sim for the spread lever (A4). The depth lever was evaluated and rejected (E1), so there is no outstanding depth-lever suite.
 - ✅ Back-test (LVR reduction vs CPMM and vs vol-fee) via `test/backtest/Backtest.t.sol` (M6 done on
   synthetic path; real-data calibration pending a price series).
 - ✅ Integration via PoolManager + gas profiling (`test/Gas.t.sol`; ~120k/block detector overhead, see G8).
@@ -190,6 +228,105 @@ Two things are worth keeping from it, because they were real and are cheap to re
 Analytics screen, and its `ai_notes` cache. `detector_configs` and `detector_samples.wad` existed
 only for the Lab and are dropped by `frontend/supabase/migration_005_drop_lab.sql`.
 
+## K. Shadow-accounted reserves (2026-09, closes the UHI10 judge's note)
+
+The UHI10 hookathon judge's single improvement (scores: 4.35/5 overall) was that `_reserves()`
+read live ERC-6909 claim balances, which anyone can move by transferring claims to the hook,
+biasing the once-per-block detector sample without touching share supply. Their prescription was
+specific: keep shadow reserves in storage, update them in the swap and mint/burn paths, and have
+`invariant_reservesMatchGhostAccounting` compare them against the claim balances.
+
+Implemented, with one deviation and one simplification worth recording.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| K1 | **Shadow reserves.** `_res0`/`_res1`, one packed slot, moved only by `_settleReserves` (swaps) and `_bookLiquidity` (add/remove) through a single checked write path. | ✅ | Each applies the exact amount `BaseCustomCurve` settles in the same call, so the shadow tracks the claims rather than predicting them. `_bookLiquidity` applies `-callerDelta`, which is the flow that actually settled rather than the one we asked for, and makes add and remove one line of arithmetic instead of two branches that could disagree. |
+| K2 | **The invariant the judge asked for.** | ✅ | Added as `invariant_shadowReservesBackedByClaims` rather than folded into the existing ghost check, because the two assert different things: the ghost check is "did we account for every flow", this is "is what we price from backed by what we hold". Asserts `shadow <= claims` (the safety direction) *and* exact equality, since the handler never donates. Runs in both invariant flavours at 128k calls. |
+| K3 | **The exact-out fee replay had to go.** | ✅ | `_getSwapFeeAmount` recovered the fee by re-running the pricing, which required `_reserves()` to still hold its pre-swap value. With the shadow updated during pricing, that replay would read post-swap state and report a wrong fee in `HookSwap`. The pricing already returns the exact split, so it is now carried across in a transient variable. Strictly better: one less place for the event to drift from reality. |
+| K4 | **Gas went down, not up.** | ✅ | Per-block detector overhead 96k → **94.7k**. Two external `balanceOf` staticcalls per reserve read became one packed SLOAD, and the exact-out replay disappeared. |
+| K5 | **Donated claims are now stranded, not gifted.** | 🟡 (behaviour change, intended) | Previously a donation accrued pro-rata to existing LPs. Now nothing can withdraw it, because redemption is priced off the shadow. This is the stronger position: it removes any reason to donate. The regression test `test_L3_claimDonation_cannotMoveReservesOrDetector` asserts the claims really arrive, and that reserves, the sampled price, share pricing and redemption are all unmoved. |
+| K6 | **The risk this introduces.** | 🟡 (guarded) | A shadow that drifts from real claims would be a worse, solvency-class bug than the donation surface it replaces — which is exactly why it was deferred before. Guards: the shadow moves in two functions through one checked write; it can only ever sit *below* the claims, which is the safe direction, since the only unbooked inflow is a donation; and equality is asserted across 384k randomized ops. `claimReserves()` exposes the live balances so the two can always be compared on-chain. |
+
+---
+
+## L. Four-year parameter study and recalibration (2026-09)
+
+Closes the long-standing "real-data calibration" item (F/§10.1). Four calendar years of ETH/USDC,
+2022-09-19 to 2026-09-18, 7,776 four-hour closes, every parameter swept one at a time against the
+deployed configuration with everything else held. Harness: `test/optimal/GammaFourYear.t.sol`.
+Headline numbers, figures and the full reasoning live in README §9.3; this section records the
+decisions and the things that went wrong.
+
+**Two parameters changed.**
+
+| Param | Was | Now | Why |
+|---|---|---|---|
+| `dFloor` | 0.50 | **0.25** | `E[D] = 1/√n` under no trend, with `n = 1/(1−λ)`. At `λ = 0.9` the noise floor is 0.316, so the gate is only meaningful as `r = dFloor/√(1−λ)`. The old value demanded `r = 1.58` noise-widths and waited through most real trends; 0.25 asks `r = 0.79`. |
+| `κ_max` | 0.10 | **0.05** | The **control**, not a second improvement. The lower gate doubles κ engagement, which alone would raise the mean fee and shed flow. Halved, the mean fee is unchanged (136bps vs 137bps), so the gain is attributable to gating rather than pricing. Also halves the worst-case directional spread, which **tightens A3**. |
+
+Measured effect, matched on mean fee: LP value +255bps, arbitrage extraction −11.7%, cost to
+uninformed traders −19.3%, at the price of 3pp of retained flow. Ahead in all four years
+independently.
+
+**`dFloor` and `λ` are one parameter, not two.** Holding `r = 0.79` fixed while `λ` moves 0.90 →
+0.98 (a five-fold change in effective window) moves LP value under 0.5%. The derivation fails
+exactly where it predicts it should, at `λ = 0.70` where `n = 3.3` and the CLT has not engaged.
+`test/DeployedConfig.t.sol::test_lambdaPairedWithGate` asserts the coupling, so changing `λ`
+alone cannot silently move the gate. **Anyone retuning `λ` must retune `dFloor` with it.**
+
+**Seven parameters were swept and deliberately left alone.** `k` and `h` are at a local optimum
+in both directions, which vindicates the original calibration. `sMax` is at its knee. `clip`
+never binds on 4h data — 0.20 and 0.40 are bit-identical — so it is a tail guard, not a knob.
+`λ`, `feeGamma` and `feeCap` unchanged.
+
+**Three richer mechanisms were built and rejected**, all kept in the harness rather than
+deleted, because the negative results are the useful part:
+
+- **Multiplicative-weights learner** over a whitelist of γ values (Abernethy & Kale, NeurIPS
+  2013). Converges correctly to within 0.05% of its best expert. No better than the deployed
+  config at a matched operating point.
+- **Adaptive-conformal quantile tracking** in place of `γ·σ̂` (Gibbs & Candès, NeurIPS 2021):
+  `f ← clamp(f + step·(α − err))`, distribution-free, coverage guarantee is an algebraic
+  identity rather than a theorem with hypotheses. Appeared to win by +906bps; at a matched
+  operating point it is a wash and slightly behind. The apparent win was the pool shedding 99%
+  of its retail flow.
+- **Self-normalised CUSUM** (`k`, `h` as multiples of σ̂ rather than absolute log-return units).
+  Scored exactly **+0bps**. That is the correct outcome: its value is invariance across
+  volatility regimes this tape does not contain, not return on this one. Worth revisiting if the
+  hook is ever deployed on a pair whose volatility regime differs materially from ETH/USDC.
+
+### L1. Five harness bugs, each of which produced a confident wrong answer
+
+Recorded because every one of them was caught only by a sanity check, not by a failing test, and
+the same traps will be there next time.
+
+1. **Price orientation inverted.** The series is USDC-per-ETH; pool price `r1/r0` is
+   ETH-per-USDC. The arbitrageur pushed one direction every bar and drained the pool. Invalidated
+   every real-data conclusion until it was found.
+2. **`Pool memory shadow = p` aliases in Solidity.** Memory structs are reference types, so
+   evaluating a counterfactual through a "copy" was mutating the real reserves five times a bar.
+3. **No flow elasticity.** Uninformed traders were captive, so every fee increase was pure profit
+   and LP value rose without bound in the fee. Fixed with `ν(f) = ν₀·exp(−400f)`.
+4. **The harness never simulated the deployed configuration.** It ran `FEE_CAP = 50%`, which is
+   not a cap; the live hook caps the vol fee at 30bps. Every "as deployed" figure before this was
+   for a pool that has never existed.
+5. **Unscaled `sMax` in the self-normalised path**, so the CUSUM statistic ran effectively
+   uncapped, the ramp saturated, and `h` appeared to have no effect at all.
+
+### L2. Known limits of this study
+
+- **4-hour bars; the hook samples per block.** Four orders of magnitude in arrival rate. The
+  scale-free *relationships* (`r`, the σ-normalised thresholds) carry over. `κ_max = 0.05`
+  specifically does not, and re-deriving it at block cadence is a roadmap item.
+- **One hole in the source data**, 2022-09-29 to 2023-03-12 (3,940 hours), collapsed into a
+  single 4h step from $1,338 to $1,552. `test_gapExcluded` re-runs past it: levels move 13–25bps,
+  no conclusion changes.
+- **Flow retention is a modelled quantity**, not a measured one. `exp(−400f)` is the shape the
+  optimal-fee literature uses, but the constant is not fitted to Poincaré's own traders because
+  there is not yet enough live flow to fit it against.
+- **Single pair, single venue.** Nothing here establishes that the same parameters suit a
+  stablecoin pair or a long-tail token.
+
 ---
 
 ## H. Olympix security review (2026-07, all findings fixed)
@@ -204,7 +341,7 @@ and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceL
 | M-2 | LP mint priced off token0 while the token1 counterpart floored down, minting claims token1 never backed. | ✅ | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected. |
 | L-1 | Lens returned a quote for a zero amount that a real swap would revert on. | ✅ | Lens mirrors the PoolManager `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful. |
 | L-2 / L-4 | Log-return domain: an extreme move could make `lnWad` revert, i.e. the detector could revert a swap (violating §4.5). | ✅ | Ratio clamped into the safe domain; a mid that floors to zero skips the sample instead of reverting. |
-| L-3 / L-6 | Docs claimed full donation-resistance; ERC-6909 claims are transferable, so a claim donation can move `_reserves()`. | ✅ (documented) | Claim corrected; the residual is bounded (donated claims accrue pro-rata to all LPs, so the donor forfeits them) and recorded in `SECURITY.md`. Shadow accounting deferred to the paid audit. |
+| L-3 / L-6 | Docs claimed full donation-resistance; ERC-6909 claims are transferable, so a claim donation can move `_reserves()`. | ✅ **closed (2026-09)** | Originally documented as a bounded residual. Now **fixed**: reserves are shadow-accounted, so a donation moves nothing the hook prices from. See K below. |
 | L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 

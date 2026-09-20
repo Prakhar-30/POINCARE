@@ -26,3 +26,9 @@ CLAUDE.md
 frontend/probe*.mjs
 # Supabase CLI scratch (version cache, local link state)
 frontend/supabase/.temp/
+
+# Parallel deploy-profile build output (see README section 10 / the deploy runbook): the
+# default `forge test` profile overwrites out/ with unoptimized, over-EIP-170 artifacts, so
+# the deploy build is kept in its own directory rather than racing for out/.
+out-deploy/
+cache-deploy/

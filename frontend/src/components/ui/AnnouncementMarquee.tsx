@@ -1,10 +1,14 @@
 import { Icon } from "@/components/ui/Icon";
 
+// The Olympix scan stays on the strip: the review happened, every finding was fixed, and each
+// fix carries a regression test. Keep the claims literally true as the suite grows — the count
+// below is the number `forge test` actually reports, not a round number.
 const ITEMS = [
   "Pre-audit scanned by Olympix BugPoCer",
   "0 high-severity findings",
   "every reported finding fixed and regression-tested",
-  "126 passing Foundry tests",
+  "228 passing Foundry tests",
+  "calibrated on 4 years of real ETH/USDC",
 ];
 
 function Group({ hidden }: { hidden?: boolean }) {

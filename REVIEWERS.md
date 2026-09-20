@@ -21,7 +21,7 @@ on the with-trend (toxic) side while the stabilising side keeps trading at the b
 ## Run it
 
 ```bash
-forge test                      # 131 tests: unit, fuzz, invariant, manipulation, calibration, regression
+forge test                      # 228 tests: unit, fuzz, invariant, manipulation, calibration, regression
 forge test --match-path test/invariant/PoincareInvariant.t.sol -vv    # 3 x 128k randomized ops, 0 reverts
 forge test --match-path test/calibration/RealDataCalibration.t.sol -vv # ARL0 + delay on real ETH/USDC returns
 forge test --match-path test/manipulation/Manipulation.t.sol -vv      # fake-trend attacks must lose money
@@ -99,10 +99,10 @@ Unichain Sepolia (chain id 1301), testnet only:
 
 | | |
 |---|---|
-| Hook | [`0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88`](https://sepolia.uniscan.xyz/address/0x9F110F6cC0dfE0CE47f3d49CaF22e9E3220e6A88) |
-| Lens | `0x1ca28a5de680109513ce26c861e049116a2643c2` |
+| Hook | [`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`](https://sepolia.uniscan.xyz/address/0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88) |
+| Lens | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` (canonical v4) |
-| Deployed | block 57598397 |
+| Deployed | block 62883477 |
 
 Every sampled block emits a `DetectorSample` event carrying the full detector trace (price, `r`,
 S⁺/S⁻, D, σ̂, κ, trend, fee), so the frontend in `frontend/` charts the *real* on-chain statistic
@@ -117,8 +117,8 @@ rather than a re-simulation. The demo pool's flow is script-driven (`frontend/re
 |---|---|
 | External human security audit | **Required before mainnet.** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run and every finding fixed (`SECURITY.md`), which is not a substitute for an independent audit. |
 | Adaptive (σ-normalized) detector | Built, tested, backtested — but gated OFF in the live deployment until its quantitative manipulation-cost bound is derived (OPEN_ITEMS **V1**). |
-| Depth / curvature lever | Deferred (**E1**). The naive version is arb-drainable; we reproduced the drain and shipped the provably-safe spread lever instead. See `AsymmetricCurve.sol`'s safety note. |
-| ERC-6909 claim donations | A donor *can* move `_reserves()`, but forfeits the donated claims to all LPs pro-rata. Bounded, documented in `SECURITY.md`; closing it fully needs shadow accounting, deferred to audit. |
+| Depth / curvature lever | **Closed (E1), not deferred.** The naive version is arb-drainable; we reproduced the drain, then built a round-trip-safe version anyway and measured it across four years of real ETH/USDC. It lost by roughly thirty to one. No depth-asymmetry mode exists in the codebase and none is planned; `test/DeployedConfig.t.sol` pins `alphaWad == 0`. See `AsymmetricCurve.sol`'s safety note. |
+| ERC-6909 claim donations | **Closed.** Reserves are shadow-accounted, so a donation moves nothing the hook prices from: not the detector's sampled price, not share pricing, not redemption. Donated claims are stranded. See `SECURITY.md` and `invariant_shadowReservesBackedByClaims`. |
 
 Full tracker, including everything closed and why: [`analysis/OPEN_ITEMS.md`](analysis/OPEN_ITEMS.md).
 
