@@ -4,7 +4,9 @@
 // DetectorSample. Each swap and each detector sample is mirrored to Supabase so the app
 // has deep history immediately.
 //
-//   PK=0x.. [CHAIN=unichain] [DRY=1] [STRIDE=6] node replay.mjs
+//   PK=0x.. [CHAIN=unichain] [DRY=1] [STRIDE=6] [SRC=file.csv] [FROM=ISO] [TO=ISO] node replay.mjs
+//
+// FROM/TO window the series, e.g. the last four months:  FROM=2026-05-19 node replay.mjs
 //
 // Addresses come from ../deployments/<chain>.json (the deploy scripts' output);
 // Supabase creds are read from ./.env (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
@@ -90,11 +92,22 @@ async function readReserves() {
   return [wad(r0), wad(r1)];
 }
 
-/** Daily closes from the repo's real Binance file. */
+/** Daily closes from the repo's real Binance file.
+ *
+ *  SRC picks the source series; FROM/TO window it by ISO timestamp, so a fresh pool can be
+ *  given a recent slice of history rather than the whole file. The 4y series runs later than
+ *  the 1y one, so it is the default: replaying a window that ends months in the past leaves
+ *  the app's most recent candle looking stale for no reason.
+ */
 function loadDaily() {
-  const lines = fs.readFileSync(new URL("../analysis/simulation/realdata/eth_usdc_4h.csv", import.meta.url), "utf8")
+  const src = process.env.SRC || "eth_usdc_4h_4y.csv";
+  const lines = fs.readFileSync(new URL(`../analysis/simulation/realdata/${src}`, import.meta.url), "utf8")
     .trim().split("\n").slice(1);
-  const rows = lines.map((l) => { const [t, p] = l.split(","); return { day: t.slice(0, 10), t, p: Number(p) }; });
+  let rows = lines.map((l) => { const [t, p] = l.split(","); return { day: t.slice(0, 10), t, p: Number(p) }; });
+  const { FROM, TO } = process.env;
+  if (FROM) rows = rows.filter((r) => r.t >= FROM);
+  if (TO) rows = rows.filter((r) => r.t <= TO);
+  if (!rows.length) { console.error(`no rows in ${src} for FROM=${FROM} TO=${TO}`); process.exit(1); }
   const out = [];
   for (let i = 0; i < rows.length; i += STRIDE) out.push(rows[i]);
   return out;

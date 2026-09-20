@@ -119,9 +119,9 @@ This is the design the figure below illustrates, and it is where we started.
 >
 > The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. A curvature-changing lever was built offline and measured against this one across four years of real ETH/USDC. It lost by roughly thirty to one, and it is **closed, not deferred**: there is no depth-asymmetry mode in the codebase, no configuration that enables one, and no plan to add one. The spread is not a compromise we settled for; it is the mechanism, and the only one. The measurements that closed it are kept as evidence in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
 
-![The asymmetric bonding curve](public/fig1_asymmetric_curve.png)
+![The directional spread](public/fig1_spread.png)
 
-*Fig 1. Conceptual view. In calm markets the curve is symmetric and deep (grey). When a real up-trend is detected, the executable price hardens on the trend-following side (red) and stays at the base on the counter-trend side (green). The kink at the operating point is a real, dynamic bid–ask spread, that kink is the directional **spread**; the pool's curvature never changes.*
+*Fig 1. Left: where the reserves land after a trade. Against the trend the quote is the plain curve price, so execution sits exactly ON the curve. With the trend the trader pays κ and receives less, so the reserves land above it, and the shaded gap is what the LP keeps. Right: the same κ as a trader meets it, a gap between two executable prices. The pool's curve is one shape and never changes; κ is exaggerated here for legibility against a deployed cap of 0.05.*
 
 ### 3.2 The signal: directional efficiency
 
@@ -158,7 +158,7 @@ $$\kappa \;=\; \text{clamp}\big(f(S_t),\; \kappa_{\min},\; \kappa_{\max}\big)$$
 
 ![The control law](public/fig4_control_law.png)
 
-*Fig 4. Below the detection threshold the curve stays symmetric and deep. Past it, asymmetry ramps up but is hard-capped, so the most an attacker could ever gain on the soft side is smaller than the cost of triggering the detector.*
+*Fig 4. Evidence to a bounded spread. Below the threshold the pool quotes the base price in both directions. Past it, κ ramps smoothly and saturates at κ_max, which is a security parameter rather than a tuning one: it caps the most the soft side can ever be worth, so faking a trend cannot pay for itself.*
 
 ---
 
