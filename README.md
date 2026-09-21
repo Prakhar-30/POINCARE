@@ -389,14 +389,22 @@ stress regimes** (calm, trends, a flash crash, whipsaw) over **1,040 blocks / 3,
 
 | metric | POINCARÉ | CONTROL | result |
 |---|---:|---:|---|
-| Cumulative LVR (arbitrageur extraction) | 155,443 USDC | 221,227 USDC | **−29.7%** |
-| **LP value retained** (marked at fair) | **10,186,959 USDC** | 9,685,443 USDC | **+$501,516** |
+| Cumulative LVR (arbitrageur extraction) | 103,490 USDC | 221,227 USDC | **−53.2%** |
+| **LP value retained** (marked at fair) | **10,340,969 USDC** | 9,685,443 USDC | **+$655,526** |
 
 That row is one seed. Re-running the whole schedule on **5 independent seeds** (fresh market,
-fresh order book, fresh pools each time) gives **19.3% - 29.7%, mean 22.9%**, with every path
+fresh order book, fresh pools each time) gives **47.1% - 53.2%, mean 50.6%**, with every path
 showing a reduction - asserted, not just averaged, in
-`test_multiSeed_poincareNeverTrailsControl`. **22.9% is the number to quote**; the 29.7% above
+`test_multiSeed_poincareNeverTrailsControl`. **50.6% is the number to quote**; the 53.2% above
 is the top of the range.
+
+> These figures roughly **doubled** when the gate was recalibrated (mean 22.9% → 50.6%). That
+> is the same `dFloor` change described in [§9.4](#94-why-the-configuration-changed-and-what-it-was-read-against),
+> and the size of the jump is a fair reflection of what a synthetic path rewards: these are
+> *designed* trend regimes, so a detector that engages sooner spends much more of the run
+> leaning. Real months are mostly reversal, which is why [§9.1](#91-against-real-market-data-12-months-of-ethusdc)
+> below moves far less. **Treat the real-data number as the honest one** and this as an upper
+> bound on a market built to suit the mechanism.
 
 The LP-value advantage is **flat in calm** (the detector correctly does not engage, nothing to
 protect), **grows through the trends**, and **jumps during the flash-crash + whipsaw**, where Poincaré
@@ -430,31 +438,40 @@ Two things make this study harsher than the synthetic one:
 
 | metric | POINCARÉ | CONTROL | VOLFEE (matched) |
 |---|---:|---:|---:|
-| Cumulative LVR | 314,124 | 328,143 | 313,664 |
-| LVR vs control | −4.27% | — | **−4.41%** |
-| Cost to uninformed flow | 3,521 | 0 | 3,521 |
-| LP value advantage | **+23,706** | — | +18,184 |
-| LP value per unit of trader cost | **6.73** | — | 5.17 |
+| Cumulative LVR | 312,792 | 328,143 | 309,545 |
+| LVR vs control | −4.67% | — | **−5.66%** |
+| Cost to uninformed flow | 4,535 | 0 | 4,529 |
+| LP value advantage | **+34,032** | — | +23,401 |
+| LP value per unit of trader cost | **7.51** | — | 5.17 |
 
 **The two metrics point different ways, and both are reported.** On raw LVR reduction the
-symmetric fee edges Poincaré, 4.41% against 4.27%. On **LP value retained**, which is the ground
-truth the harness marks at fair, Poincaré leads by about 30%: +23,706 against +18,184, for an
-identical 3,521 of trader cost (matched to 0.01%). A symmetric fee collects on every block from
-everyone, and Poincaré collects only from the flow that is taking money out of LPs, which is why
-it converts a given friction budget into more retained LP value while reducing slightly less
-measured LVR.
+symmetric fee beats Poincaré, 5.66% against 4.67%. On **LP value retained**, which is the ground
+truth the harness marks at fair, Poincaré leads by 45%: +34,032 against +23,401, for an identical
+friction budget (4,535 against 4,529, matched to 0.13%). A symmetric fee collects on every block
+from everyone, and Poincaré collects only from the flow that is taking money out of LPs, which is
+why it converts a given friction budget into more retained LP value while reducing *less* measured
+LVR. Per unit of trader cost the gap is 7.51 against 5.17.
+
+> **Both columns moved when the gate was recalibrated, and the baseline moved more.** At the old
+> gate this read 4.27% against 4.41% with Poincaré 30% ahead on LP value. Lowering `dFloor` to the
+> deployed setting raised Poincaré's LP advantage by 44% (+23,706 → +34,032) — but it also raised
+> Poincaré's friction, so `FEE_GAMMA` had to rise from 0.0441 to 0.0568 to keep the budgets
+> matched, and the better-funded baseline improved its own LVR reduction more (4.41% → 5.66%).
+> Reporting the LVR column without re-tuning that constant would have shown Poincaré winning it,
+> which is the trap [§9.4](#94-why-the-configuration-changed-and-what-it-was-read-against)
+> describes: an unmatched baseline is a handicap, not a baseline.
 
 **By half of the window:**
 
 | half of the window | POINCARÉ vs control | VOLFEE vs control |
 |---|---:|---:|
-| H1, the calibration sample | −4.55% | −4.56% |
-| **H2, out-of-sample** | −3.73% | **−4.11%** |
+| H1, the calibration sample | −5.39% | **−5.86%** |
+| **H2, out-of-sample** | −3.23% | **−5.28%** |
 
-On LVR the baseline holds its edge out-of-sample too, which is a change from the previous window
-and is reported as such. The synthetic stress path in §9 (−22.9% mean over 5 seeds) is trend-dense
-by construction, which is precisely why it flatters the design, and this run remains the honest
-counterweight to it.
+On LVR the baseline holds its edge in both halves, and widens it out-of-sample. The synthetic
+stress path in §9 (−50.6% mean over 5 seeds) is trend-dense by construction, which is precisely
+why it flatters the design, and this run remains the honest counterweight to it: the same gate
+change that doubled the synthetic number moved the real-data LVR column against us.
 
 Two things survive everywhere. **LVR ≤ control throughout** (asserted in the test), so leaning
 against detected trends never costs LPs more than doing nothing. And the qualitative property no
