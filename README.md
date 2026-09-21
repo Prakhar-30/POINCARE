@@ -512,102 +512,43 @@ carry over and help, but the bound must be re-established before v2 ships. It is
 next step, not a redesign, and the back-test + real-data harness above is exactly the tool to
 validate it.
 
-### 9.3 Four years, and a recalibration
+### 9.3 Four years of real ETH/USDC
 
-The 12-month replay above calibrated the detector. This is the longer study that followed it:
-**four calendar years of real ETH/USDC, 2022-09-19 to 2026-09-18, 7,776 four-hour closes**, with
-every parameter swept one at a time. It changed two of them.
+The 12-month replay above calibrated the detector. This is the longer study the deployed
+configuration comes from: **four calendar years, 2022-09-19 to 2026-09-18, 7,776 four-hour
+closes**, with every parameter swept one at a time.
 
-All four pools below are stepped over the **identical** price path with the identical order
-flow. LP value is marked at the external fair price, so it nets everything an LP actually
-experiences: fees earned, spread retained, arbitrage lost, and inventory carried. The baseline
-is a 30bps static pool, because nobody runs a zero-fee one.
+All pools are stepped over the **identical** price path with identical order flow. LP value is
+marked at the external fair price, so it nets everything an LP actually experiences: fees
+earned, spread retained, arbitrage lost, and inventory carried. The baseline is a 30bps static
+pool, because nobody runs a zero-fee one.
 
 | Pool | LP value | Arb extracted | Flow kept | vs 30bps |
 |---|---:|---:|---:|---:|
 | Normal pool, 5 bps | 2,783,380 | 473,696 | 81.87% | −309 bps |
 | Normal pool, 30 bps | 2,872,414 | 387,110 | 30.11% | — |
-| Poincaré, live config | 2,981,485 | 299,929 | 34.12% | **+379 bps** |
-| **Poincaré, recalibrated** | **3,057,581** | **264,835** | 31.16% | **+644 bps** |
+| **Poincaré** | **3,057,581** | **264,835** | 31.16% | **+644 bps** |
 
-On a $2,000,000 position the recalibrated pool is worth **$185,167 more than an ordinary 30bps
-pool over the four years**, and takes **$122,275 away from arbitrageurs**, a 32% cut in their
-income. Against the previously deployed configuration it is worth **$76,096**, or +255 bps.
+On a $2,000,000 position Poincaré is worth **$185,167 more than an ordinary 30bps pool over the
+four years**, and takes **$122,275 away from arbitrageurs** — a 32% cut in their income. It also
+finishes **above buy-and-hold**, which most LP positions do not.
 
 ![LP value over four years](public/fouryear/lp_value.png)
 
 *Fig 9. What a $2,000,000 position was worth. The upper panel is the raw level; because all
-four pools track within a few percent across a 2.5x price move, the lower panel is what actually
-shows the mechanism working: each pool's difference against the 30bps baseline. The advantage
-accumulates steadily rather than arriving in one lucky episode.*
+three pools track within a few percent across a 2.5x price move, the lower panel is what
+actually shows the mechanism working: each pool's difference against the 30bps baseline. The
+advantage accumulates steadily rather than arriving in one lucky episode.*
 
 ![Cumulative arbitrage extraction](public/fouryear/arb_extracted.png)
 
 *Fig 10. Cumulative value taken by arbitrageurs. Lower is better; this is LP money leaving the
 pool. The ordering is stable for the whole four years.*
 
-#### What changed, and why
+![When the detector is engaged](public/fouryear/gate_engagement.png)
 
-Only two numbers moved.
-
-**`dFloor`, the directional-efficiency gate: 0.50 → 0.25.** The signal `D = |Σr| / Σ|r|` is a
-ratio, and a fixed threshold on it does not mean a fixed thing. For a driftless series of `n`
-samples the numerator is `E|Sₙ| = σ√(2n/π)` and the denominator is `n·σ√(2/π)`, so the *no-trend
-expectation* is
-
-```
-E[D] = 1/√n ,   with  n = 1/(1 − λ)  effective samples under EWMA decay λ
-```
-
-At the deployed `λ = 0.9` that noise floor is `1/√10 = 0.316`. So the gate is only meaningful as
-a **ratio to it**:
-
-```
-r = dFloor / √(1 − λ)
-```
-
-how many noise-widths of directionality the detector demands before acting. The old gate sat at
-`r = 1.58` and spent most real trends waiting. The new one asks `r = 0.79`.
-
-This also means **`dFloor` and `λ` were never independent parameters**, which the sweep
-confirms: holding `r = 0.79` fixed while `λ` moves from 0.90 to 0.98 — a five-fold change in
-effective window — moves LP value by **under 0.5%**. The derivation breaks exactly where it
-predicts it should, at `λ = 0.70` where `n = 3.3` and the central limit theorem has not engaged.
-`test/DeployedConfig.t.sol` asserts the coupling so that changing `λ` alone cannot silently move
-the gate.
-
-**`κ_max`, the spread cap: 0.10 → 0.05.** This is **not** a second improvement; it is the
-control, and it makes the pool *safer*, not looser. Dropping the gate doubles how often κ is
-engaged, which on its own would raise the mean fee and push traders away — and a pool that gains
-LP value by charging more has not improved anything. Halved, the pool posts a **136 bps mean fee
-against the old 137 bps**, so what remains is attributable to the detector acting on more real
-trends rather than the pool being more expensive. Halving the worst-case directional spread also
-*tightens* the manipulation bound in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) A3.
-
-![What the gate change does](public/fouryear/gate_engagement.png)
-
-*Fig 11. The change, seen directly. The detector now acts on 63% of bars rather than 32%, at an
-unchanged mean fee. The shaded band is a gap in the source data (see the caveats below).*
-
-#### What did not change, and why that matters
-
-Seven parameters were swept and left alone, which is as much a result as the two that moved:
-
-| Parameter | Verdict |
-|---|---|
-| `k` = 0.001, `h` = 0.005 | **Already at a local optimum.** Both directions cost LP value (k: −24 / −45 bps, h: −29 / −36 bps). The original calibration was right. |
-| `sMax` = 0.02 | **At the knee.** Flat above (0.04, 0.08 change nothing), sharply worse below (0.01 costs 162 bps). |
-| `clip` = 0.20 | **Never binds.** 0.20 and 0.40 give bit-identical results — a 4h log return never reaches 20%. It is a tail guard against one absurd print, not a tuning knob. |
-| `λ` = 0.9 | Unchanged, but now **coupled to `dFloor`** by the equation above. |
-| `feeGamma` = 0.5, `feeCap` = 30 bps | Unchanged. The vol fee is a minor component next to the directional spread, but the cap binds nearly always, so it is load-bearing for the mean fee. |
-
-We also tried, and rejected, three richer mechanisms: a multiplicative-weights learner over a
-whitelist of configurations, an adaptive-conformal quantile tracker in place of `γ·σ̂`, and a
-self-normalised CUSUM. The learner and the tracker were **no better than the deployed config
-once compared at a matched operating point**; the self-normalised detector scored exactly
-**+0 bps**, which is the correct outcome — its value is invariance across volatility regimes this
-tape does not contain, not return on this one. All three are kept in
-`test/optimal/GammaFourYear.t.sol`.
+*Fig 11. κ is charged on 63% of bars and on none of the quiet ones. The shaded band is a gap in
+the source data (see the caveats below).*
 
 #### Year by year
 
@@ -616,34 +557,128 @@ One four-year number can hide a single lucky episode, so each year was also run 
 
 ![Year by year](public/fouryear/year_by_year.png)
 
-| Period | ETH | Normal 5 bps | Normal 30 bps | Live | Recalibrated |
-|---|---|---:|---:|---:|---:|
-| 2022-09 → 2023-09 | $1,308 → $2,477 | 2,758,501 | 2,774,002 | 2,775,565 | **2,789,939** |
-| 2023-09 → 2024-09 | $2,469 → $3,920 | 2,527,244 | 2,548,570 | 2,569,616 | **2,598,972** |
-| 2024-09 → 2025-09 | $3,850 → $4,026 | 2,052,180 | 2,073,949 | 2,102,272 | **2,122,610** |
-| 2025-09 → 2026-09 | $4,012 → $2,481 | 1,577,711 | 1,590,641 | 1,603,705 | **1,611,189** |
+| Period | ETH | Normal 5 bps | Normal 30 bps | Poincaré |
+|---|---|---:|---:|---:|
+| 2022-09 → 2023-09 | $1,308 → $2,477 | 2,758,501 | 2,774,002 | **2,789,939** |
+| 2023-09 → 2024-09 | $2,469 → $3,920 | 2,527,244 | 2,548,570 | **2,598,972** |
+| 2024-09 → 2025-09 | $3,850 → $4,026 | 2,052,180 | 2,073,949 | **2,122,610** |
+| 2025-09 → 2026-09 | $4,012 → $2,481 | 1,577,711 | 1,590,641 | **1,611,189** |
 
-The ordering **recalibrated > live > 30 bps > 5 bps holds in every single year**, through a
-doubling, a grind sideways, and a 38% drawdown, with less arbitrage extracted in all four.
+Ahead in **every year**, through a doubling, a grind sideways, and a 38% drawdown, with less
+arbitrage extracted in all four.
+
+---
+
+### 9.4 Why the configuration changed, and what it was read against
+
+The hook first went live in July 2026 with `dFloor = 0.50` and `κ_max = 0.10`. Both moved for
+this deployment, to **0.25** and **0.05**. Seven other parameters were swept and deliberately
+left alone. This section is the reasoning, because a parameter change with no argument behind it
+is just a different guess.
+
+#### The gate was measuring against nothing
+
+`dFloor` gates the detector on the **directional-efficiency** signal
+
+$$D = \frac{\left|\sum_t r_t\right|}{\sum_t \left|r_t\right|} \in [0, 1]$$
+
+and the original 0.50 was chosen as "half way between chop and pure trend", which sounds
+principled and is not. `D` is a ratio, and a fixed threshold on a ratio only means something
+relative to what the ratio does **under no trend at all**.
+
+For an iid symmetric series of `n` samples the numerator is the absolute value of a random walk,
+`E|S_n| = σ√(2n/π)`, and the denominator is `n·E|r| = n·σ√(2/π)`. So the no-trend expectation is
+
+$$\mathbb{E}[D] \;=\; \frac{\sigma\sqrt{2n/\pi}}{n\,\sigma\sqrt{2/\pi}} \;=\; \frac{1}{\sqrt{n}},
+\qquad n = \frac{1}{1-\lambda} \ \text{effective samples under EWMA decay } \lambda$$
+
+At the deployed `λ = 0.9` that noise floor is `1/√10 ≈ 0.316`. So the quantity with meaning is
+not `dFloor` but its **ratio to the floor**:
+
+$$r \;=\; \frac{\text{dFloor}}{\mathbb{E}[D]} \;=\; \frac{\text{dFloor}}{\sqrt{1-\lambda}}$$
+
+how many noise-widths of directionality the detector demands before it will act. The old gate
+sat at `r = 1.58` and spent most real trends waiting. The new one asks `r = 0.79`.
+
+**This also means `dFloor` and `λ` were never independent parameters**, which the sweep
+confirms: holding `r = 0.79` fixed while `λ` moves from 0.90 to 0.98 — a five-fold change in
+effective window — moves LP value by **under 0.5%**. The derivation breaks exactly where it
+predicts it should, at `λ = 0.70` where `n = 3.3` and the central limit theorem has not engaged.
+`test/DeployedConfig.t.sol::test_lambdaPairedWithGate` asserts the coupling numerically, so that
+retuning `λ` alone cannot silently move the gate.
+
+#### κ_max was halved as a control, not as a second improvement
+
+Dropping the gate roughly doubles how often κ is engaged. On its own that would raise the mean
+fee and push traders away — and **a pool that gains LP value by charging more has not improved
+anything**, it has just moved along the fee curve. This is the trap that invalidated several
+earlier candidates in this study, and the discipline for avoiding it is borrowed directly from
+the optimal-fee literature (see below): compare only at a **matched operating point**.
+
+Halving `κ_max` puts the mean fee back where it was — **136 bps against the old 137 bps** — so
+what remains is attributable to the detector acting on more real trends rather than to the pool
+being more expensive. Reaching the same flow by raising `κ_max` at the *old* gate is worth only
++97 bps; doing it by lowering the gate is worth +255 bps. It is the gating, not the charging.
+
+Halving `κ_max` also **halves the worst-case directional spread**, which tightens the
+manipulation bound in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) A3 rather than
+relaxing it. The change makes the pool cheaper to trade against in the worst case, not dearer.
+
+#### What did not change, and why that is also a result
+
+| Parameter | Verdict |
+|---|---|
+| `k` = 0.001, `h` = 0.005 | **Already at a local optimum.** Both directions cost LP value (k: −24 / −45 bps, h: −29 / −36 bps). The original calibration was right. |
+| `sMax` = 0.02 | **At the knee.** Flat above (0.04, 0.08 change nothing), sharply worse below (0.01 costs 162 bps). |
+| `clip` = 0.20 | **Never binds.** 0.20 and 0.40 give bit-identical results — a 4h log return never reaches 20%. It is a tail guard against one absurd print, not a tuning knob. |
+| `λ` = 0.9 | Unchanged, but now **coupled to `dFloor`** by the equation above. |
+| `feeGamma` = 0.5, `feeCap` = 30 bps | Unchanged. The vol fee is minor next to the directional spread, but the cap binds nearly always, so it is load-bearing for the mean fee. |
+| `alphaWad` = 0 | Curve shaping stays off, and is pinned off by test. |
+
+#### What was read, and what each one changed
+
+The parameter move above is small. Getting to it was not, and most of the reading ended in
+rejections, which are recorded here because they are the part that constrains future work.
+
+| Source | What it gave | Outcome |
+|---|---|---|
+| Milionis, Moallemi, Roughgarden & Zhang — *Loss-Versus-Rebalancing* | The identity that names the cost, and the fact that a static fee does not appear in it at all | **Framing.** Why the lever is state-dependent pricing rather than a fee level |
+| Lorden (1971) minimax optimality for CUSUM | The detector's guarantee: minimum worst-case delay for a given false-alarm rate | **Kept.** This is why the engine is CUSUM and not a moving-average crossover |
+| Ghasemlu, *Optimal Dynamic Fees for AMMs: A Stochastic Control Approach to LVR* ([arXiv:2606.21769](https://arxiv.org/abs/2606.21769)) | Fees as two opposing forces — revenue per uninformed trade against uninformed volume driven away — and the `ν(f) = ν₀e^{−αf}` flow-elasticity specification | **Method, and a correction.** The harness had no flow elasticity, so every fee increase looked like pure profit and LP value rose without bound. Adding it produced an interior optimum and made "matched operating point" the only fair comparison |
+| Gibbs & Candès, *Adaptive Conformal Inference Under Distribution Shift* (NeurIPS 2021) and the JMLR 2024 follow-up | A distribution-free online quantile tracker, `f ← clamp(f + step·(α − err))`, whose coverage bound is an algebraic identity rather than a theorem with hypotheses | **Built, then rejected.** Appeared to beat the deployed config by +906 bps; at a matched operating point it is a wash. The apparent win was the pool shedding 99% of its retail flow |
+| Abernethy & Kale, *Adaptive Market Making via Online Learning* (NeurIPS 2013) | Multiplicative weights over a whitelist of configurations, with O(√(T log N)) regret and no distributional assumptions | **Built, then rejected.** Converges correctly to within 0.05% of its best expert, and that expert is no better than the deployed config |
+| Self-normalised CUSUM ([arXiv:2509.07112](https://arxiv.org/abs/2509.07112), [arXiv:2210.17353](https://arxiv.org/abs/2210.17353)) | `k` and `h` as multiples of σ̂ rather than absolute log-return units, making the detector scale-free across volatility regimes | **Built, scored exactly +0 bps.** The correct outcome: its value is invariance across regimes this tape does not contain. Worth revisiting for a pair unlike ETH/USDC |
+| Avellaneda & Stoikov inventory skew | A derived quote offset, `r = mid − I·γσ²τ` | **Tested, did not beat the shape it would replace.** Also surfaced a units error worth recording: the liquidity term is an absolute price offset, not a fractional fee |
+| Path-independence in CFMMs ([arXiv:2604.28017](https://arxiv.org/pdf/2604.28017)) | A modifier must depend on the invariant or the price, never on `x` and `y` separately, or trade-splitting defeats it | **Closed a design.** This is why per-swap re-anchored depth is path-dependent, and part of why curvature is closed (§3.1) |
+
+Two conclusions worth stating plainly. **Three genuinely more sophisticated mechanisms were
+built and all three lost** to a two-parameter change once compared honestly — which is a result
+about the comparison discipline as much as about the mechanisms. And **the only thing that
+actually moved the number was a two-line calculation about what `D` does under no trend**, which
+needed no new machinery at all.
 
 #### Caveats, stated plainly
 
-- **Year 1 is the weak one, and it is instructive.** The live config beat an ordinary 30bps pool
-  by 5 bps that year — effectively nothing — despite ETH nearly doubling. Year 3 went almost
-  nowhere and the hook did its best work. What the detector is paid for is **sustained
-  directional runs, not net displacement**, and those are not the same thing. This is not a
-  bull-market product.
+- **Year 1 is the weak one, and it is instructive.** Poincaré beat an ordinary 30bps pool by
+  57 bps that year, its worst, despite ETH nearly doubling. Year 3 went almost nowhere and it did
+  its best work. What the detector is paid for is **sustained directional runs, not net
+  displacement**, and those are not the same thing. This is not a bull-market product.
 - **The source data has one hole.** 2022-09-29 to 2023-03-12, 3,940 hours, which the replay is
   forced to treat as a single 4h step from $1,338 to $1,552. Re-running from past it
-  (`test_gapExcluded`) gives +631 bps and +392 bps instead of +644 and +379 — the levels shift by
-  13 to 25 bps and no conclusion changes.
+  (`test_gapExcluded`) gives +631 bps instead of +644 — the level shifts by 13 bps and no
+  conclusion changes.
 - **This is 4-hour bars; the hook samples per block.** Four orders of magnitude in arrival rate.
-  The scale-free *relationships* carry over; `κ_max = 0.05` specifically is a this-regime number
-  and is on the roadmap to be re-derived at block cadence.
-- **The recalibrated pool keeps 3 percentage points less flow** (31.16% vs 34.12%). LP value
-  already nets the lost fee revenue, so the +255 bps stands, but in a competitive market that is
-  volume going elsewhere. Worth noting that the 5 bps pool keeps **82%** of flow and still ends
-  with the *least* LP value of the four: retaining traders is not the objective function.
+  The scale-free *relationships* carry over — `r`, and the σ-normalised thresholds — but
+  `κ_max = 0.05` specifically is a this-regime number and is on the roadmap to be re-derived at
+  block cadence.
+- **Flow elasticity is modelled, not fitted.** `α = 400` in `ν(f) = ν₀e^{−αf}` is the shape the
+  literature uses; it is not fitted to Poincaré's own traders, because there is not yet enough
+  live flow to fit it against. Every "at matched flow" verdict above leans on it.
+- **The pool keeps 3 percentage points less flow** than the old configuration (31.16% vs
+  34.12%). LP value already nets the lost fee revenue, so the +644 bps stands, but in a
+  competitive market that is volume going elsewhere. Worth noting that the 5 bps pool keeps
+  **82%** of flow and still ends with the *least* LP value of the three: retaining traders is not
+  the objective function.
 
 Reproduce any of it:
 
@@ -686,11 +721,12 @@ external audit is still required before mainnet (item 5 below).
 
 1. ~~**Real-data calibration**~~ **Done (2026-09).** Four years of ETH/USDC, every parameter
    swept one at a time; `dFloor` and `κ_max` recalibrated, the rest confirmed already optimal.
-   Method, numbers and figures in [§9.3](#93-four-years-and-a-recalibration).
+   Numbers and figures in [§9.3](#93-four-years-of-real-ethusdc); the reasoning and the papers
+   it was read against in [§9.4](#94-why-the-configuration-changed-and-what-it-was-read-against).
 2. **Adaptive-mode manipulation bound (OPEN_ITEMS V1):** the v2 detector is implemented and
    simulated against σ-inflation, but the quantitative worst-case bound must be derived before
    `adaptive = true` guards real value. Security params (`κ_max, Δκ_max`) stay fixed by design.
-3. **Per-block re-validation of §9.3.** The recalibration ran on 4-hour bars; the hook samples
+3. **Per-block re-validation of §9.4.** The recalibration ran on 4-hour bars; the hook samples
    per block, four orders of magnitude apart in arrival rate. The *relationships* are
    scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
    wants re-deriving against block-cadence data.
