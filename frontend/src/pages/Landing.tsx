@@ -85,7 +85,7 @@ export function Landing() {
 
             <motion.div {...fade(0.24)} className="mt-9 flex items-center gap-5 flex-wrap" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-3)" }}>
               <Trust icon="shield" text="Manipulation-bounded by design" />
-              <Trust icon="check" text="131 tests · 384k-op invariant suite" />
+              <Trust icon="check" text="228 tests · 384k-op invariant suite" />
               <Trust icon="target" text="No oracle, no AVS" />
             </motion.div>
           </div>
