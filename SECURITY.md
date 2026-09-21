@@ -78,7 +78,7 @@ before mainnet.
 
 ## Existing coverage
 
-228 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), fork simulations, adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
+228 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
 
 ## Deployment
 

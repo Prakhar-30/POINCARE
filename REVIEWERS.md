@@ -22,6 +22,9 @@ on the with-trend (toxic) side while the stabilising side keeps trading at the b
 
 ```bash
 forge test                      # 228 tests: unit, fuzz, invariant, manipulation, calibration, regression
+FOUNDRY_PROFILE=fork forge test --match-path "test/sim/Fork*.t.sol"
+                                # 6 more, against a live Sepolia fork: quote-vs-execution
+                                # through the CANONICAL router. Needs SEPOLIA_RPC.
 forge test --match-path test/invariant/PoincareInvariant.t.sol -vv    # 3 x 128k randomized ops, 0 reverts
 forge test --match-path test/calibration/RealDataCalibration.t.sol -vv # ARL0 + delay on real ETH/USDC returns
 forge test --match-path test/manipulation/Manipulation.t.sol -vv      # fake-trend attacks must lose money
@@ -87,7 +90,8 @@ swapped that block (`test/PoincareLens.t.sol`).
 | Never worse than constant product | asserted in both fork replays (`assertLe(lvrOn, lvrOff)`) |
 | No value creation / always solvent | `test/invariant/` — 3 invariants x 128k ops, ghost accounting to the wei |
 | Faking a trend is unprofitable | `test/manipulation/`, `test/backtest/` |
-| Quotes match execution | `test/PoincareLens.t.sol` |
+| Quotes match execution | `test/PoincareLens.t.sol` (via `PoolSwapTest`) and `test/sim/ForkRouterLens.t.sol` (via the **canonical router**, on a fork) |
+| The canonical `V4Quoter` also prices this pool correctly | `test/sim/ForkRouterLens.t.sol::test_canonicalQuoterAgreesWithLens`. We previously claimed it could not; that was wrong and is retracted in `FEEDBACK.md` §1 |
 | Detector overhead is affordable | `test/Gas.t.sol` — ~96k gas on the first swap of a block, 0 after |
 | Reported findings were fixed | `test/regression/OlympixFindings.t.sol` — one test per finding, each fails pre-fix |
 
