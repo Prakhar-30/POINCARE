@@ -132,6 +132,20 @@ export type ExplainFailure = { reason: string };
  */
 export type ExplainKind = "regime" | "report";
 
+/**
+ * Failures that will NOT fix themselves, so a caller that retries should stop.
+ *
+ * The distinction matters because the two groups look identical from the UI and are fixed very
+ * differently. "cooling down" and an exhausted quota clear on their own given time and are worth
+ * waiting out. "unknown kind" means the deployed function does not have the task the client is
+ * asking for - it clears when someone redeploys it, and never before. Retrying that every 30
+ * seconds forever is a request loop that can only ever fail.
+ */
+const PERMANENT = ["unknown kind", "not configured", "backend not configured"];
+
+export const isPermanentFailure = (reason: string | null): boolean =>
+  !!reason && PERMANENT.some((p) => reason.toLowerCase().includes(p));
+
 export async function requestExplanation(
   kind: ExplainKind,
   cacheKey: string,

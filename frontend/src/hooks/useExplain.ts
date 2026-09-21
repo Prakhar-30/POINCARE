@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isExplanation, requestExplanation, type ExplainKind } from "@/lib/db";
+import { isExplanation, isPermanentFailure, requestExplanation, type ExplainKind } from "@/lib/db";
 
 export type ExplainSource = "model" | "local" | "pending";
 
@@ -13,6 +13,8 @@ export type Explained = {
   reason: string | null;
   /** Failed attempts so far, for surfaces that keep retrying rather than falling back. */
   attempts: number;
+  /** The model cannot answer and waiting will not help; the caller should say so plainly. */
+  stalled: boolean;
   /** Ask the model now. Used by the manual (`auto: false`) surfaces. */
   ask: () => void;
 };
@@ -88,7 +90,9 @@ export function useExplain(opts: {
       setState((s) => ({ ...s, reason: res.reason }));
       askedFor.current = null;
 
-      if (retry) {
+      // A permanent failure cannot be waited out. Surface it and stop, rather than re-asking a
+      // question the deployed function has no answer for every thirty seconds forever.
+      if (retry && !isPermanentFailure(res.reason)) {
         attempts.current += 1;
         const delay = Math.min(30_000, 2000 * 2 ** (attempts.current - 1));
         if (timer.current) clearTimeout(timer.current);
@@ -127,7 +131,12 @@ export function useExplain(opts: {
 
   return {
     text: state.text || fallback,
-    source: state.text ? "model" : loading || retry ? "pending" : "local",
+    source: state.text
+      ? "model"
+      : loading || (retry && !isPermanentFailure(state.reason))
+        ? "pending"
+        : "local",
+    stalled: retry && isPermanentFailure(state.reason),
     attempts: attempts.current,
     model: state.model,
     cached: state.cached,

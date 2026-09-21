@@ -28,8 +28,10 @@ export function AiNote({
    */
   skeletonLines?: number;
 }) {
-  const { text, source, model, cached, loading, reason, attempts } = explained;
-  const waiting = skeletonLines > 0 && source !== "model";
+  const { text, source, model, cached, loading, reason, attempts, stalled } = explained;
+  // Stalled is not waiting. A skeleton says "this is coming"; if the deployed function has no
+  // answer for this question, that is a promise the panel cannot keep.
+  const waiting = skeletonLines > 0 && source !== "model" && !stalled;
 
   // "Computed locally" covers both "no model configured" and "the model was tried
   // and failed", which look identical from the outside and are fixed very
@@ -78,7 +80,9 @@ export function AiNote({
                 ? attempts > 0
                   ? `retrying · attempt ${attempts + 1}`
                   : "generating…"
-                : localLabel}
+                : stalled
+                  ? "unavailable"
+                  : localLabel}
           </span>
 
         </div>
@@ -106,6 +110,21 @@ export function AiNote({
             </p>
           )}
         </>
+      ) : stalled ? (
+        <div
+          className="rounded-md p-3"
+          style={{ background: "var(--surface)", border: "1px dashed var(--lav-dim)" }}
+        >
+          <p style={{ fontSize: 12, lineHeight: 1.65, color: "var(--text-2)", margin: 0 }}>
+            The report could not be generated: <b>{reason}</b>.
+          </p>
+          <p style={{ fontSize: 11, lineHeight: 1.6, color: "var(--faint)", margin: "6px 0 0" }}>
+            This will not resolve on its own — the deployed <code>explain</code> function does not
+            have the task this page is asking for. Redeploy it with{" "}
+            <code>supabase functions deploy explain --no-verify-jwt</code>. Every figure on the
+            rest of this page is measured on-chain and unaffected.
+          </p>
+        </div>
       ) : (
         <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>{text}</p>
       )}
