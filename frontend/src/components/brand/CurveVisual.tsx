@@ -43,6 +43,7 @@ const kMax = Math.max(...HERO.kappa, 1);
 // clamping it away, because a hero that only ever goes up is a hero nobody should believe.
 const advHi = Math.max(...HERO.adv, 1);
 const advLo = Math.min(...HERO.adv, 0);
+const ENGAGED = HERO.kappa.filter((v) => v > 0).length;
 
 const sx = (i: number) => L + (i / (N - 1)) * (W - L - R);
 const sp = (p: number) => PRICE_T + PRICE_H - ((p - pMin) / (pMax - pMin || 1)) * PRICE_H;
@@ -70,27 +71,29 @@ export function CurveVisual() {
   const [i, setI] = useState(N - 1);
   const raf = useRef(0);
 
+  // Draws ONCE and settles on the finished window. It used to loop, which turns a chart that
+  // is meant to be read into motion in the corner of the eye, and the numbers never sat still
+  // long enough to be read at all.
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
     let t0 = 0;
-    const DUR = 5000;
-    const HOLD = 1800;
+    const DUR = 2600;
     const step = (now: number) => {
       if (!t0) t0 = now;
       const e = now - t0;
-      if (e < DUR) setI(Math.floor((e / DUR) * (N - 1)));
-      else if (e < DUR + HOLD) setI(N - 1);
-      else t0 = now;
+      if (e >= DUR) {
+        setI(N - 1);
+        return; // done: no rAF rescheduled, nothing animates after this
+      }
+      const p = e / DUR;
+      const eased = 1 - Math.pow(1 - p, 3);
+      setI(Math.floor(eased * (N - 1)));
       raf.current = requestAnimationFrame(step);
     };
     setI(0);
     raf.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf.current);
   }, []);
-
-  const k = HERO.kappa[i];
-  const up = HERO.trend[i] === 1;
-  const engaged = k > 0;
 
   return (
     <div
@@ -116,14 +119,16 @@ export function CurveVisual() {
           kept for liquidity providers, against an ordinary 30bps pool
         </text>
 
-        {/* live state pill, top right */}
-        <g transform={`translate(${W - R - 150}, 26)`}>
-          <rect width="150" height="22" rx="11" fill={engaged ? "rgba(217,140,0,.15)" : "var(--surface)"} stroke="var(--border)" />
-          <circle cx="13" cy="11" r="3.5" fill={engaged ? "var(--honey)" : "var(--faint)"}>
-            {engaged && <animate attributeName="opacity" values="1;.3;1" dur="1.1s" repeatCount="indefinite" />}
-          </circle>
-          <text x="25" y="15" fontSize="9.5" fontWeight="800" fill={engaged ? "var(--honey-deep)" : "var(--faint)"}>
-            {engaged ? `trend · κ ${k}bps on ${up ? "buys" : "sells"}` : "calm · no spread charged"}
+        {/* A STATIC summary, not a live readout. This used to flip between "trend" and "calm"
+            on every animation frame, which is movement in the corner of the eye that carries no
+            information: the reader cannot act on it and it never holds still long enough to be
+            read. What is worth knowing is how often the detector acted over the window, and
+            that is one number that does not change. */}
+        <g transform={`translate(${W - R - 158}, 26)`}>
+          <rect width="158" height="22" rx="11" fill="rgba(217,140,0,.13)" stroke="var(--border)" />
+          <circle cx="13" cy="11" r="3.5" fill="var(--honey)" />
+          <text x="25" y="15" fontSize="9.5" fontWeight="800" fill="var(--honey-deep)">
+            κ charged on {ENGAGED} of {N} samples
           </text>
         </g>
 
