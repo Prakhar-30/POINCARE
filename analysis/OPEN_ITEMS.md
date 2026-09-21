@@ -172,8 +172,10 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 ## F. Testing gaps (vs §9 "definition of done")
 
 - ✅ Unit + fuzz for `Cusum`, `DirectionalSignal`, `AsymmetricCurve` core, `PriceLib`, `ControlLaw`, spread.
-- ✅ Invariant suite (`test/invariant/PoincareInvariant.t.sol`): solvency/no-leak + bounds across 384k randomized ops.
-- ✅ Hook integration coverage now includes exact-output via router (Lens + manipulation tests), multiple LPs / fair dilution (invariant handler add/remove), and the delta-accounting rounding direction (A8). NOT yet covered: native-ETH pairs.
+- ✅ Invariant suites: `PoincareInvariant.t.sol` (solvency/no-leak + bounds, 384k randomized ops, single actor) and `MultiActorInvariant.t.sol` (provider-vs-provider, 1.28M calls across two configs).
+- ✅ Hook integration coverage includes exact-output via router (Lens + manipulation tests), native-ETH pairs (`PoincareNativeEth.t.sol`), and the delta-accounting rounding direction (A8).
+- ✅ Multiple LPs / fair dilution. **This line used to claim the invariant handler covered it, and it did not:** that handler is a single actor who is simultaneously the only provider and the only trader, so it could not express dilution at all — dilution needs a second provider to be diluted. Closed properly by `test/unit/LpAccounting.t.sol` (scripted sequences) and `test/invariant/MultiActorInvariant.t.sol` (three providers, share transfers, a separate trader; 128k calls per invariant per config). See **N3**.
+- ✅ Access control, state extremes and the offset-scaling path: see **N**.
 - ✅ G1 resolved (D gates the asymmetry, implemented + tested). ✅ B3 resolved (reserves = 6909 balances).
 - ✅ Manipulation sim for the spread lever (A4). The depth lever was evaluated and rejected (E1), so there is no outstanding depth-lever suite.
 - ✅ Back-test (LVR reduction vs CPMM and vs vol-fee) via `test/backtest/Backtest.t.sol` (M6 done on
@@ -371,6 +373,94 @@ around. A 30% spread would not survive contact with a router.
 **What would reopen it:** live per-block tape from a pool with real flow. That is a consequence
 of router integration, not of more analysis, which is why the roadmap now carries the router
 work and not this.
+
+---
+
+## N. Auditor-style sweep of the whole system (2026-09)
+
+An adversarial pass over the surfaces the existing suite reaches only incidentally. Four new
+files, 35 new tests. Everything below is recorded whether or not it produced a finding, because
+"we looked here and found nothing" is the part of an audit that is worth keeping.
+
+### N1. Doors — `test/unit/AccessControlAudit.t.sol` (10 tests). **No findings.**
+
+Every callback rejects non-PoolManager callers; `unlockCallback` (the only function that moves
+tokens without the caller having paid first) rejects them too; the native tick-liquidity path is
+closed in both directions; a second pool cannot bind to the hook, same pair or different.
+
+Two of these tests were **vacuous when first written** and are worth remembering as a pattern:
+`poolManager.modifyLiquidity` called from the test contract reverts `ManagerLocked` before the
+hook is ever consulted, so the test passed while proving nothing about the guard under test. It
+now runs inside an unlock (`LiquidityUnlocker`) and matches the hook's own selector. Gas told the
+story: 19k before, 743k after.
+
+### N2. Edges — `test/unit/ExtremeStateAudit.t.sol` (8 tests). **No findings.**
+
+A reserve driven toward exhaustion (40 doubling swaps) stays positive and backed; a 1-wei swap
+where the fee rounds away the entire input returns nothing rather than paying out; 1,000 dust
+round trips do not bleed the invariant; the pool emptied to `MINIMUM_LIQUIDITY` is still
+fundable and tradeable.
+
+Two things established rather than merely tested:
+
+- **The `priceWad == 0` skip is unreachable by trading.** Draining token1 far enough for the
+  marginal price to floor would push token0 past the `uint128` shadow-reserve ceiling first, so
+  the swap reverts long before the price does anything interesting. The only door into that state
+  is an absurd seed, which is how the branch is now exercised.
+- **The detector packing holds.** `int128(ewmaNet)`, `uint128(ewmaTV)` and `uint64(kappa)` are
+  unchecked downcasts and Solidity does not check them, so the bound in the comment above the
+  state variables is load-bearing. It is now asserted directly: `previewDetector()` computes the
+  step at full width and storage is compared against it, every block, under `lambda = WAD - 1`
+  (the most hostile value `isValidConfig` accepts) across 60 alternating large swaps.
+
+### N3. Providers — `test/invariant/MultiActorInvariant.t.sol` (5 invariants x 2 configs).
+
+The existing invariant run has ONE actor who is both the only provider and the only trader, which
+is enough for solvency but structurally cannot express dilution. This adds three providers, share
+transfers between them, and a separate trader: 128,000 calls per invariant per config.
+
+Backing per share never falls; supply always equals the shares somebody holds; the locked minimum
+stays locked; every holder can exit together; the shadow stays backed. **No findings.**
+
+`afterInvariant` asserts the run actually completed deposits, withdrawals, transfers and swaps —
+every handler action swallows its own revert, so a handler that silently never succeeded would
+pass every invariant above while exercising nothing.
+
+### N4. Offsets — `test/unit/DeepBaseSeamAudit.t.sol` (7 tests). **One finding, informational.**
+
+**The constructor's `"offset seed too small"` guard is not an invariant.** It refuses a seed whose
+offsets floor to zero on one side only, because the mid is `(r1 + b) / (r0 + a)` and a curve with
+only one virtual side is anchored off its own reserve ratio. But `_baseOffsets()` scales both by
+the live share supply, so `b` reaches zero once
+
+    supply < supply0 / b0 = sqrt(A0 / B0) / alpha
+
+and nothing re-enters the constructor on the way there. For a seed within a few orders of
+magnitude of balanced that threshold is **below `MINIMUM_LIQUIDITY`**, so the locked shares keep
+both offsets alive and the guard holds — by accident of the lock rather than by construction. For
+a lopsided seed (tested at A0 = 5e24 against B0 = 1e6, threshold ~2e9 shares) it does not.
+
+**Severity: informational.** `alphaWad = 0` in the deployed configuration, so production offsets
+are `(0, 0)` and the path is dead code today; reaching it needs a lopsided seed *and* withdrawal
+to roughly a billionth of the pool, at which point the reserves are dust. **Not fixed here** —
+the change belongs on its own branch, and the natural form is to make the degradation symmetric
+(`if (a == 0 || b == 0) return (0, 0)`, falling back to a plain constant-product base) rather
+than to leave a one-sided anchor. `test_balancedSeed_keepsBothOffsetsDownToTheLock` is the test
+that will fail first if anyone lowers `MINIMUM_LIQUIDITY`.
+
+Two measurement traps found and documented in the same file, both of which read as leaks and are
+not:
+
+- **`sqrt(r0 * r1) / supply` is the wrong LP-value measure on a deep-base pool.** The curve
+  conserves `(r0 + a)(r1 + b)`; the real product is *maximised* where the reserve ratio equals the
+  offset ratio — the seed — so it falls with any price move in either direction and reports a loss
+  on every swap. `LpAccounting.t.sol` uses it legitimately because that suite runs at
+  `alphaWad = 0`, where the two coincide.
+- **A round trip straddling a liquidity deposit gets back more than it spent.** True of every
+  constant-product pool: doubling the depth halves the return leg's impact, and the difference is
+  paid by the depositor who bought into a ratio the first leg had already skewed. The property
+  that must hold is the other one — the deposit does not leak — and the self-sandwich version
+  (same actor deposits, round-trips, withdraws) does not dominate.
 
 ---
 
