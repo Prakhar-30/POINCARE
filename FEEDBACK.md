@@ -14,27 +14,41 @@ hit was almost entirely documentation rather than protocol design.
 
 ---
 
-## 1. The default Quoter silently mis-prices every custom-curve hook
+## 1. `V4Quoter` works for custom curves, but it cannot be called from a `view`
 
-**The problem.** A custom-curve hook replaces the pricing function, but the canonical Quoter still
-assumes `x·y=k`. It does not revert, it does not warn. It returns a confidently wrong number.
+**A correction first.** An earlier draft of this document claimed the default Quoter silently
+mis-prices custom-curve hooks — that it assumes `x·y=k` and returns a confidently wrong number.
+**That is not true, and we were wrong to say it.** We wrote a test to reproduce it and the test
+disproved it: `V4Quoter` and our own Lens agree to the wei on a pool whose pricing function is
+entirely custom.
 
-This is the single largest integration gap in v4 today, because it is invisible. A router
-integrating a custom-curve pool will quote incorrectly and only discover it when executions
-diverge from quotes. The failure mode is silent and it lands on the integrator rather than the
-hook author.
+The reason is that `V4Quoter` does not compute a closed form. It calls `poolManager.unlock`,
+performs a **real** swap, and reverts with the resulting delta. A real swap runs `beforeSwap`, so
+a custom curve is applied and the quote is exactly what would have executed. That is a good
+design and it deserves to be better known, because the assumption we made is an easy one to make
+from the outside.
 
-**What we did.** Shipped `PoincareLens`, a first-class quoter that prices through the exact same
-libraries and the same detector projection the swap path uses, so a quote cannot drift from
-execution.
+`test_canonicalQuoterAgreesWithLens` in
+[`test/sim/ForkRouterLens.t.sol`](./test/sim/ForkRouterLens.t.sol) is the reproduction, on a
+Sepolia fork, with a detector-driven directional spread actively engaged.
 
-**What would help.** A prominent warning in the custom-curve documentation, not a footnote: *if
-your hook returns a `BeforeSwapDelta`, the default Quoter cannot price your pool and you must ship
-your own.* Better still, a `IHookQuoter` interface convention so routers have a standard place to
-look, and the Quoter reverting rather than guessing when it detects `beforeSwapReturnDelta` in the
-hook's permission bits.
+**The real friction.** `quoteExactInputSingle` is **not `view`** — the unlock-and-revert pattern
+makes it state-mutating. Consequences for an integrator:
 
----
+- It cannot be `staticcall`ed from a `view` function, so an on-chain contract that wants a quote
+  inside a view path has no option.
+- It costs a full swap simulation, which for a hook doing real work in `beforeSwap` is not
+  nothing. Ours runs a CUSUM update per sampled block.
+- `eth_call` from off-chain is fine, so this bites contracts rather than frontends.
+
+**What would help.** A `view` quoting path for hooks that can offer one. Our curve is a pure
+function of reserves and detector state, so `PoincareLens.quoteExactInput` is a plain `view` that
+returns the same number `V4Quoter` does — we just have no standard interface to advertise that
+through, so every integrator has to be told about it out of band.
+
+An `IHookQuoter` convention would solve the advertising problem: a hook that can price itself
+cheaply declares so, routers prefer it when present, and fall back to the simulating Quoter when
+it is absent. That is a smaller ask than we made in the earlier draft, and a more accurate one.
 
 ## 2. `slot0` is meaningless for a custom-curve hook, and nothing says so
 
