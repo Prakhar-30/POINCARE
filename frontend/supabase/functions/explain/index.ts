@@ -254,6 +254,20 @@ Deno.serve(async (req) => {
     text = await generate(prompt);
   } catch (e) {
     console.error("generate failed", e);
+    // "generation failed" collapsed every upstream problem into one message, which is the
+    // difference between "wait a minute" and "your key is wrong" - and a caller that retries
+    // needs to tell those apart. `generate` throws `gemini <status>: <body>`, so the status is
+    // there to be read.
+    const msg = e instanceof Error ? e.message : String(e);
+    const status = Number(/gemini (\d{3})/.exec(msg)?.[1] ?? 0);
+    const invalidKey = /API_KEY_INVALID|PERMISSION_DENIED|API key not valid/i.test(msg);
+
+    if (invalidKey || status === 401 || status === 403) {
+      return json({ error: "api key rejected", fallback: true }, 502);
+    }
+    if (status === 429) return json({ error: "model quota exhausted", fallback: true }, 429);
+    if (status === 503) return json({ error: "model busy", fallback: true }, 503);
+    if (status === 404) return json({ error: "model not found", fallback: true }, 502);
     return json({ error: "generation failed", fallback: true }, 502);
   }
 

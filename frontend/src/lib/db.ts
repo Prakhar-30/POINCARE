@@ -141,7 +141,13 @@ export type ExplainKind = "regime" | "report";
  * asking for - it clears when someone redeploys it, and never before. Retrying that every 30
  * seconds forever is a request loop that can only ever fail.
  */
-const PERMANENT = ["unknown kind", "not configured", "backend not configured"];
+const PERMANENT = [
+  "unknown kind",          // the deployed function has no such task
+  "not configured",        // no GEMINI_API_KEY on the project
+  "backend not configured",
+  "api key rejected",      // the key is wrong or revoked, not merely busy
+  "model not found",       // the model name was retired
+];
 
 export const isPermanentFailure = (reason: string | null): boolean =>
   !!reason && PERMANENT.some((p) => reason.toLowerCase().includes(p));
