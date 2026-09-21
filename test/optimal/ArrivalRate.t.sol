@@ -7,9 +7,12 @@ import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 
 import {PoincareSim} from "./PoincareSim.sol";
 
-/// @title ArrivalRate: how kappa_max should scale with how often the pool is sampled.
+/// @title ArrivalRate: CLOSED. Per-block kappa_max cannot be derived from bar data.
 ///
-/// @notice THE ASTERISK ON EVERY NUMBER THIS BRANCH HAS PUBLISHED. The four-year study runs on
+/// @notice THIS QUESTION IS CLOSED AND THE ANSWER IS NEGATIVE. Kept as the evidence for why,
+///         so it is not proposed again. See `analysis/OPEN_ITEMS.md` M for the write-up.
+///
+///         THE ASTERISK IT WAS TRYING TO REMOVE. The four-year study runs on
 ///         four-hour bars, so its lambda is 2,190 a year. The deployed hook samples once per
 ///         chain block, roughly one a second, so its lambda is about 31,500,000. That is a
 ///         factor of 14,400, and `kappa_max = 0.05` was chosen against the first of those.

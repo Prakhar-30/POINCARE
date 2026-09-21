@@ -316,8 +316,9 @@ the same traps will be there next time.
 ### L2. Known limits of this study
 
 - **4-hour bars; the hook samples per block.** Four orders of magnitude in arrival rate. The
-  scale-free *relationships* (`r`, the σ-normalised thresholds) carry over. `κ_max = 0.05`
-  specifically does not, and re-deriving it at block cadence is a roadmap item.
+  scale-free *relationships* (`r`, the σ-normalised thresholds) carry over. `κ_max` does not
+  transfer the same way; deriving the per-block value from bar data was attempted and does not
+  work (**M**, below). It is closed, not deferred.
 - **One hole in the source data**, 2022-09-29 to 2023-03-12 (3,940 hours), collapsed into a
   single 4h step from $1,338 to $1,552. `test_gapExcluded` re-runs past it: levels move 13–25bps,
   no conclusion changes.
@@ -326,6 +327,50 @@ the same traps will be there next time.
   there is not yet enough live flow to fit it against.
 - **Single pair, single venue.** Nothing here establishes that the same parameters suit a
   stablecoin pair or a long-tail token.
+
+---
+
+## M. Per-block κ_max calibration: attempted, closed (2026-09)
+
+**Not a roadmap item. Do not re-propose it without live per-block data.**
+
+The four-year study runs on 4h bars (λ ≈ 2,190/yr); the hook samples per chain block
+(λ ≈ 31,500,000/yr). `κ_max = 0.05` was chosen against the first. The plan was to measure how
+the LP-optimal `κ_max` scales with sampling cadence and extrapolate, using
+Ghasemlu ([arXiv:2606.21769](https://arxiv.org/abs/2606.21769)) — already cited in
+`OptimalFee.t.sol` — which gives `η = √(2λ/v)·f` and therefore `f ∝ 1/√λ`.
+
+**It does not identify, and the reason is structural rather than fixable.** `test/optimal/ArrivalRate.t.sol`
+coarsens the series over strides 1–24 (a 24× λ sweep, the most the data permits) and finds the
+LP-value objective has a **broad plateau** in `κ_max` — at stride 1 the top four candidates sit
+within 0.5% of each other. An exponent fitted through weakly-determined argmaxes over 24× cannot
+support a 14,400× extrapolation. Measured b = −0.16 against a predicted +0.5: wrong sign, wrong
+magnitude, and not trustworthy enough to count as a refutation of the theory either.
+
+Two confounds were found and controlled before that conclusion was reached, and both would have
+produced a confident wrong answer:
+
+- `k` and `h` are absolute log-return units, so coarsening 24× multiplies the per-bar return
+  ~5× and a fixed `k` filters five times less. Run naively the study measures "optimal cap
+  versus how mis-scaled the thresholds are". Controlled by running self-normalised.
+- The first pass used the pre-recalibration gate (0.50) rather than the deployed 0.25.
+
+**One substantive finding survives, and it is not a reason to change anything.** `κ_max` behaves
+nothing like the vol fee: raising the fee crushes uninformed flow, while raising the *cap*
+barely touches it (31% retained at 500bps vs 26% at 3,000bps — a 60× increase for five points of
+flow). It caps an evidence-gated ramp rather than charging everything, so only strongly-trending
+bars ever reach it, and the matched-operating-point trap (**L**) does not apply to this
+parameter. On four years at 4h cadence the LP optimum is ~2,000–3,000bps, far above the deployed
+500bps (+674bps of LP value at 2,000bps).
+
+We are **not** acting on that. `κ_max` is a security parameter — lower is strictly safer, and
+A3's bound is what it exists to protect. The measurement sits four orders of magnitude from the
+deployment, on a flat curve, with an arbitrageur model that does not capture a pool being routed
+around. A 30% spread would not survive contact with a router.
+
+**What would reopen it:** live per-block tape from a pool with real flow. That is a consequence
+of router integration, not of more analysis, which is why the roadmap now carries the router
+work and not this.
 
 ---
 

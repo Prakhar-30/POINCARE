@@ -690,9 +690,10 @@ needed no new machinery at all.
   (`test_gapExcluded`) gives +631 bps instead of +644 — the level shifts by 13 bps and no
   conclusion changes.
 - **This is 4-hour bars; the hook samples per block.** Four orders of magnitude in arrival rate.
-  The scale-free *relationships* carry over — `r`, and the σ-normalised thresholds — but
-  `κ_max = 0.05` specifically is a this-regime number and is on the roadmap to be re-derived at
-  block cadence.
+  The scale-free *relationships* carry over — `r`, and the σ-normalised thresholds. `κ_max` does
+  not transfer the same way, and we **tried and failed** to derive the per-block value from this
+  data; see [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) M. `κ_max = 0.05` stands on its
+  security argument, which does not depend on cadence: lower is strictly safer.
 - **Flow elasticity is modelled, not fitted.** `α = 400` in `ν(f) = ν₀e^{−αf}` is the shape the
   literature uses; it is not fitted to Poincaré's own traders, because there is not yet enough
   live flow to fit it against. Every "at matched flow" verdict above leans on it.
@@ -748,10 +749,10 @@ external audit is still required before mainnet (item 5 below).
 2. **Adaptive-mode manipulation bound (OPEN_ITEMS V1):** the v2 detector is implemented and
    simulated against σ-inflation, but the quantitative worst-case bound must be derived before
    `adaptive = true` guards real value. Security params (`κ_max, Δκ_max`) stay fixed by design.
-3. **Per-block re-validation of §9.4.** The recalibration ran on 4-hour bars; the hook samples
-   per block, four orders of magnitude apart in arrival rate. The *relationships* are
-   scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
-   wants re-deriving against block-cadence data.
+3. **Derive `dFloor` on chain from `r` and `λ`** rather than taking it as a constructor
+   argument. §9.4 shows the two are one parameter, `dFloor = r·√(1−λ)`; deriving it makes
+   the whole class of "someone retuned `λ` and forgot the gate" impossible rather than merely
+   asserted in a test.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. **External security audit** before mainnet.
 
