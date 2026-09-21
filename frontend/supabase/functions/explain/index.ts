@@ -135,27 +135,30 @@ const TASK: Record<string, string> = {
 
   // The Analytics page's standing report. Longer and structured, because it is the page a
   // liquidity provider reads to decide whether this pool is doing anything for them.
-  report:
-    "Write a short standing report on this pool for a liquidity provider who is deciding " +
-    "whether it is worth leaving money here. Cover, in this order and as four separate " +
-    "paragraphs separated by a blank line:
-" +
-    "1. WHAT IS HAPPENING NOW. The live regime, how close the detector is to firing, and " +
-    "whether the efficiency gate is holding it back.
-" +
-    "2. WHAT IT HAS DONE. Over the samples and swaps given: how often it engaged, what share " +
-    "of volume actually paid a spread, and what the LP kept as a result. If nothing has traded " +
-    "yet, say exactly that rather than describing an empty pool as calm.
-" +
-    "3. WHERE THE RISK IS. Name the condition that would be bad for an LP here - a sustained " +
-    "one-way move the detector is slow to confirm, or chop that keeps the gate shut - and say " +
-    "which of those the current numbers look like.
-" +
-    "4. WHAT THE SETTINGS MEAN. Explain in plain words what this pool's dFloor and kappa_max " +
-    "imply about how eagerly it leans and how hard it can lean at most.
-" +
-    "Around 4 to 6 sentences per paragraph at most. Do not invent figures that are not in the " +
-    "data. Do not tell anyone to deposit or withdraw.",
+  // A template literal, deliberately: the earlier version built this by concatenating quoted
+  // strings and ended up with real newlines inside the quotes, which is a syntax error Deno
+  // only reports at bundle time ("Expected ',', got 'string literal'"). Backticks take the
+  // line breaks literally, so there is nothing left to escape wrongly.
+  report: `Write a short standing report on this pool for a liquidity provider who is deciding
+whether it is worth leaving money here. Cover, in this order and as four separate paragraphs
+separated by a blank line:
+
+1. WHAT IS HAPPENING NOW. The live regime, how close the detector is to firing, and whether the
+efficiency gate is holding it back.
+
+2. WHAT IT HAS DONE. Over the samples and swaps given: how often it engaged, what share of
+volume actually paid a spread, and what the LP kept as a result. If nothing has traded yet, say
+exactly that rather than describing an empty pool as calm.
+
+3. WHERE THE RISK IS. Name the condition that would be bad for an LP here - a sustained one-way
+move the detector is slow to confirm, or chop that keeps the gate shut - and say which of those
+the current numbers look like.
+
+4. WHAT THE SETTINGS MEAN. Explain in plain words what this pool's dFloor and kappa_max imply
+about how eagerly it leans and how hard it can lean at most.
+
+Around 4 to 6 sentences per paragraph at most. Do not invent figures that are not in the data.
+Do not tell anyone to deposit or withdraw.`,
 };
 
 async function generate(prompt: string): Promise<string> {
