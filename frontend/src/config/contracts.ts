@@ -156,6 +156,7 @@ export const HOOK_ABI = [
   { type: "function", name: "dMax", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "lambda", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "dFloor", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "gateR", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   // detector mode, surfaced in the Analytics readout
   { type: "function", name: "adaptive", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
   { type: "function", name: "lastSampledPriceWad", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },

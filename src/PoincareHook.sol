@@ -45,7 +45,13 @@ struct PoincareConfig {
     int256 h; // CUSUM threshold + kappa-ramp start
     int256 sMax; // CUSUM cap + kappa-ramp saturation (<= int128.max for packing)
     uint256 lambda; // EWMA decay for D and sigma
-    uint256 dFloor; // directional-efficiency gate
+    /// Noise-widths of directionality the detector demands before it acts, WAD.
+    ///
+    /// NOT the gate itself. `dFloor` is DERIVED from this and `lambda` in the constructor,
+    /// because the two are one parameter: D's no-trend expectation is 1/sqrt(n) with
+    /// n = 1/(1-lambda), so a raw gate only means something relative to that floor. Taking
+    /// both as inputs let someone retune the memory and silently move the gate.
+    uint256 gateR;
     bool adaptive; // standardize CUSUM increments by live sigma
     uint256 sigmaFloor; // adaptive only: min sigma used for standardization (> 0)
     uint256 clipWad; // Huber clip on the increment (> 0)
@@ -124,6 +130,11 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     int256 public immutable thresholdH;
     int256 public immutable sMax;
     uint256 public immutable lambda;
+    /// The configured noise-width target. Kept as an immutable so the INTENT is readable on
+    /// chain, not just its consequence.
+    uint256 public immutable gateR;
+    /// Derived: `gateR * sqrt(1 - lambda)`. Still exposed, since it is what the hot path reads
+    /// and what the frontend charts against D.
     uint256 public immutable dFloor;
     bool public immutable adaptive;
     uint256 public immutable sigmaFloor;
@@ -215,13 +226,19 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         // int256 cast of clip-derived values in range.
         require(cfg.clipWad > 0 && cfg.clipWad <= uint256(uint128(type(int128).max)), "clip cfg");
         require(!cfg.adaptive || cfg.sigmaFloor > 0, "sigmaFloor cfg");
+        // A gate at or above 1 can never be crossed (D is in [0,1]) and the detector would be
+        // dead on arrival; 0 disables the gate entirely. Both are configuration errors rather
+        // than choices, so they are rejected here rather than discovered in production.
+        require(cfg.gateR > 0, "gateR cfg");
+        require(DirectionalSignal.gateFloorWad(cfg.gateR, cfg.lambda) < WAD, "gate >= 1");
         require(cfg.feeCap < WAD, "fee cfg");
 
         k = cfg.k;
         thresholdH = cfg.h;
         sMax = cfg.sMax;
         lambda = cfg.lambda;
-        dFloor = cfg.dFloor;
+        gateR = cfg.gateR;
+        dFloor = DirectionalSignal.gateFloorWad(cfg.gateR, cfg.lambda);
         adaptive = cfg.adaptive;
         sigmaFloor = cfg.sigmaFloor;
         clipWad = cfg.clipWad;

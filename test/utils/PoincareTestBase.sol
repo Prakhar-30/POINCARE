@@ -25,7 +25,7 @@ abstract contract PoincareTestBase is BaseTest {
         c.h = 5e15; //        threshold 0.005
         c.sMax = 2e16; //     evidence cap 0.02
         c.lambda = 9e17; //   EWMA decay 0.9
-        c.dFloor = 5e17; //   D gate 0.5
+        c.gateR = 158e16; // 1.58 noise-widths == the old dFloor 0.5 at lambda 0.9
         c.adaptive = false;
         c.sigmaFloor = 0;
         c.clipWad = 1e18;

@@ -13,7 +13,8 @@ export type DetectorConfig = {
   kappaMax: number; // security cap on asymmetry
   dMax: number; // max spread (κ -> spread ceiling)
   lambda: number; // EWMA decay
-  dFloor: number; // directional-efficiency floor to engage
+  dFloor: number; // directional-efficiency floor to engage (derived from gateR and lambda)
+  gateR: number; // noise-widths of directionality demanded; the configured input
   effWindow: number; // implied effective window N = 1/(1-λ)
   lastSampledBlock: number;
   /** True when the detector standardizes its increments by the live σ̂ (v2 mode). */
@@ -35,6 +36,7 @@ export function useDetectorConfig(): DetectorConfig {
       { ...hook, functionName: "dFloor" },
       { ...hook, functionName: "lastSampledBlock" },
       { ...hook, functionName: "adaptive" },
+      { ...hook, functionName: "gateR" },
     ],
     query: { refetchInterval: 12000 },
   });
@@ -54,6 +56,9 @@ export function useDetectorConfig(): DetectorConfig {
       dMax: num(5),
       lambda,
       dFloor: num(7),
+      /// The configured NOISE-WIDTH target. dFloor is derived from this and lambda on chain,
+      /// so this is the number that was actually chosen and dFloor is its consequence.
+      gateR: num(10),
       effWindow: lambda < 1 && lambda > 0 ? 1 / (1 - lambda) : 0,
       lastSampledBlock: Number(wad(8)),
       adaptive,

@@ -63,10 +63,9 @@ contract ForkSimulationTest is Test {
     uint256 constant KAPPA_MAX = 5e16; //   5% cap
     uint256 constant D_MAX = 2e16;
     uint256 constant LAMBDA = 8e17;
-    // 0.353 = the deployed gate r = 0.79 restated at this sim's lambda = 0.80
-    // (0.79*sqrt(0.20)). The old 0.60 was r = 1.34, nearly twice as conservative as the hook
-    // that actually ships. See README section 9.4 for the derivation of r.
-    uint256 constant D_FLOOR = 353e15;
+    // The DEPLOYED noise-width target; dFloor is derived from it and lambda by the hook.
+    // The old 0.60 here was r = 1.34, nearly twice as conservative as what ships.
+    uint256 constant GATE_R = 79e16; // 0.79 noise-widths, as deployed
 
     IPoolManager pm;
     IUniswapV4Router04 router;
@@ -133,7 +132,7 @@ contract ForkSimulationTest is Test {
         cfg.h = H;
         cfg.sMax = S_MAX;
         cfg.lambda = LAMBDA;
-        cfg.dFloor = D_FLOOR;
+        cfg.gateR = GATE_R;
         cfg.clipWad = 1e18; // inert clip: no per-block move in the sim approaches 100% log-return
         cfg.kappaMin = KAPPA_MIN;
         cfg.kappaMax = kappaMax;

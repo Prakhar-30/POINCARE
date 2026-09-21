@@ -60,13 +60,10 @@ contract ForkRealDataTest is Test {
     uint256 constant KAPPA_MAX = 5e16; // 5% - a security cap, NOT calibrated from data
     uint256 constant D_MAX = 15e15; // 1.5%/block
     uint256 constant LAMBDA = 85e16; // ~1-day memory
-    // 0.306, which is the DEPLOYED gate expressed at this sim's lambda. D's no-trend
-    // expectation is 1/sqrt(n) with n = 1/(1-lambda), so a gate only means something as the
-    // ratio r = dFloor/sqrt(1-lambda); the hook ships r = 0.79 (README section 9.4). At
-    // lambda = 0.85 that is 0.79*sqrt(0.15) = 0.306. The old 0.55 here was r = 1.42, nearly
-    // twice as conservative as what is on chain, so this study was describing a detector the
-    // deployment does not have.
-    uint256 constant D_FLOOR = 306e15; // 0.306  (r = 0.79, as deployed)
+    // The DEPLOYED noise-width target. The hook derives dFloor from this and lambda itself,
+    // so this study and the deployment cannot drift apart the way they had: this file was
+    // running r = 1.42 against a chain running 0.79. See README section 9.4.
+    uint256 constant GATE_R = 79e16; // 0.79 noise-widths, as deployed
 
     // Symmetric vol-fee baseline: fee = min(FEE_GAMMA * sigma, FEE_CAP), charged both ways.
     // FEE_GAMMA is chosen so this pool's cost to uninformed flow matches POINCARE's over the
@@ -164,7 +161,7 @@ contract ForkRealDataTest is Test {
         cfg.h = H;
         cfg.sMax = S_MAX;
         cfg.lambda = LAMBDA;
-        cfg.dFloor = D_FLOOR;
+        cfg.gateR = GATE_R;
         cfg.clipWad = 1e18; // inert clip: no 4h ETH candle approaches a 100% log-return
         cfg.kappaMin = KAPPA_MIN;
         cfg.kappaMax = kappaMax;

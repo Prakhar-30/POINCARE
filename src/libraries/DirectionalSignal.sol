@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title DirectionalSignal - directional-efficiency ("trend vs chop") signal
 /// @notice D = |net displacement| / total variation over a window, in [0, 1].
@@ -74,6 +75,43 @@ library DirectionalSignal {
     ///      lambda >= WAD removes decay and the state grows unbounded.
     function isValidConfig(uint256 lambda) internal pure returns (bool) {
         return lambda > 0 && lambda < WAD;
+    }
+
+    /**
+     * @notice The directional-efficiency gate implied by a noise-width target and the EWMA decay.
+     *
+     * @dev `dFloor` and `lambda` are not independent parameters, and treating them as if they
+     *      were is how a gate silently moves when someone retunes the memory.
+     *
+     *      D is `|sum r| / sum |r|`. For an iid symmetric series of n samples the numerator is
+     *      the absolute value of a random walk, `E|S_n| = sigma*sqrt(2n/pi)`, and the denominator
+     *      is `n*E|r| = n*sigma*sqrt(2/pi)`. So under NO TREND
+     *
+     *          E[D] = sqrt(2n/pi) / (n*sqrt(2/pi)) = 1/sqrt(n)
+     *
+     *      and with EWMA decay the effective sample count is `n = 1/(1 - lambda)`. A fixed
+     *      threshold on D therefore means nothing on its own; the quantity with meaning is the
+     *      ratio of the gate to that noise floor,
+     *
+     *          r = dFloor / E[D] = dFloor / sqrt(1 - lambda)
+     *
+     *      how many noise-widths of directionality the detector demands before it acts. This
+     *      inverts that: given the target `r`, return the gate it implies.
+     *
+     *      Verified empirically as well as derived: holding r fixed while lambda moves from 0.90
+     *      to 0.98 - a five-fold change in effective window - moves LP value by under 0.5% on
+     *      four years of real ETH/USDC. The derivation fails exactly where it predicts it should,
+     *      at lambda = 0.70 where n = 3.3 and the CLT has not engaged, which is why `r` is
+     *      bounded below by a lambda that keeps n >= 10. See README section 9.4.
+     *
+     * @param rWad   Noise-widths of directionality required, WAD.
+     * @param lambda EWMA decay, WAD, strictly between 0 and WAD.
+     * @return       The implied `dFloor`, WAD.
+     */
+    function gateFloorWad(uint256 rWad, uint256 lambda) internal pure returns (uint256) {
+        // sqrt of a WAD quantity: sqrt(x * WAD) is sqrt(x) in WAD.
+        uint256 noiseFloor = Math.sqrt((WAD - lambda) * WAD);
+        return FullMath.mulDiv(rWad, noiseFloor, WAD);
     }
 
     /// @dev a * lambda / WAD, sign-preserving. lambda < WAD means the magnitude never

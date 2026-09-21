@@ -47,7 +47,7 @@ const CFG = {
   h: 5n * 10n ** 15n, //       threshold 0.005
   sMax: 2n * 10n ** 16n, //    evidence cap 0.02
   lambda: 9n * 10n ** 17n, //  EWMA decay 0.9
-  dFloor: 25n * 10n ** 16n, // D gate 0.25 (recalibrated; see README section 8)
+  gateR: 79n * 10n ** 16n, //  0.79 noise-widths; the hook derives dFloor from this and lambda
   adaptive: false,
   sigmaFloor: 0n,
   clipWad: 2n * 10n ** 17n, // Huber clip 20%/block
@@ -93,7 +93,7 @@ const HOOK_CTOR = [
   { type: "address" },
   { type: "tuple", components: [
     { name: "k", type: "int256" }, { name: "h", type: "int256" }, { name: "sMax", type: "int256" },
-    { name: "lambda", type: "uint256" }, { name: "dFloor", type: "uint256" },
+    { name: "lambda", type: "uint256" }, { name: "gateR", type: "uint256" },
     { name: "adaptive", type: "bool" }, { name: "sigmaFloor", type: "uint256" }, { name: "clipWad", type: "uint256" },
     { name: "kappaMin", type: "uint256" }, { name: "kappaMax", type: "uint256" }, { name: "dMax", type: "uint256" },
     { name: "feeGamma", type: "uint256" }, { name: "feeCap", type: "uint256" }, { name: "alphaWad", type: "uint256" },

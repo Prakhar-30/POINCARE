@@ -50,7 +50,7 @@ abstract contract ForkBase is Test {
         cfg.h = 5e15;
         cfg.sMax = 2e16;
         cfg.lambda = 9e17;
-        cfg.dFloor = 5e17;
+        cfg.gateR = 158e16; // 1.58 noise-widths == the old dFloor 0.5 at lambda 0.9
         cfg.clipWad = 1e18;
         cfg.kappaMax = 1e17;
         cfg.dMax = 5e16;

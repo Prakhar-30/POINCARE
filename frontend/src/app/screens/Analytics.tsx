@@ -266,9 +266,12 @@ export function Analytics() {
         <ParamRow sym="λ" name="EWMA decay" value={cfg.lambda.toFixed(3)}
           desc={`Signal memory ≈ ${cfg.effWindow ? fmtNum(cfg.effWindow, 1) : "—"} samples.`}
           why="Paired with D_floor: the gate only means something relative to the noise this window implies. Changing one without the other silently moves the gate." />
-        <ParamRow sym="D_floor" name="Efficiency floor" value={fmtPct(cfg.dFloor)}
-          desc="How one-way a move must look before the pool acts."
-          why={`Set at about 0.79 noise-widths of directionality. For a driftless walk D averages 1/√n, so a fixed floor means nothing except relative to λ.`} />
+        <ParamRow sym="r" name="Gate target" value={`${cfg.gateR.toFixed(2)}σ`}
+          desc="Noise-widths of directionality demanded before the pool acts."
+          why="This is the number actually configured. For a driftless walk D averages 1/√n, so a raw floor means nothing except relative to λ — the hook derives the floor from this and λ itself, which is why the two can never drift apart." />
+        <ParamRow sym="D_floor" name="Efficiency floor (derived)" value={fmtPct(cfg.dFloor)}
+          desc="The gate the hot path actually compares D against."
+          why={`Computed on chain as r·√(1−λ) = ${cfg.gateR.toFixed(2)}·√(1−${cfg.lambda.toFixed(2)}). Not settable on its own.`} />
         <ParamRow sym="κ_max" name="Lean cap" value={fmtPct(cfg.kappaMax)}
           desc="The hardest this pool can ever lean."
           why="A security bound, not a tuning knob: it caps the most a faked trend could ever be worth, and halving it tightened that bound." />

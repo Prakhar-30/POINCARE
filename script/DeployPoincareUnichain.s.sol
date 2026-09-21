@@ -104,11 +104,14 @@ contract DeployPoincareUnichain is Script {
     // dFloor AND kappaMax WERE RECALIBRATED after a four-year study on real ETH/USDC; see
     // `test/optimal/GammaFourYear.t.sol` and README section 8. The short version:
     //
-    //   dFloor 0.50 -> 0.25   D is |sum r| / sum |r|, whose no-trend expectation is
-    //                         1/sqrt(n) for n = 1/(1-lambda) effective samples. At
-    //                         lambda 0.9 that floor is 0.316, so the old gate demanded
-    //                         1.58 noise-widths of directionality and spent most real
-    //                         trends waiting. 0.25 asks for 0.79 and acts on them.
+    //   gateR 1.58 -> 0.79    The gate is no longer set directly. D is |sum r| / sum |r|,
+    //                         whose no-trend expectation is 1/sqrt(n) for n = 1/(1-lambda)
+    //                         effective samples, so a raw dFloor means nothing except
+    //                         relative to that floor. The hook now takes the NOISE-WIDTH
+    //                         target and derives dFloor = gateR*sqrt(1-lambda) itself, which
+    //                         is why lambda and the gate can no longer drift apart. At
+    //                         lambda 0.9 this yields 0.2498; the old 0.50 was gateR 1.58 and
+    //                         spent most real trends waiting.
     //
     //   kappaMax 0.10 -> 0.05 NOT a second improvement, and not a loosening. Halving it
     //                         is the control: the lower gate doubles how often kappa is
@@ -129,7 +132,7 @@ contract DeployPoincareUnichain is Script {
     uint256 constant KAPPA_MAX = 5e16; // 0.05 max directional spread (was 0.10)
     uint256 constant D_MAX = 5e16; // kappa ramp rate / block
     uint256 constant LAMBDA = 9e17; // EWMA decay 0.9
-    uint256 constant D_FLOOR = 25e16; // directional-efficiency gate 0.25 (was 0.50)
+    uint256 constant GATE_R = 79e16; // 0.79 noise-widths (was 1.58); dFloor is derived
     uint256 constant CLIP = 2e17; // Huber clip: 20% log-return per block
     uint256 constant FEE_GAMMA = 5e17; // fee = 0.5 * sigma,
     uint256 constant FEE_CAP = 3e15; // capped at 0.30%
@@ -215,7 +218,7 @@ contract DeployPoincareUnichain is Script {
         cfg.h = H;
         cfg.sMax = S_MAX;
         cfg.lambda = LAMBDA;
-        cfg.dFloor = D_FLOOR;
+        cfg.gateR = GATE_R;
         cfg.adaptive = false;
         cfg.sigmaFloor = 0;
         cfg.clipWad = CLIP;

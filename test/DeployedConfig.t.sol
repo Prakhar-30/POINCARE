@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {PoincareConfig} from "../src/PoincareHook.sol";
 import {DeployPoincareUnichain} from "../script/DeployPoincareUnichain.s.sol";
+import {DirectionalSignal} from "../src/libraries/DirectionalSignal.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title The configuration that goes on chain, pinned.
 ///
@@ -27,12 +29,37 @@ contract DeployedConfigTest is Test {
         return script.exposedConfig();
     }
 
-    /// @dev D = |sum r| / sum |r| has no-trend expectation 1/sqrt(n) for n = 1/(1-lambda)
-    ///      effective samples. At lambda = 0.9, n = 10 and that floor is 0.316. The gate is
-    ///      therefore r = dFloor/0.316 noise-widths of directionality. 0.25 is r = 0.79; the
-    ///      previous 0.50 was r = 1.58 and spent most real trends waiting.
-    function test_gateIsQuarter() public view {
-        assertEq(_cfg().dFloor, 25e16, "dFloor must be 0.25; see README section 8");
+    /// @dev The gate is configured as a NOISE-WIDTH TARGET and derived, not set directly.
+    ///
+    ///      D's no-trend expectation is 1/sqrt(n) for n = 1/(1-lambda) effective samples, so a
+    ///      raw dFloor means nothing except relative to that floor. 0.79 noise-widths was the
+    ///      value the four-year study landed on; the previous configuration was 1.58 and spent
+    ///      most real trends waiting.
+    function test_gateTargetIsSeventyNineHundredths() public view {
+        assertEq(_cfg().gateR, 79e16, "gateR must be 0.79 noise-widths; see README section 9.4");
+    }
+
+    /// @dev And the derivation lands where the hand-set value used to, which is the check that
+    ///      this refactor did not quietly move the pool's behaviour. 0.79*sqrt(0.10) = 0.24982
+    ///      against the 0.25 that was previously typed in: a 0.07% difference, which is the
+    ///      rounding the old literal was hiding rather than a change of intent.
+    function test_derivedGateMatchesTheOldLiteral() public view {
+        uint256 derived = DirectionalSignal.gateFloorWad(_cfg().gateR, _cfg().lambda);
+        assertApproxEqRel(derived, 25e16, 0.001e18, "derived gate should be ~0.25 at lambda 0.9");
+    }
+
+    /// @dev THE POINT OF THE REFACTOR: the gate tracks lambda automatically, so the class of
+    ///      bug where someone retunes the memory and forgets the gate cannot happen. Asserted
+    ///      across the range where the 1/sqrt(n) derivation is valid (n >= 10, so lambda >= 0.9).
+    function testFuzz_gateTracksLambda(uint256 lambdaSeed) public pure {
+        uint256 lambda = 9e17 + (lambdaSeed % 99e15); // [0.900, 0.999)
+        uint256 r = 79e16;
+        uint256 gate = DirectionalSignal.gateFloorWad(r, lambda);
+        assertLt(gate, 1e18, "a gate at or above 1 can never be crossed");
+        assertGt(gate, 0, "a zero gate disables the detector");
+        // r is the ratio of the gate to the noise floor, so recovering it must round-trip.
+        uint256 floor_ = Math.sqrt((1e18 - lambda) * 1e18);
+        assertApproxEqRel((gate * 1e18) / floor_, r, 0.0001e18, "r must round-trip");
     }
 
     /// @dev Halved alongside the gate. This is the CONTROL, not a second improvement: the
@@ -57,18 +84,16 @@ contract DeployedConfigTest is Test {
         assertEq(_cfg().sMax, 2e16, "sMax is at the knee of the sweep");
     }
 
-    /// @dev lambda and dFloor are NOT independent. The gate is meaningful only as
-    ///      r = dFloor/sqrt(1-lambda); holding r fixed while lambda moved from 0.9 to 0.98
-    ///      changed LP value by under 0.5%. Moving lambda without moving dFloor silently
-    ///      moves the gate, so this assertion exists to make that coupling visible.
+    /// @dev lambda and the gate are NOT independent, and since this refactor that is enforced
+    ///      by construction rather than by this assertion: the hook derives dFloor from lambda,
+    ///      so there is no longer a way to move one without the other. What is still worth
+    ///      pinning is lambda itself, and that the derived gate sits where the study put it.
     function test_lambdaPairedWithGate() public view {
         PoincareConfig memory c = _cfg();
-        assertEq(c.lambda, 9e17, "lambda is paired with dFloor via r = dFloor/sqrt(1-lambda)");
-        // r = dFloor / sqrt(1 - lambda), in WAD, checked to two decimals
-        uint256 oneMinus = 1e18 - c.lambda; // 0.10
-        uint256 sqrtWad = Math_sqrtWad(oneMinus); // 0.3162...
-        uint256 r = (c.dFloor * 1e18) / sqrtWad;
-        assertApproxEqAbs(r, 79e16, 1e16, "gate must sit at r ~ 0.79 noise-widths");
+        assertEq(c.lambda, 9e17, "lambda is what the gate is derived against");
+        // n = 1/(1-lambda) effective samples; the derivation needs n >= 10 for 1/sqrt(n) to
+        // hold, which is exactly where it was verified on four years of real returns.
+        assertLe(1e18 - c.lambda, 1e17, "lambda must keep n >= 10 for the derivation to hold");
     }
 
     /// @dev The vol fee is a minor component next to the directional spread but the cap does
@@ -94,14 +119,4 @@ contract DeployedConfigTest is Test {
         assertEq(_cfg().clipWad, 2e17, "clip 20% per block");
     }
 
-    /// @dev Integer sqrt in WAD, so the r assertion above does not need a library import.
-    function Math_sqrtWad(uint256 xWad) internal pure returns (uint256) {
-        uint256 z = (xWad + 1) / 2;
-        uint256 y = xWad;
-        while (z < y) {
-            y = z;
-            z = (xWad / z + z) / 2;
-        }
-        return y * 1e9; // sqrt(x * 1e18) == sqrt(x) * 1e9
-    }
 }
