@@ -235,3 +235,93 @@ export function biggestLeanOf(rows: SwapRow[]): SwapRow | null {
 }
 
 export { priceOf };
+
+// ---------------------------------------------------------------------------------------
+// Aggregates over the HISTORIC tape, for the column and donut charts.
+//
+// These answer questions the live gauges cannot: which direction the retained value actually
+// came from, whether the pool charges near its cap or nowhere near it, and how activity is
+// distributed over time rather than right now.
+
+export type DayBucket = { day: string; volume: number; captured: number; swaps: number };
+
+/** Volume, value kept and swap count per calendar day, oldest first. */
+export function dailyActivityOf(rows: SwapRow[], maxDays = 14): DayBucket[] {
+  const by = new Map<string, DayBucket>();
+  for (const t of rows) {
+    if (!t.ts) continue;
+    const day = String(t.ts).slice(0, 10);
+    const b = by.get(day) ?? { day, volume: 0, captured: 0, swaps: 0 };
+    b.volume += t.notional_usdc || 0;
+    b.captured += t.lvr_captured_usdc || 0;
+    b.swaps += 1;
+    by.set(day, b);
+  }
+  const all = [...by.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
+  return all.slice(-maxDays);
+}
+
+export type Slice = { label: string; value: number; color: string };
+
+/**
+ * Where the retained value came from, by the direction that was running.
+ *
+ * Worth splitting because an LP's intuition is usually that a hook like this earns in
+ * downtrends. Whether that holds for a given pool is a question about its flow, not its design,
+ * and this is the chart that answers it.
+ */
+export function capturedByTrendOf(rows: SwapRow[]): Slice[] {
+  let up = 0;
+  let down = 0;
+  for (const t of rows) {
+    if (!t.with_trend || (t.lvr_captured_usdc || 0) <= 0) continue;
+    if (t.trend === "up") up += t.lvr_captured_usdc;
+    else if (t.trend === "down") down += t.lvr_captured_usdc;
+  }
+  return [
+    { label: "Up-trend", value: up, color: "var(--up)" },
+    { label: "Down-trend", value: down, color: "var(--down)" },
+  ].filter((s) => s.value > 0);
+}
+
+/** Notional split by which way the swap went, regardless of whether it paid. */
+export function sideSplitOf(rows: SwapRow[]): Slice[] {
+  let buy = 0;
+  let sell = 0;
+  for (const t of rows) {
+    if (t.side === "buy_weth") buy += t.notional_usdc || 0;
+    else sell += t.notional_usdc || 0;
+  }
+  return [
+    { label: "Bought WETH", value: buy, color: "var(--lav)" },
+    { label: "Sold WETH", value: sell, color: "var(--honey)" },
+  ].filter((s) => s.value > 0);
+}
+
+export type Bucket = { label: string; n: number; frac: number };
+
+/**
+ * Distribution of the spread actually charged, as a share of the cap.
+ *
+ * The useful read is whether the pool lives near its ceiling or rarely approaches it. A pool
+ * pinned at 100% of the cap is one whose cap is doing the work rather than its detector.
+ */
+export function kappaHistogramOf(rows: SwapRow[], kappaMax: number): Bucket[] {
+  const edges = [0.2, 0.4, 0.6, 0.8, 1.0001];
+  const labels = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"];
+  const counts = new Array(edges.length).fill(0);
+  let total = 0;
+  for (const t of rows) {
+    const k = t.kappa || 0;
+    if (!t.with_trend || k <= 0 || kappaMax <= 0) continue;
+    const frac = k / kappaMax;
+    const i = edges.findIndex((e) => frac < e);
+    counts[i < 0 ? edges.length - 1 : i] += 1;
+    total += 1;
+  }
+  return labels.map((label, i) => ({
+    label,
+    n: counts[i],
+    frac: total ? counts[i] / total : 0,
+  }));
+}

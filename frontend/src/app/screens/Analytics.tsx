@@ -8,9 +8,15 @@ import { Icon } from "@/components/ui/Icon";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 import { AiNote } from "@/components/ui/AiNote";
 import { useExplain } from "@/hooks/useExplain";
-import { fallbackReport, type ReportFacts } from "@/lib/narrate";
-import { analyticsOf, counterfactualOf, biggestLeanOf } from "@/lib/analytics";
-import { SavingsChart, RegimeBar, FlowSplitChart, RiskMeter } from "@/components/ui/AnalyticsCharts";
+import type { ReportFacts } from "@/lib/narrate";
+import {
+  analyticsOf, counterfactualOf, biggestLeanOf,
+  dailyActivityOf, capturedByTrendOf, sideSplitOf, kappaHistogramOf,
+} from "@/lib/analytics";
+import {
+  SavingsChart, RegimeBar, FlowSplitChart, RiskMeter,
+  Donut, DailyColumns, KappaHistogram,
+} from "@/components/ui/AnalyticsCharts";
 
 /**
  * The Analytics screen: a standing report on what this pool has actually done, rather than a
@@ -40,6 +46,10 @@ export function Analytics() {
   );
   const cf = useMemo(() => counterfactualOf(tape), [tape]);
   const biggest = useMemo(() => biggestLeanOf(tape), [tape]);
+  const days = useMemo(() => dailyActivityOf(tape), [tape]);
+  const byTrend = useMemo(() => capturedByTrendOf(tape), [tape]);
+  const bySide = useMemo(() => sideSplitOf(tape), [tape]);
+  const kappaHist = useMemo(() => kappaHistogramOf(tape, cfg.kappaMax), [tape, cfg.kappaMax]);
 
   const facts: ReportFacts | null = useMemo(() => {
     if (!series.points.length) return null;
@@ -78,10 +88,12 @@ export function Analytics() {
       ? `${series.points[series.points.length - 1]?.block_number ?? 0}-${facts.swaps}`
       : null,
     facts,
-    fallback: facts
-      ? fallbackReport(facts)
-      : "Waiting for the first detector samples — one is recorded per traded block.",
+    // The fallback stays as the last resort for a pool with no samples at all; with samples the
+    // panel waits on the model rather than substituting a local reading, because the report IS
+    // the model's reading and a blunter stand-in would be passing one off as the other.
+    fallback: "Waiting for the first detector samples — one is recorded per traded block.",
     auto: true,
+    retry: Boolean(facts),
   });
 
   return (
@@ -114,7 +126,7 @@ export function Analytics() {
           style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1.35fr) minmax(0,1fr)" }}
         >
           <div style={{ minWidth: 0 }}>
-            <AiNote explained={report} />
+            <AiNote explained={report} title="Pool report" skeletonLines={12} />
           </div>
           <div style={{ minWidth: 0 }}>
             <SectionLabel icon="target" text="Right now" />
@@ -171,6 +183,65 @@ export function Analytics() {
           <Mini label="mean κ when leaning" value={a.meanKappaWhenEngaged > 0 ? fmtPct(a.meanKappaWhenEngaged) : "—"} color="var(--honey-deep)" sub={`cap ${fmtPct(cfg.kappaMax)}`} />
           <Mini label="longest unbroken lean" value={a.longestRun ? `${a.longestRun} blocks` : "—"} color="var(--lav-deep)" sub="κ continuously engaged" />
           <Mini label="mean volatility σ̂" value={a.meanSigma > 0 ? fmtPct(a.meanSigma) : "—"} color="var(--text-2)" sub="per sampled block" />
+        </div>
+      </div>
+
+      {/* ---------------- historic tape ---------------- */}
+      <div
+        className="grid gap-4.5"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.25fr) minmax(0,1fr)", gap: 18 }}
+      >
+        <div className="card p-6">
+          <SectionLabel icon="chart" text="Activity by day" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+            Volume traded each day, with the value the pool kept drawn over it on its own scale.
+            The two do not track each other, which is the point: what the LP keeps depends on when
+            the flow arrived, not just how much of it there was.
+          </p>
+          <DailyColumns days={days} />
+        </div>
+
+        <div className="card p-6">
+          <SectionLabel icon="target" text="How hard it actually leans" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+            Spread charged, as a share of the {fmtPct(cfg.kappaMax)} cap. A pool pinned at the top
+            of this range is one whose cap is doing the work rather than its detector.
+          </p>
+          <KappaHistogram buckets={kappaHist} />
+        </div>
+      </div>
+
+      <div
+        className="grid gap-4.5"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 18 }}
+      >
+        <div className="card p-6">
+          <SectionLabel icon="brain" text="Which direction paid" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+            Value kept, split by the trend that was running when it was charged.
+          </p>
+          <Donut
+            slices={byTrend}
+            centerLabel="kept"
+            centerValue={a.flow.captured > 0 ? fmtUsd(a.flow.captured, { dp: 0 }) : "—"}
+          />
+        </div>
+
+        <div className="card p-6">
+          <SectionLabel icon="swap" text="Flow direction" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+            All notional, by side. Direction alone decides nothing — only direction relative to a
+            detected trend does.
+          </p>
+          <Donut
+            slices={bySide}
+            centerLabel="volume"
+            centerValue={
+              a.flow.withTrend + a.flow.free > 0
+                ? fmtUsd(a.flow.withTrend + a.flow.free, { dp: 0 })
+                : "—"
+            }
+          />
         </div>
       </div>
 

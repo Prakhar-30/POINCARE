@@ -11,6 +11,8 @@ export type Explained = {
   loading: boolean;
   /** Why the model was not used, when it was tried and failed. */
   reason: string | null;
+  /** Failed attempts so far, for surfaces that keep retrying rather than falling back. */
+  attempts: number;
   /** Ask the model now. Used by the manual (`auto: false`) surfaces. */
   ask: () => void;
 };
@@ -37,8 +39,18 @@ export function useExplain(opts: {
   fallback: string;
   /** Fetch automatically when `cacheKey` changes. */
   auto?: boolean;
+  /**
+   * Keep retrying until the model answers, instead of settling for the fallback.
+   *
+   * For the short regime note a locally-computed line is a fine substitute. For the Analytics
+   * report it is not: the whole point of that panel is the model's reading, so the caller would
+   * rather show a skeleton and wait. Backoff is exponential and capped, because the two most
+   * common failures - a per-hook cooldown and an exhausted free-tier budget - both resolve on
+   * their own given time, and hammering the function helps neither.
+   */
+  retry?: boolean;
 }): Explained {
-  const { kind, cacheKey, facts, fallback, auto = false } = opts;
+  const { kind, cacheKey, facts, fallback, auto = false, retry = false } = opts;
 
   const [state, setState] = useState<{
     text: string;
@@ -54,6 +66,8 @@ export function useExplain(opts: {
   factsRef.current = facts;
 
   const askedFor = useRef<string | null>(null);
+  const attempts = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const run = useCallback(
     async (key: string) => {
@@ -73,19 +87,38 @@ export function useExplain(opts: {
       // own, since only a cacheKey change triggers it.
       setState((s) => ({ ...s, reason: res.reason }));
       askedFor.current = null;
+
+      if (retry) {
+        attempts.current += 1;
+        const delay = Math.min(30_000, 2000 * 2 ** (attempts.current - 1));
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => {
+          // Only chase the question still on screen; a newer cacheKey supersedes this one.
+          if (cacheKeyRef.current === key) void run(key);
+        }, delay);
+      }
     },
-    [kind],
+    [kind, retry],
   );
+
+  // `run` reads this rather than closing over cacheKey, so a scheduled retry can tell whether
+  // the question it was asked about is still the current one.
+  const cacheKeyRef = useRef(cacheKey);
+  cacheKeyRef.current = cacheKey;
 
   useEffect(() => {
     if (!auto || !cacheKey || askedFor.current === cacheKey) return;
     void run(cacheKey);
   }, [auto, cacheKey, run]);
 
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
   // A new question invalidates the previous answer, so the stale text does not
   // sit under a changed set of numbers while the next request is in flight.
   useEffect(() => {
     setState({ text: "", model: null, cached: false, reason: null });
+    attempts.current = 0;
+    if (timer.current) clearTimeout(timer.current);
   }, [cacheKey]);
 
   const ask = useCallback(() => {
@@ -94,7 +127,8 @@ export function useExplain(opts: {
 
   return {
     text: state.text || fallback,
-    source: state.text ? "model" : loading ? "pending" : "local",
+    source: state.text ? "model" : loading || retry ? "pending" : "local",
+    attempts: attempts.current,
     model: state.model,
     cached: state.cached,
     reason: state.reason,

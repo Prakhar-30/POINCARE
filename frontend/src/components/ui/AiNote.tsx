@@ -13,11 +13,23 @@ import type { Explained } from "@/hooks/useExplain";
 export function AiNote({
   explained,
   title = "What the detector is doing",
+  skeletonLines = 0,
 }: {
   explained: Explained;
   title?: string;
+  /**
+   * When set, show a shimmer of this many lines instead of a locally-computed substitute while
+   * waiting for the model.
+   *
+   * The regime note is happy with a local line; the Analytics report is not, because the panel
+   * exists to show the model's reading. There a substitute is worse than a wait - so the caller
+   * asks for a skeleton, `useExplain` keeps retrying, and the reason is still surfaced quietly
+   * underneath so an undeployed function does not look like an eternal loading state.
+   */
+  skeletonLines?: number;
 }) {
-  const { text, source, model, cached, loading, reason } = explained;
+  const { text, source, model, cached, loading, reason, attempts } = explained;
+  const waiting = skeletonLines > 0 && source !== "model";
 
   // "Computed locally" covers both "no model configured" and "the model was tried
   // and failed", which look identical from the outside and are fixed very
@@ -60,13 +72,43 @@ export function AiNote({
               source === "model" ? "Generated from the pool's on-chain detector state" : localTitle
             }
           >
-            {source === "model" ? `${model ?? "model"}${cached ? " · cached" : ""}` : localLabel}
+            {source === "model"
+              ? `${model ?? "model"}${cached ? " · cached" : ""}`
+              : waiting
+                ? attempts > 0
+                  ? `retrying · attempt ${attempts + 1}`
+                  : "generating…"
+                : localLabel}
           </span>
 
         </div>
       </div>
 
-      <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)" }}>{text}</p>
+      {waiting ? (
+        <>
+          <div className="flex flex-col" style={{ gap: 8 }}>
+            {Array.from({ length: skeletonLines }).map((_, i) => (
+              <div
+                key={i}
+                className="shimmer"
+                style={{
+                  height: 10,
+                  borderRadius: 5,
+                  // ragged right edge, so it reads as prose rather than a progress bar
+                  width: `${[97, 92, 99, 88, 95, 71][i % 6]}%`,
+                }}
+              />
+            ))}
+          </div>
+          {reason && (
+            <p style={{ fontSize: 10.5, lineHeight: 1.6, color: "var(--faint)", marginTop: 12 }}>
+              Waiting on the model — {reason}. Retrying automatically.
+            </p>
+          )}
+        </>
+      ) : (
+        <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>{text}</p>
+      )}
     </div>
   );
 }

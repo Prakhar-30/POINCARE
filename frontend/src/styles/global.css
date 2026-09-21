@@ -147,6 +147,21 @@
 }
 .anim-pulse-dot { animation: pulseDot 1.8s infinite; }
 
+/* Skeleton line for panels that wait on the model rather than substituting a local reading. */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--lav-dim) 25%,
+    var(--surface) 50%,
+    var(--lav-dim) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer { animation: none; background: var(--lav-dim); }
+}
+
 /* bonding-curve motion: drifting dash current + one-shot trade ripple */
 @keyframes curveFlow {
   to { stroke-dashoffset: -64; }
