@@ -19,7 +19,9 @@
  *
  * Deploy:
  *   supabase functions deploy explain --no-verify-jwt
- *   supabase secrets set GEMINI_API_KEY=...   # optionally GEMINI_MODEL=...
+ *   supabase secrets set GEMINI_API_KEY=...
+ *     # optional: GEMINI_MODEL=...            preferred model
+ *     # optional: GEMINI_FALLBACK_MODELS=a,b  tried in order when it is busy or retired
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -30,6 +32,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // replacement, so it is the default rather than the newest available model.
 const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+
+/**
+ * Models to fall back to, in order, when the preferred one cannot answer.
+ *
+ * A 503 from Gemini means that model is busy, not that the request was wrong, and the lighter
+ * tiers are less contended precisely because fewer callers reach for them. For a summarising
+ * job over numbers the pool already computed, a lite model is a perfectly good second choice -
+ * this is not a task where the frontier model earns its place.
+ *
+ * Overridable by GEMINI_FALLBACK_MODELS (comma-separated) so a retirement can be worked around
+ * without redeploying, the same reason GEMINI_MODEL exists. Set it empty to disable fallback.
+ */
+const FALLBACKS = (
+  Deno.env.get("GEMINI_FALLBACK_MODELS") ?? "gemini-3.5-flash-lite,gemini-2.5-flash-lite"
+)
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
+
+/** The preferred model first, then the fallbacks, with any duplicate of the primary dropped. */
+const CHAIN = [MODEL, ...FALLBACKS.filter((m) => m !== MODEL)];
+
+/** Statuses where trying a DIFFERENT model is worth doing; a key problem is not one of them. */
+const TRY_NEXT_MODEL = new Set([404, 429, 500, 502, 503, 504]);
 
 /**
  * Namespace for every cached note this version of the function writes.
@@ -161,9 +187,9 @@ Around 4 to 6 sentences per paragraph at most. Do not invent figures that are no
 Do not tell anyone to deposit or withdraw.`,
 };
 
-async function generate(prompt: string): Promise<string> {
+async function generateWith(model: string, prompt: string): Promise<string> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": API_KEY },
@@ -192,6 +218,29 @@ async function generate(prompt: string): Promise<string> {
     throw new Error(`gemini stopped early: ${candidate.finishReason}`);
   }
   return text;
+}
+
+/**
+ * Walk the chain until one model answers, and report which did.
+ *
+ * Stops immediately on anything that is not a capacity or availability problem: a rejected key
+ * will be rejected by every model, and hammering three of them with it only turns one clear
+ * failure into three confusing ones. The last error is rethrown so the caller can classify it.
+ */
+async function generate(prompt: string): Promise<{ text: string; model: string }> {
+  let last: unknown;
+  for (const model of CHAIN) {
+    try {
+      return { text: await generateWith(model, prompt), model };
+    } catch (e) {
+      last = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const status = Number(/gemini (\d{3})/.exec(msg)?.[1] ?? 0);
+      if (!TRY_NEXT_MODEL.has(status)) throw e;
+      console.warn(`model ${model} unavailable (${status}); trying next`);
+    }
+  }
+  throw last instanceof Error ? last : new Error("all models unavailable");
 }
 
 Deno.serve(async (req) => {
@@ -250,8 +299,11 @@ Deno.serve(async (req) => {
   const prompt = `${TASK[kind]}\n\nData:\n${JSON.stringify(sanitize(body.facts), null, 1)}`;
 
   let text: string;
+  let usedModel = MODEL;
   try {
-    text = await generate(prompt);
+    const out = await generate(prompt);
+    text = out.text;
+    usedModel = out.model;
   } catch (e) {
     console.error("generate failed", e);
     // "generation failed" collapsed every upstream problem into one message, which is the
@@ -273,9 +325,9 @@ Deno.serve(async (req) => {
 
   const { error } = await admin
     .from("ai_notes")
-    .insert({ hook, kind, cache_key: cacheKey, model: MODEL, body: text });
+    .insert({ hook, kind, cache_key: cacheKey, model: usedModel, body: text });
   // A duplicate means a concurrent request won the race; its note is equivalent.
   if (error && error.code !== "23505") console.warn("cache write failed", error.message);
 
-  return json({ body: text, model: MODEL, cached: false });
+  return json({ body: text, model: usedModel, cached: false });
 });
