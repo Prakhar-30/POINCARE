@@ -620,6 +620,24 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     }
 
     /// @dev Current base offsets: the seed anchor scaled by the LP share supply.
+    ///
+    ///      Both offsets or neither. The constructor already refuses a SEED whose offsets floor
+    ///      to zero on one side only, because the mid is `(r1 + b) / (r0 + a)` and a curve with
+    ///      one virtual side is anchored off the pool's own reserve ratio. That check is not
+    ///      sufficient on its own: the same scaling that produced both offsets shrinks them with
+    ///      the share supply, so a withdrawal can re-enter that state later without anyone
+    ///      passing through the constructor again. `b` reaches zero once
+    ///      `supply < supply0 / b0 = sqrt(A0 / B0) / alpha`, which for a seed within a few
+    ///      orders of magnitude of balanced sits below `MINIMUM_LIQUIDITY` - so the guard used
+    ///      to hold by accident of the lock rather than by construction, and for a lopsided pair
+    ///      it did not hold at all.
+    ///
+    ///      Falling back to `(0, 0)` makes the degradation symmetric: a plain constant-product
+    ///      base, correctly anchored at `r1 / r0`. That is strictly better than the alternative
+    ///      it replaces, which was a PERSISTENT mispricing - at the point `b` floors, `a` is of
+    ///      the same order as `r0` itself, so a one-sided anchor misprices the mid by tens of
+    ///      percent for every subsequent swap. Both versions step at the same threshold; only
+    ///      this one steps somewhere correct.
     function _baseOffsets() internal view returns (uint256 a, uint256 b) {
         if (alphaWad == 0) return (0, 0);
         uint256 s0 = _supply0;
@@ -627,6 +645,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         uint256 supply = totalSupply();
         a = FullMath.mulDiv(_a0, supply, s0);
         b = FullMath.mulDiv(_b0, supply, s0);
+        if (a == 0 || b == 0) return (0, 0);
     }
 
     /// @notice Expose reserves and detector state for routers / the Lens (read-only).

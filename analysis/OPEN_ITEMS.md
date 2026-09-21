@@ -435,9 +435,12 @@ the wei). And the feasibility boundary is asserted as AGREEMENT rather than as a
 the Lens refuses exactly what execution refuses, and prices what it does not, so a router is
 never handed a number for a trade that cannot settle.
 
-### N4. Offsets — `test/unit/DeepBaseSeamAudit.t.sol` (7 tests). **One finding, informational.**
+### N4. Offsets — `test/unit/DeepBaseSeamAudit.t.sol` (8 tests). **One finding, FIXED.**
 
-**The constructor's `"offset seed too small"` guard is not an invariant.** It refuses a seed whose
+Fix on `fix/offset-floor-symmetry`, unmerged. Zero gas cost at the deployed configuration
+(`alphaWad = 0` returns from `_baseOffsets` before the new branch); one comparison otherwise.
+
+**The constructor's `"offset seed too small"` guard was not an invariant.** It refuses a seed whose
 offsets floor to zero on one side only, because the mid is `(r1 + b) / (r0 + a)` and a curve with
 only one virtual side is anchored off its own reserve ratio. But `_baseOffsets()` scales both by
 the live share supply, so `b` reaches zero once
@@ -451,11 +454,23 @@ a lopsided seed (tested at A0 = 5e24 against B0 = 1e6, threshold ~2e9 shares) it
 
 **Severity: informational.** `alphaWad = 0` in the deployed configuration, so production offsets
 are `(0, 0)` and the path is dead code today; reaching it needs a lopsided seed *and* withdrawal
-to roughly a billionth of the pool, at which point the reserves are dust. **Not fixed here** —
-the change belongs on its own branch, and the natural form is to make the degradation symmetric
-(`if (a == 0 || b == 0) return (0, 0)`, falling back to a plain constant-product base) rather
-than to leave a one-sided anchor. `test_balancedSeed_keepsBothOffsetsDownToTheLock` is the test
-that will fail first if anyone lowers `MINIMUM_LIQUIDITY`.
+to roughly a billionth of the pool, at which point the reserves are dust.
+
+**The fix:** `_baseOffsets` now drops BOTH offsets if either floors to zero, degrading to a plain
+constant-product base correctly anchored at `r1 / r0`.
+
+Worth stating why symmetric degradation rather than something cleverer. Both behaviours step
+discontinuously at the same threshold — the question is only where they step TO. At the point
+`b` floors, `a` is of the same order as `r0` itself (for the tested seed, `a` ≈ 1.1e12 against
+`r0` ≈ 2.2e12), so a one-sided anchor is not a rounding artefact: it is a **standing ~33%
+discount on the mid**, paid by every remaining provider to every arbitrageur, for every
+subsequent swap. `test_aOneSidedAnchorWouldHaveMispricedTheMidMaterially` computes that
+counterfactual from the seed parameters and asserts it exceeds 10%, so the claim is checkable
+rather than asserted.
+
+`test_balancedSeed_keepsBothOffsetsDownToTheLock` is the test that fails first if anyone lowers
+`MINIMUM_LIQUIDITY` — the fallback guards a state a sanely-seeded pool never reaches, which is
+precisely the argument for enforcing it in code rather than in a comment.
 
 Two measurement traps found and documented in the same file, both of which read as leaks and are
 not:

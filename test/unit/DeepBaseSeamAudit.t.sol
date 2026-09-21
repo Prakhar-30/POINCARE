@@ -6,6 +6,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
 import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomAccounting.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
 import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
@@ -122,7 +123,7 @@ contract DeepBaseSeamAuditTest is PoincareTestBase {
         assertApproxEqRel(_mid(h), before, 1e10, "200 liquidity cycles must not ratchet the mid");
     }
 
-    // ------------------------------------- 2. is the seed-time offset guard an invariant?
+    // ------------------------- 2. the seed-time offset guard, enforced as an invariant
 
     /// @dev The constructor refuses a seed where one offset floors to zero while the other does
     ///      not, because the mid is `(r1 + b) / (r0 + a)` and a curve with only one virtual side
@@ -136,32 +137,67 @@ contract DeepBaseSeamAuditTest is PoincareTestBase {
     ///      lopsided pair it is not: a pool seeded at A0 = 5e24 against B0 = 1e6 has a threshold
     ///      around 2e9 shares, far above the 1000 that are locked.
     ///
-    ///      So this is the honest statement of the state: the guard holds for any pair whose
-    ///      seed is within a few orders of magnitude of balanced, and stops holding for one that
-    ///      is not. Everything downstream of it is dust - a pool withdrawn to a billionth of its
-    ///      seed - but "dust" is a size argument, not a correctness one, and the size argument
-    ///      is the thing that should be written down rather than assumed.
-    function test_lopsidedSeed_canLoseAnOffsetToWithdrawalAlone() public {
+    ///      It could, and `_baseOffsets` now enforces the condition rather than assuming it:
+    ///      if either offset floors to zero, BOTH are dropped and the pool degrades to a plain
+    ///      constant-product base. This is the test for that, and it was written first as a
+    ///      finding - it asserted `b == 0` while `a > 0` and passed.
+    ///
+    ///      Why the symmetric fallback is the right shape rather than merely a tidier one: at
+    ///      the point `b` floors, `a` is of the same order as `r0` itself (here `a < A0 / B0` =
+    ///      5e18 against an `r0` under 1e19), so a one-sided anchor misprices the mid by tens of
+    ///      percent for EVERY subsequent swap. Both behaviours step at the same threshold. Only
+    ///      this one steps somewhere correct.
+    function test_lopsidedSeed_degradesToConstantProductRatherThanAOneSidedAnchor() public {
         (PoincareHook h,) = _deepPool(0xDB04, 5e24, 1e6);
 
         (uint256 a, uint256 b) = h.baseOffsets();
         assertGt(a, 0, "the constructor guarantees both offsets at the seed");
         assertGt(b, 0, "including the small side");
 
-        // Withdraw down toward the locked minimum.
+        // Withdraw down toward the locked minimum: far enough that the small offset floors.
         uint256 shares = h.balanceOf(address(this));
         _remove(h, shares - 1);
 
         (uint256 a2, uint256 b2) = h.baseOffsets();
-        assertGt(a2, 0, "the large offset survives");
-        assertEq(b2, 0, "the small one does not: the seed-time guard is not an invariant");
+        assertEq(b2, 0, "the small offset floors, as the arithmetic says it must");
+        assertEq(a2, 0, "and the large one is dropped with it rather than left anchoring alone");
+
+        // The pool is now a plain constant-product curve, correctly anchored on its own reserves.
+        (uint256 r0, uint256 r1) = h.reserves();
+        assertEq(_mid(h), (r1 * 1e18) / r0, "the mid must be the reserve ratio, not a skewed one");
+    }
+
+    /// @dev The counterfactual, stated as arithmetic so the claim above is checkable rather than
+    ///      asserted: had the large offset been left in place alone, the executable mid would
+    ///      have sat materially below the reserve ratio - a standing discount on token0 that
+    ///      every arbitrageur takes and every remaining provider pays.
+    function test_aOneSidedAnchorWouldHaveMispricedTheMidMaterially() public {
+        (PoincareHook h,) = _deepPool(0xDB08, 5e24, 1e6);
+        uint256 shares = h.balanceOf(address(this));
+        _remove(h, shares - 1);
+
+        (uint256 r0, uint256 r1) = h.reserves();
+
+        // Recomputed from the seed rather than read off the hook: `_a0` and `_supply0` are
+        // private, and exposing internals so a test can check a counterfactual would be the
+        // tail wagging the dog. `_supply0` is the first deposit's share count, which is also
+        // the total supply at that moment, so both terms are derivable from the seed alone.
+        uint256 a0 = Math.mulDiv(5e17, 5e24, 1e18);
+        uint256 s0 = Math.sqrt(5e24 * 1e6);
+        uint256 aAlone = Math.mulDiv(a0, h.totalSupply(), s0);
+        assertGt(aAlone, 0, "the large offset does survive the scaling on its own");
+
+        uint256 honest = (r1 * 1e18) / r0;
+        uint256 skewed = (r1 * 1e18) / (r0 + aAlone);
+        assertLt(skewed * 100, honest * 90, "a one-sided anchor would have cut the mid by >10%");
+        assertEq(_mid(h), honest, "which is why the live mid is the honest one");
     }
 
     /// @dev And the balanced case, which is the one that matters in practice: the same
     ///      withdrawal leaves both offsets alive, because `MINIMUM_LIQUIDITY` sits above the
-    ///      threshold at any sane seed ratio. This is the test that says WHY the finding above
-    ///      is bounded rather than general, and it is the one that will fail first if someone
-    ///      ever lowers the lock.
+    ///      threshold at any sane seed ratio. So the fallback above is a guard against a state
+    ///      a normal pool never reaches - which is exactly the argument for enforcing it in code
+    ///      rather than in a comment. This test is what fails first if anyone lowers the lock.
     function test_balancedSeed_keepsBothOffsetsDownToTheLock() public {
         (PoincareHook h,) = _deepPool(0xDB05, SEED0, SEED1);
 
