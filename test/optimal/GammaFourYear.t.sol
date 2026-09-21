@@ -1280,7 +1280,7 @@ contract GammaFourYearTest is Test {
         q.d = _mk(0, 250e15, 5e16);
 
         vm.writeFile(CSV, "");
-        vm.writeLine(CSV, "bar,price,hodl,lp5,lp30,lpLive,lpProp,arb5,arb30,arbLive,arbProp,kLive,kProp");
+        vm.writeLine(CSV, "bar,price,hodl,lp5,lp30,lpLive,lpProp,arb5,arb30,arbLive,arbProp,kLive,kProp,trendProp");
         for (uint256 t = 0; t < prices.length; t++) {
             uint256 fair = _fairPool(t);
             bool dir = (uint256(keccak256(abi.encode(t, "noise"))) & 1) == 0;
@@ -1323,7 +1323,11 @@ contract GammaFourYearTest is Test {
             ",",
             vm.toString(q.c.kappa),
             ",",
-            vm.toString(q.d.kappa)
+            vm.toString(q.d.kappa),
+            ",",
+            // the detected DIRECTION, not just the magnitude: the figures need to know which
+            // side of the quote the spread is being charged on
+            vm.toString(uint256(q.d.trend))
         );
         vm.writeLine(CSV, line);
     }

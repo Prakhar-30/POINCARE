@@ -27,11 +27,15 @@ function useTweened(target: number, ms = 900) {
 }
 
 /**
- * The live bonding curve. The frame is anchored to a slow-moving reference so trades
- * visibly slide the reserve point along the hyperbola (re-centering instantly would
- * cancel all apparent motion). A directional dash current runs along the curve, a
- * ripple fires when reserves change, and under a detected trend the bid/ask tangents
- * fan apart with the seam wedge shaded.
+ * The live pool. The curve is the RESERVE display: one x*y=k hyperbola whose shape never
+ * changes, with the reserve point sliding along it as trades land. The frame is anchored to a
+ * slow-moving reference so that motion stays visible (re-centering instantly would cancel it).
+ *
+ * The spread is drawn separately, as a quote strip on the right, because that is where it
+ * lives. It used to be drawn as two tangents fanning from the reserve point, which was
+ * arithmetically fine and read as "the curve bends differently each way" - the depth lever we
+ * built, measured across four years and rejected (OPEN_ITEMS E1). A spread is a price, not a
+ * shape, so it belongs on a price scale.
  */
 export function BondingCurve({
   r0, r1, spreadZeroForOne, spreadOneForZero, trend, height = 260,
@@ -60,7 +64,7 @@ export function BondingCurve({
     }
   }, [r0, r1]);
 
-  const { path, px, py, bid, ask, seam } = useMemo(() => {
+  const { path, px, py, bid, ask, qx, qMid } = useMemo(() => {
     const k = x0 * y0;
     const xMin = (ax || 1) * 0.4;
     const xMax = (ax || 1) * 1.85;
@@ -82,21 +86,19 @@ export function BondingCurve({
     const px = sx(x0);
     const py = sy(yAt(x0));
 
-    // marginal slope dy/dx = -k/x^2 mapped into screen space (screen-Y grows downward)
-    const slope = -k / (x0 * x0);
-    const dXdx = (W - 2 * pad) / (xMax - xMin);
-    const dYdy = -((H - 2 * pad) / (yMax - yMin));
-    const screenSlope = (slope * dYdy) / dXdx;
-    const L = 78;
-    const tangent = (spreadFrac: number, dir: 1 | -1) => {
-      const s = screenSlope * (1 + spreadFrac * 6);
-      const dx = (dir * L) / Math.sqrt(1 + s * s);
-      return { x1: px, y1: py, x2: px + dx, y2: py + s * dx };
-    };
-    const ask = tangent(sAsk, 1); // buy WETH direction
-    const bid = tangent(sBid, -1); // sell WETH direction
-    const seam = `M${px},${py} L${ask.x2},${ask.y2} L${bid.x2},${bid.y2} Z`;
-    return { path: d.trim(), px, py, bid, ask, seam };
+    // The QUOTE, as a price offset from the pool price — not as a pair of tangents fanning
+    // from the point. Two rays at different slopes on a curved line read as "the curve bends
+    // differently each way", which is the depth lever we built, measured over four years and
+    // rejected (OPEN_ITEMS E1). The hook never changes the curve's shape; it charges a spread
+    // on one side. So the spread is drawn on a price scale, where it actually lives.
+    const QH = H - 2 * pad; // usable height of the quote strip
+    const qx = W - pad - 16;
+    const qMid = pad + QH / 2;
+    const span = 0.06; // full strip height = +/- 6% around the pool price
+    const qy = (frac: number) => qMid - (frac / span) * (QH / 2);
+    const ask = { x: qx, yMid: qMid, y: qy(sAsk) }; // buying WETH pays sAsk
+    const bid = { x: qx, yMid: qMid, y: qy(-sBid) }; // selling WETH pays sBid
+    return { path: d.trim(), px, py, bid, ask, qx, qMid };
   }, [x0, y0, ax, ay, sBid, sAsk, H]);
 
   const leaning = trend !== "none" && (spreadZeroForOne > 0 || spreadOneForZero > 0);
@@ -125,12 +127,14 @@ export function BondingCurve({
           opacity={0.55}
         />
 
-        {/* bid/ask seam wedge, only visible when the curve leans */}
-        {leaning && <path d={seam} fill={accent} opacity={0.1} />}
-
-        {/* executable tangents: bid = soft/against-trend, ask = hard/with-trend */}
-        <line x1={ask.x1} y1={ask.y1} x2={ask.x2} y2={ask.y2} stroke="var(--up)" strokeWidth={2} strokeLinecap="round" opacity={leaning ? 0.95 : 0.4} />
-        <line x1={bid.x1} y1={bid.y1} x2={bid.x2} y2={bid.y2} stroke="var(--down)" strokeWidth={2} strokeLinecap="round" opacity={leaning ? 0.95 : 0.4} />
+        {/* THE QUOTE STRIP: the pool price, and how far each side is quoted from it. */}
+        <line x1={qx} y1={pad} x2={qx} y2={H - pad} stroke="var(--divider)" strokeWidth={1} />
+        <line x1={qx - 13} y1={qMid} x2={qx + 13} y2={qMid} stroke="var(--lav)" strokeWidth={2.5} strokeLinecap="round" />
+        {/* the with-trend side steps away by kappa; the other stays on the pool price */}
+        {leaning && <rect x={qx - 5} y={Math.min(ask.y, qMid)} width={10} height={Math.abs(qMid - ask.y)} fill="var(--up)" opacity={0.3} />}
+        {leaning && <rect x={qx - 5} y={Math.min(bid.y, qMid)} width={10} height={Math.abs(qMid - bid.y)} fill="var(--down)" opacity={0.3} />}
+        <line x1={qx - 11} y1={ask.y} x2={qx + 11} y2={ask.y} stroke="var(--up)" strokeWidth={3} strokeLinecap="round" opacity={leaning ? 1 : 0.45} />
+        <line x1={qx - 11} y1={bid.y} x2={qx + 11} y2={bid.y} stroke="var(--down)" strokeWidth={3} strokeLinecap="round" opacity={leaning ? 1 : 0.45} />
 
         {/* reserve point: halo + trade ripple + pulsing core */}
         <circle cx={px} cy={py} r={9} fill={accent} opacity={0.16} />
@@ -142,11 +146,11 @@ export function BondingCurve({
 
       <div className="absolute left-3 top-2.5 hidden sm:block" style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>x · y = k · WETH ↔ USDC</div>
       <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 10, fontWeight: 700 }}>
-        <span style={{ color: "var(--up)" }}>● buy slope</span>
-        <span style={{ color: "var(--down)" }}>● sell slope</span>
+        <span style={{ color: "var(--up)" }}>● buy quote</span>
+        <span style={{ color: "var(--down)" }}>● sell quote</span>
       </div>
       <div className="absolute left-3 bottom-2" style={{ fontSize: 10, fontWeight: 600, color: leaning ? accent : "var(--faint)" }}>
-        {leaning ? "leaning, bid/ask seam open" : "calm, symmetric and deep"}
+        {leaning ? "trend detected · κ charged on one side" : "calm · both sides at the pool price"}
       </div>
     </div>
   );

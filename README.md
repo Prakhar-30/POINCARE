@@ -69,7 +69,7 @@ $$\text{LVR rate} \;\approx\; \tfrac{1}{2}\,\sigma^2 \cdot \big(\text{marginal l
 
 Two truths fall out of that one line:
 
-- **Curvature is the lever.** "Marginal liquidity" is a property of the curve's *shape*. A flat curve bleeds more LVR; a sharp curve bleeds less. The *fee* is not in this equation, so fee-tweaking, which most hooks do, is pulling the wrong lever.
+- **A static fee cannot fix it.** The fee does not appear in that identity at all, so fee-tweaking, which most hooks do, is pulling a lever the equation does not have. Marginal liquidity does appear — but reshaping the curve to reduce it taxes *every* trade, including the flow you want, which is why we built that version, measured it, and rejected it (§3.1). What is left is to make the informed side pay **when, and only when, it is actually informed**.
 - **The damage is directional.** LVR is driven by *sustained, one-directional* price moves, not by symmetric noise. A market that thrashes around but goes nowhere barely hurts LPs; a market that *trends* is what drains them.
 
 So the right response is: **quote asymmetrically, charging the side that is taking value and not the side that is giving it back, but only when a real trend is actually happening.** That last clause is the hard part, and the whole project.
@@ -100,7 +100,7 @@ flowchart LR
     class CURVE curve;
 ```
 
-The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses change-point detection. The asymmetric curve is just where its decision lands.
+The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses change-point detection. The directional spread is just where its decision lands.
 
 ---
 
@@ -108,20 +108,26 @@ The novelty is the **detector**: no AMM in the Uniswap hook ecosystem uses chang
 
 ### 3.1 The actuator: a directional spread on a symmetric curve
 
-A constant-product pool is the hyperbola `x·y = k`. The natural way to make it *asymmetric* is to generalise it with **direction-dependent virtual offsets**: small offsets for the with-trend side (a steep, shallow curve, heavy impact) and large offsets for the stabilising side (a flat, deep curve):
+**The pool's curve is `x·y = k`, and it stays `x·y = k`.** In calm markets, in a trend, buying, selling: one curve, one shape, always. Nothing about the geometry moves.
 
-$$\big(x + a_{\pm}\big)\big(y + b_{\pm}\big) = K$$
+What moves is the **price one side is quoted**. When the detector says a trend is running, a swap pushing *with* that trend is charged a spread `κ` on top of the curve price, which the LP keeps. A swap pushing *against* it — the one helping the price back toward fair — is quoted the plain curve price and pays nothing extra. That is the whole actuator:
 
-This is the design the figure below illustrates, and it is where we started.
+$$
+\text{quote} = \underbrace{\text{curve price}}_{x\cdot y\,=\,k,\ \text{never changes}} \;\times\; \big(1 - \kappa \cdot \mathbb{1}[\text{with the trend}]\big)
+$$
 
-> **Why we did *not* ship raw direction-dependent offsets, and what we ship instead.**
-> Choosing *different depths* per swap direction and re-anchoring at the current reserves on every swap is **arbitrage-exploitable**. We reproduced it as a concrete round-trip drain: buy on the shallow branch, sell back on the deep branch, and walk away with pool value. The root cause is that depth-asymmetry shifts the **mid-price**, not just the spread, which opens a free round trip, a hole an MEV bot empties on day one.
+It is a **one-sided bid–ask spread**, the same instrument a human market maker widens when they think they are being picked off, and it is set by evidence rather than by feel. Because `κ ≥ 0` only ever *worsens* the trader's execution, and because it sits on a base price that both directions share, **every round trip is strictly unprofitable by construction** — proven by fuzzing and a 384k-operation invariant.
+
+> **A note on what this is *not*, because the obvious design is the wrong one.**
+> The intuitive way to make an AMM lean is to reshape it — give each direction its own curvature, steep against the flow you dislike and flat for the flow you want, via direction-dependent virtual offsets `(x + a±)(y + b±) = K`. We started there, and it does not work. Choosing different depths per direction moves the **mid-price**, not just the spread, which opens a free round trip: buy on the shallow branch, sell back on the deep one, walk away with pool value. We reproduced that drain concretely; it is a hole an MEV bot empties on day one.
 >
-> The fix, and what the MVP actually implements, is to put the asymmetry **in the slope, not the depth**: a **non-negative directional spread** layered on a *single, symmetric* base curve. The with-trend (toxic) side is charged a spread `κ` the LP keeps; the against-trend (stabilising) side trades at the base price. Because the spread only ever *worsens* the trader's execution and sits on a symmetric base, **every round trip is strictly unprofitable by construction** (proven by fuzzing and a 384k-op invariant), yet the two executable branches still meet at the current price, giving the **endogenous bid–ask spread written into the geometry** that a professional market maker maintains. A curvature-changing lever was built offline and measured against this one across four years of real ETH/USDC. It lost by roughly thirty to one, and it is **closed, not deferred**: there is no depth-asymmetry mode in the codebase, no configuration that enables one, and no plan to add one. The spread is not a compromise we settled for; it is the mechanism, and the only one. The measurements that closed it are kept as evidence in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
+> The deeper problem is that it also *loses*. We later built a round-trip-safe, split-invariant version of the depth lever and measured it against the spread across four years of real ETH/USDC. It lost by roughly **thirty to one**. Steepening taxes every trade, and real months are mostly reversal, so a reshaped curve leans against flow that is about to turn.
+>
+> So curvature is **closed, not deferred**: no depth-asymmetry mode exists in the codebase, no configuration enables one, and `test/DeployedConfig.t.sol` pins `alphaWad == 0` so it cannot be switched on by accident. The spread is not a compromise we settled for. It is the mechanism, and the only one. Evidence in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) E1.
 
 ![The directional spread](public/fig1_spread.png)
 
-*Fig 1. Left: where the reserves land after a trade. Against the trend the quote is the plain curve price, so execution sits exactly ON the curve. With the trend the trader pays κ and receives less, so the reserves land above it, and the shaded gap is what the LP keeps. Right: the same κ as a trader meets it, a gap between two executable prices. The pool's curve is one shape and never changes; κ is exaggerated here for legibility against a deployed cap of 0.05.*
+*Fig 1. Left: the pool's price is one line, the same in every regime. Under a detected up-trend the side buying into it is quoted κ worse; the side selling back is quoted the pool price, unpenalised. Right: the same κ over three months of real ETH/USDC, with the lower panel showing which side is being charged. The band opens on one side at a time and closes when the trend does — and the price line underneath it never moves. κ is exaggerated on the left for legibility; the deployed cap is 0.05.*
 
 ### 3.2 The signal: directional efficiency
 
@@ -337,7 +343,7 @@ The asymmetric-curve idea alone would resemble the directional-fee family (Nezlo
 
 | Axis | Existing hooks | **Poincaré** |
 |---|---|---|
-| Lever | fee / spread / static curve | **asymmetric geometry: a directional, trend-gated spread, arb-safe by construction and measured against the depth alternative over four years of real data** |
+| Lever | fee / spread / static curve | **a directional, trend-gated spread on one fixed curve: arb-safe by construction, and measured against the depth alternative over four years of real data** |
 | Trigger | fixed window / threshold / oracle | **CUSUM stopping time (data-dependent)** |
 | Optimality | heuristic | **Lorden minimax-optimal detection** |
 | Manipulation | hopes the signal is hard to fake | **bounded prize (soft-gain ≡ 0) + arbitrage punishment; robust-QCD on the roadmap** |
@@ -674,7 +680,7 @@ the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus t
 cases in `PriceLib.t.sol`). Full finding table in [§11](#11-security-review). An independent
 external audit is still required before mainnet (item 5 below).
 
-**Built (MVP + the 2026-07 feature pass):** the asymmetric curve engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
+**Built (MVP + the 2026-07 feature pass):** the directional-spread pricing engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
 
 **Next, to production:**
 
