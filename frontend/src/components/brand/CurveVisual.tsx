@@ -44,6 +44,7 @@ const kMax = Math.max(...HERO.kappa, 1);
 const advHi = Math.max(...HERO.adv, 1);
 const advLo = Math.min(...HERO.adv, 0);
 const ENGAGED = HERO.kappa.filter((v) => v > 0).length;
+const BADGE_W = 186;
 
 const sx = (i: number) => L + (i / (N - 1)) * (W - L - R);
 const sp = (p: number) => PRICE_T + PRICE_H - ((p - pMin) / (pMax - pMin || 1)) * PRICE_H;
@@ -121,8 +122,11 @@ export function CurveVisual() {
             information: the reader cannot act on it and it never holds still long enough to be
             read. What is worth knowing is how often the detector acted over the window, and
             that is one number that does not change. */}
-        <g transform={`translate(${W - R - 166}, 16)`}>
-          <rect width="158" height="22" rx="11" fill="rgba(217,140,0,.13)" stroke="var(--border)" />
+        {/* Width measured, not guessed: the label renders 138.5 units wide and starts 25 in
+            after the dot, so anything under ~178 lets the text spill out of its own pill. It
+            had been 158, which is exactly what that looks like. */}
+        <g transform={`translate(${W - R - BADGE_W}, 16)`}>
+          <rect width={BADGE_W} height="22" rx="11" fill="rgba(217,140,0,.13)" stroke="var(--border)" />
           <circle cx="13" cy="11" r="3.5" fill="var(--honey)" />
           <text x="25" y="15" fontSize="9.5" fontWeight="800" fill="var(--honey-deep)">
             κ charged on {ENGAGED} of {N} samples
