@@ -33,7 +33,7 @@ rather than sitting alongside it. Line numbers are against the current `main`.
 | **Vol fee reported to `HookSwap`** | [`src/PoincareHook.sol:290`](./src/PoincareHook.sol#L290) | `_getSwapFeeAmount` |
 | **Hook-owned liquidity** | [`src/PoincareHook.sol:223`](./src/PoincareHook.sol#L223), [`:445`](./src/PoincareHook.sol#L445), [`:497`](./src/PoincareHook.sol#L497) | `addLiquidity`, `_getAmountIn`, `_getAmountOut`; the native tick-liquidity path is reverted |
 | **Reserves as ERC-6909 claims** | [`src/PoincareHook.sol:536`](./src/PoincareHook.sol#L536) | `poolManager.balanceOf(address(this), currency.toId())`, never a tracked variable |
-| **The quoter** | [`src/PoincareLens.sol:33`](./src/PoincareLens.sol#L33) | `quoteExactInput`. Exists because the canonical Quoter cannot price a custom curve |
+| **The quoter** | [`src/PoincareLens.sol:33`](./src/PoincareLens.sol#L33) | `quoteExactInput`. A `view` quote; the canonical `V4Quoter` agrees to the wei but is state-mutating |
 | **`HookMiner` CREATE2 deploy** | [`script/DeployPoincareUnichain.s.sol:209`](./script/DeployPoincareUnichain.s.sol#L209) | Mines the salt so permission flags are encoded in the address |
 | **Detector libraries** | [`src/libraries/`](./src/libraries/) | `Cusum`, `DirectionalSignal`, `ControlLaw`, `AsymmetricCurve`, `PriceLib`. All original |
 
@@ -45,6 +45,11 @@ rather than sitting alongside it. Line numbers are against the current `main`.
 | Hook | `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88` |
 | Lens (quoter) | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
 | App | https://poincare-beta.vercel.app |
+
+**Integrating?** The canonical `V4Quoter` prices this pool correctly — it simulates the swap, so
+the custom curve applies. [`PoincareLens`](./src/PoincareLens.sol) returns the same numbers as a
+plain `view`, which `V4Quoter` is not. [`INTEGRATING.md`](./INTEGRATING.md) is the short version
+for routers and aggregators.
 
 Developer feedback on the v4 stack, as required by the Uniswap Stack Contribution prize:
 [`FEEDBACK.md`](./FEEDBACK.md).
@@ -353,7 +358,7 @@ The asymmetric-curve idea alone would resemble the directional-fee family (Nezlo
 
 ## 8. Integration: routing and best-fit pairs
 
-**Will routers find it, and will they pick it?** A Poincaré pool is a normal Uniswap v4 pool from the `PoolManager`'s point of view, discoverable like any other. The one subtlety every custom-curve hook shares: the **vanilla v4 Quoter cannot price it**, because it assumes the canonical `x·y=k` math and would mis-quote our curve. That is exactly what the first-class **`PoincareLens`** is for: it prices off the *same* libraries the swap path uses, so any router or aggregator that quotes through the Lens (or simulates the swap) gets the correct number. Integration therefore means "quote via the Lens," not "trust the default quoter."
+**Will routers find it, and will they pick it?** A Poincaré pool is a normal Uniswap v4 pool from the `PoolManager`'s point of view, discoverable like any other. We assumed for a long time that the vanilla v4 Quoter could not price a custom curve; **that was wrong**, and the fork test that was written to prove it disproved it instead. `V4Quoter` simulates a real swap rather than computing `x·y=k`, so `beforeSwap` runs and it quotes our curve exactly — [`test/sim/ForkRouterLens.t.sol`](./test/sim/ForkRouterLens.t.sol) asserts the agreement to the wei with a spread actively engaged. **`PoincareLens`** returns the same numbers and earns its place on a narrower point: it is a plain `view`, where `V4Quoter` is state-mutating and so cannot be `staticcall`ed from a view context. Integration means "quote via either, prefer the Lens if you need a view."
 
 Given correct quotes, selection is a **feature of the design, not a hope**:
 

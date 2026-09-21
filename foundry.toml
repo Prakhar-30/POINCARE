@@ -17,7 +17,26 @@ skip = ["test/sim/**"]
 # Inherits everything else from [profile.default]. Run: FOUNDRY_PROFILE=sim forge test --match-path test/sim/...
 [profile.sim]
 via_ir = true
+# via-IR without the optimizer is where "stack too deep" comes back as an IR-level error, and
+# this profile un-skips the whole tree so it compiles the heavier back-test contracts too.
+# The optimizer is what makes IR stack allocation tractable; `[profile.deploy]` already pairs
+# the two for the same reason.
+optimizer = true
+optimizer_runs = 200
 skip = []
+
+# Profile for the ROUTER/LENS integration check, which is the one fork test an integrator might
+# reasonably want to run themselves.
+#
+# It does not belong behind the `sim` profile's build. That profile needs via-IR for the two big
+# replay contracts, and via-IR plus the optimizer over the whole tree is a twenty-minute compile
+# — a price worth paying once for a four-year study and absurd for a proof that quotes match
+# execution. Skipping those two contracts keeps this on the normal pipeline, where it compiles in
+# seconds.
+#
+# Run: FOUNDRY_PROFILE=fork forge test --match-path test/sim/ForkRouterLens.t.sol
+[profile.fork]
+skip = ["test/sim/ForkRealData.t.sol", "test/sim/ForkSimulation.t.sol"]
 # The 12-month replay (2190 points, two pools) outgrows the default 2^30 gas /
 # 128MB memory caps inside a single test; lift both for this profile only.
 gas_limit = "18446744073709551615"
