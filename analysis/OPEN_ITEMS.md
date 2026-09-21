@@ -426,6 +426,15 @@ stays locked; every holder can exit together; the shadow stays backed. **No find
 every handler action swallows its own revert, so a handler that silently never succeeded would
 pass every invariant above while exercising nothing.
 
+### N5. Quotes at the edges — `test/PoincareLens.t.sol` (+3 tests). **No findings.**
+
+Every prior agreement test ran on a healthy, roughly balanced pool. A router meets the pool
+wherever the last trade left it, so the quote now has to hold where the arithmetic is worst
+conditioned: a reserve driven to under 5% of its counterpart (exact-in and exact-out, still to
+the wei). And the feasibility boundary is asserted as AGREEMENT rather than as a fixed error —
+the Lens refuses exactly what execution refuses, and prices what it does not, so a router is
+never handed a number for a trade that cannot settle.
+
 ### N4. Offsets — `test/unit/DeepBaseSeamAudit.t.sol` (7 tests). **One finding, informational.**
 
 **The constructor's `"offset seed too small"` guard is not an invariant.** It refuses a seed whose

@@ -219,4 +219,65 @@ contract PoincareLensTest is PoincareTestBase {
         uint256 spent = _swapOut(fullKey, 0.5 ether, false);
         assertEq(spent, quoteOut, "full-feature exact-out quote must equal execution");
     }
+
+    // --------------------------------------------- the edges, where a quote matters most
+
+    /// @dev Every agreement test above runs on a healthy, roughly balanced pool. A router meets
+    ///      the pool wherever the last trade left it, and the place a quote is most likely to
+    ///      drift from execution is the place the arithmetic is worst conditioned: one reserve
+    ///      nearly gone. Drive it there first, then quote.
+    function test_quoteMatchesExecution_atANearlyExhaustedReserve() public {
+        for (uint256 i = 0; i < 12; i++) {
+            vm.roll(block.number + 1);
+            _swapIn(poolKey, 5 ether, true);
+        }
+        (uint256 r0, uint256 r1) = hook.reserves();
+        assertLt(r1 * 20, r0, "the drive must actually have skewed the pool");
+
+        vm.roll(block.number + 1);
+        uint256 quoted = lens.quoteExactInput(true, 1 ether);
+        assertEq(_swapIn(poolKey, 1 ether, true), quoted, "exact-in quote must hold at the edge");
+
+        vm.roll(block.number + 1);
+        (, uint256 r1b) = hook.reserves();
+        uint256 want = r1b / 4;
+        uint256 quotedIn = lens.quoteExactOutput(true, want);
+        assertEq(_swapOut(poolKey, want, true), quotedIn, "exact-out quote must hold at the edge");
+    }
+
+    /// @dev The quote for a swap that cannot execute must REVERT, not return a number. A router
+    ///      handed a price for an impossible trade routes into a failed transaction and blames
+    ///      the pool; the Lens sharing the hook's feasibility guard is what prevents that.
+    ///
+    ///      Asserted as agreement rather than as a fixed error, so the two stay tied together:
+    ///      the Lens refuses exactly what execution refuses.
+    function test_anInfeasibleSwapIsRefusedByTheLensAndByExecutionAlike() public {
+        (, uint256 r1) = hook.reserves();
+
+        vm.expectRevert();
+        lens.quoteExactOutput(true, r1);
+
+        vm.expectRevert();
+        swapRouter.swapTokensForExactTokens(
+            r1, type(uint256).max, true, poolKey, Constants.ZERO_BYTES, address(this), block.timestamp + 1
+        );
+    }
+
+    /// @dev And a feasible output is quoted, not refused. Without this the test above would pass
+    ///      on a Lens that refused everything.
+    ///
+    ///      Two halves, because they are different claims. One wei short of the whole reserve is
+    ///      the boundary case and it PRICES - at a cost that runs to 1e38 wei of input, which is
+    ///      the hyperbola doing its job and not a number anyone can pay, so it is quoted and not
+    ///      executed. Ninety percent of the reserve is the largest output a funded trader can
+    ///      actually take, and that one is quoted AND executed at the quoted price.
+    function test_aFeasibleOutputIsStillQuotedRightUpToTheBoundary() public {
+        (, uint256 r1) = hook.reserves();
+
+        assertGt(lens.quoteExactOutput(true, r1 - 1), 0, "one wei short of the reserve must price");
+
+        uint256 want = (r1 * 9) / 10;
+        uint256 quotedIn = lens.quoteExactOutput(true, want);
+        assertEq(_swapOut(poolKey, want, true), quotedIn, "and a payable one must execute at its quote");
+    }
 }
