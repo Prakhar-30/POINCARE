@@ -63,7 +63,10 @@ contract ForkSimulationTest is Test {
     uint256 constant KAPPA_MAX = 5e16; //   5% cap
     uint256 constant D_MAX = 2e16;
     uint256 constant LAMBDA = 8e17;
-    uint256 constant D_FLOOR = 6e17;
+    // 0.353 = the deployed gate r = 0.79 restated at this sim's lambda = 0.80
+    // (0.79*sqrt(0.20)). The old 0.60 was r = 1.34, nearly twice as conservative as the hook
+    // that actually ships. See README section 9.4 for the derivation of r.
+    uint256 constant D_FLOOR = 353e15;
 
     IPoolManager pm;
     IUniswapV4Router04 router;

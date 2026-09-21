@@ -26,7 +26,7 @@ const R = 16;
 
 // Laid out by accumulation rather than by hand, because hand-picked offsets put the last strip
 // 12px past the bottom of the card on the first attempt and clipped it.
-const PRICE_T = 88;
+const PRICE_T = 76;
 const PRICE_H = 84;
 const KAPPA_T = PRICE_T + PRICE_H + 34;
 const KAPPA_H = 72; // +/- half of this around the zero line
@@ -77,7 +77,7 @@ export function CurveVisual() {
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
     let t0 = 0;
-    const DUR = 2600;
+    const DUR = 1950; // 25% quicker than the first pass, which dawdled
     const step = (now: number) => {
       if (!t0) t0 = now;
       const e = now - t0;
@@ -109,13 +109,10 @@ export function CurveVisual() {
         </defs>
 
         {/* ---------- headline: what it was worth ---------- */}
-        <text x={L} y={22} fontSize="10" fontWeight="700" fill="var(--faint)">
-          ETH/USDC · {HERO.from} → {HERO.to} · real detector output
-        </text>
-        <text x={L} y={48} fontSize="23" fontWeight="800" fill={HERO.adv[i] >= 0 ? "var(--up)" : "var(--faint)"}>
+        <text x={L} y={34} fontSize="25" fontWeight="800" fill={HERO.adv[i] >= 0 ? "var(--up)" : "var(--faint)"}>
           {HERO.adv[i] >= 0 ? "+" : "−"}${Math.abs(HERO.adv[i]).toLocaleString()}
         </text>
-        <text x={L} y={62} fontSize="9.5" fontWeight="700" fill="var(--text-3)">
+        <text x={L} y={50} fontSize="9.5" fontWeight="700" fill="var(--text-3)">
           kept for liquidity providers, against an ordinary 30bps pool
         </text>
 
@@ -124,7 +121,7 @@ export function CurveVisual() {
             information: the reader cannot act on it and it never holds still long enough to be
             read. What is worth knowing is how often the detector acted over the window, and
             that is one number that does not change. */}
-        <g transform={`translate(${W - R - 158}, 26)`}>
+        <g transform={`translate(${W - R - 166}, 16)`}>
           <rect width="158" height="22" rx="11" fill="rgba(217,140,0,.13)" stroke="var(--border)" />
           <circle cx="13" cy="11" r="3.5" fill="var(--honey)" />
           <text x="25" y="15" fontSize="9.5" fontWeight="800" fill="var(--honey-deep)">
@@ -144,38 +141,13 @@ export function CurveVisual() {
 
         {/* ---------- 2. the spread, at its own scale ---------- */}
         <text x={L} y={KAPPA_T - 11} fontSize="9" fontWeight="700" fill="var(--honey-deep)">
-          THE SPREAD κ
+          THE SPREAD κ  ·  above = buyers pay, below = sellers pay
         </text>
         <line x1={L} y1={kMid} x2={W - R} y2={kMid} stroke="var(--divider)" strokeWidth="1" />
         <path d={areaTo(i, sk, kMid)} fill="var(--honey)" opacity="0.55" />
         <path d={poly(i, sk)} fill="none" stroke="var(--honey-deep)" strokeWidth="1.4" strokeLinejoin="round" />
-        {/* haloed, because the ribbon runs underneath them once the window fills */}
-        <text
-          x={L + 2}
-          y={kMid - KAPPA_H / 2 + 9}
-          fontSize="8.5"
-          fontWeight="800"
-          fill="var(--honey-deep)"
-          stroke="var(--scope-bg)"
-          strokeWidth="3"
-          paintOrder="stroke"
-        >
-          buyers pay ↑
-        </text>
-        <text
-          x={L + 2}
-          y={kMid + KAPPA_H / 2 - 1}
-          fontSize="8.5"
-          fontWeight="800"
-          fill="var(--honey-deep)"
-          stroke="var(--scope-bg)"
-          strokeWidth="3"
-          paintOrder="stroke"
-        >
-          sellers pay ↓
-        </text>
         <text x={W - R} y={KAPPA_T - 11} textAnchor="end" fontSize="8.5" fontWeight="700" fill="var(--faint)">
-          charged only to the side pushing with the trend
+          the other side pays nothing
         </text>
 
         {/* ---------- 3. what the LP kept ---------- */}

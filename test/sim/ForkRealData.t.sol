@@ -60,13 +60,24 @@ contract ForkRealDataTest is Test {
     uint256 constant KAPPA_MAX = 5e16; // 5% - a security cap, NOT calibrated from data
     uint256 constant D_MAX = 15e15; // 1.5%/block
     uint256 constant LAMBDA = 85e16; // ~1-day memory
-    uint256 constant D_FLOOR = 55e16; // 0.55
+    // 0.306, which is the DEPLOYED gate expressed at this sim's lambda. D's no-trend
+    // expectation is 1/sqrt(n) with n = 1/(1-lambda), so a gate only means something as the
+    // ratio r = dFloor/sqrt(1-lambda); the hook ships r = 0.79 (README section 9.4). At
+    // lambda = 0.85 that is 0.79*sqrt(0.15) = 0.306. The old 0.55 here was r = 1.42, nearly
+    // twice as conservative as what is on chain, so this study was describing a detector the
+    // deployment does not have.
+    uint256 constant D_FLOOR = 306e15; // 0.306  (r = 0.79, as deployed)
 
     // Symmetric vol-fee baseline: fee = min(FEE_GAMMA * sigma, FEE_CAP), charged both ways.
     // FEE_GAMMA is chosen so this pool's cost to uninformed flow matches POINCARE's over the
     // window (the equal-friction-budget condition); the run reports both realized costs so the
     // match can be checked rather than trusted.
-    uint256 constant FEE_GAMMA = 441e14; // 0.0441 -> sized so the baseline's cost to uninformed flow matches Poincare's
+    // 0.0568. RE-TUNED when the gate moved to the deployed r = 0.79: the lower gate engages
+    // kappa far more often, which pushed POINCARE's cost to uninformed flow from 3,521 to
+    // 4,535 and left the old 0.0441 baseline 22% cheaper. A cheaper baseline is not a baseline,
+    // it is a handicap, and the LVR numbers either side of it stop being comparable. Scaled by
+    // the measured ratio 4534.5/3520.6 = 1.288.
+    uint256 constant FEE_GAMMA = 568e14; // 0.0568 -> sized so the baseline's cost to uninformed flow matches Poincare's
     uint256 constant FEE_CAP = 1e17;
 
     IPoolManager pm;
