@@ -114,3 +114,61 @@ export const sourceLabel = (cached: boolean, model: string | null) =>
 
 /** Formats a spread/percentage consistently with the rest of the app. */
 export const pct = (frac: number, dp = 2) => fmtPct(frac, dp);
+
+// ---------------------------------------------------------------------------------------
+// The Analytics standing report.
+//
+// Same contract as the regime note: build a small, flat, numeric facts object, and provide a
+// deterministic fallback that is useful on its own. The fallback is not a placeholder - the
+// edge function can be down, rate-limited, or simply not deployed, and this page has to stay
+// worth reading when it is.
+
+export type ReportFacts = {
+  // live
+  trend: string;
+  riskLevel: string;
+  progressToThresholdPct: number;
+  gateBlocking: boolean;
+  dPct: number;
+  dFloorPct: number;
+  kappaPct: number;
+  kappaMaxPct: number;
+  sigmaPct: number;
+  // history
+  samples: number;
+  engagedPct: number;
+  calmPct: number;
+  upPct: number;
+  downPct: number;
+  longestTrendRun: number;
+  meanKappaWhenEngagedPct: number;
+  // flow
+  swaps: number;
+  volumeUsdc: number;
+  withTrendVolumeUsdc: number;
+  freeVolumeUsdc: number;
+  paidSpreadPct: number;
+  keptByLpUsdc: number;
+};
+
+export function fallbackReport(f: ReportFacts): string {
+  const now =
+    f.kappaPct > 0
+      ? `The detector has a ${f.trend} confirmed and is charging ${f.kappaPct.toFixed(2)}% to flow pushing into it; everything else trades at the pool price.`
+      : f.gateBlocking
+        ? `No trend is being acted on. Evidence sits at ${Math.round(f.progressToThresholdPct)}% of the threshold, but directional efficiency (${f.dPct.toFixed(0)}%) is below the ${f.dFloorPct.toFixed(0)}% floor, so the move is read as chop and nothing is charged.`
+        : `No trend is being acted on. Evidence sits at ${Math.round(f.progressToThresholdPct)}% of the firing threshold and both sides trade at the plain constant-product price.`;
+
+  const done = f.swaps
+    ? `Across ${f.samples} sampled blocks the detector was engaged on ${f.engagedPct.toFixed(0)}% of them, with the longest unbroken trend running ${f.longestTrendRun} blocks. Of ${f.swaps} swaps, ${f.paidSpreadPct.toFixed(0)}% of volume pushed with a trend and paid the spread; the rest paid nothing extra. The pool kept ${f.keptByLpUsdc.toFixed(2)} USDC from that flow.`
+    : `No swaps have been recorded against this pool yet, so there is nothing to report on outcomes — only on what the detector is currently reading.`;
+
+  const risk =
+    f.upPct + f.downPct > 55
+      ? `This tape has been trend-heavy (${(f.upPct + f.downPct).toFixed(0)}% of blocks with a direction declared), which is the regime the spread is built for.`
+      : `This tape has been mostly directionless (${f.calmPct.toFixed(0)}% calm), which is the regime where the pool deliberately does nothing and an LP earns from the base fee alone.`;
+
+  const cfgLine = `A ${f.dFloorPct.toFixed(0)}% efficiency floor is how much one-way movement the pool insists on seeing before it acts, and ${f.kappaMaxPct.toFixed(1)}% is the hardest it can ever lean, which is a security bound rather than a tuning choice.`;
+
+  return `${now}\n\n${done}\n\n${risk}\n\n${cfgLine}`;
+}

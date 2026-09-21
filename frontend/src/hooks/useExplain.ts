@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isExplanation, requestExplanation } from "@/lib/db";
+import { isExplanation, requestExplanation, type ExplainKind } from "@/lib/db";
 
 export type ExplainSource = "model" | "local" | "pending";
 
@@ -30,7 +30,8 @@ export type Explained = {
  * the server caches under.
  */
 export function useExplain(opts: {
-  kind: "regime";
+  /** Must match a key of TASK in the `explain` edge function. */
+  kind: ExplainKind;
   cacheKey: string | null;
   facts: unknown;
   fallback: string;

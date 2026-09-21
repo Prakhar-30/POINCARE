@@ -42,8 +42,10 @@ const API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
  *
  * v2: raised the token ceiling after v1 answers were truncated mid-sentence by
  * Gemini 3.x thought tokens counting against it.
+ * v3: the length rule moved out of SYSTEM into each task, so the existing `regime` answers
+ * were written under a different instruction than the one that produces them now.
  */
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 
 /** Minimum seconds between live generations per (hook, kind). Cache hits ignore it. */
 const COOLDOWN_S = 20;
@@ -55,7 +57,10 @@ const COOLDOWN_S = 20;
  * sized to the visible answer gets spent on reasoning and the reply is truncated
  * mid-sentence. The prompt constrains the length; this only stops a runaway.
  */
-const MAX_OUTPUT_TOKENS = 2048;
+// Gemini 3.x counts THINKING tokens against this ceiling, which is what truncated v1 answers
+// mid-sentence. The `report` task asks for four paragraphs where `regime` asks for three
+// sentences, so the headroom has to cover the longer answer plus whatever reasoning precedes it.
+const MAX_OUTPUT_TOKENS = 4096;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -118,13 +123,39 @@ How to read the numbers you are given:
 Rules:
 - Explain what the detector is doing and WHY, referring to the actual numbers.
 - Never predict a price, never suggest a trade, never give financial advice.
-- No preamble, no headings, no bullet points, no markdown. Plain prose.
-- At most 3 sentences. Be specific and concrete over general.`;
+- No preamble, no headings, no markdown. Plain prose.
+- Be specific and concrete over general: cite the actual numbers you were given.
+- Length and shape are set by the task below, which overrides any default.`;
 
 const TASK: Record<string, string> = {
   regime:
     "Describe the pool's CURRENT regime: what the detector sees right now, whether it is " +
-    "engaged or holding back, and which side (if any) is paying a spread.",
+    "engaged or holding back, and which side (if any) is paying a spread. " +
+    "At most 3 sentences.",
+
+  // The Analytics page's standing report. Longer and structured, because it is the page a
+  // liquidity provider reads to decide whether this pool is doing anything for them.
+  report:
+    "Write a short standing report on this pool for a liquidity provider who is deciding " +
+    "whether it is worth leaving money here. Cover, in this order and as four separate " +
+    "paragraphs separated by a blank line:
+" +
+    "1. WHAT IS HAPPENING NOW. The live regime, how close the detector is to firing, and " +
+    "whether the efficiency gate is holding it back.
+" +
+    "2. WHAT IT HAS DONE. Over the samples and swaps given: how often it engaged, what share " +
+    "of volume actually paid a spread, and what the LP kept as a result. If nothing has traded " +
+    "yet, say exactly that rather than describing an empty pool as calm.
+" +
+    "3. WHERE THE RISK IS. Name the condition that would be bad for an LP here - a sustained " +
+    "one-way move the detector is slow to confirm, or chop that keeps the gate shut - and say " +
+    "which of those the current numbers look like.
+" +
+    "4. WHAT THE SETTINGS MEAN. Explain in plain words what this pool's dFloor and kappa_max " +
+    "imply about how eagerly it leans and how hard it can lean at most.
+" +
+    "Around 4 to 6 sentences per paragraph at most. Do not invent figures that are not in the " +
+    "data. Do not tell anyone to deposit or withdraw.",
 };
 
 async function generate(prompt: string): Promise<string> {

@@ -130,8 +130,10 @@ export type ExplainFailure = { reason: string };
  * otherwise looks identical to "no model configured" from the UI, and the
  * difference is only visible in the function logs.
  */
+export type ExplainKind = "regime" | "report";
+
 export async function requestExplanation(
-  kind: "regime",
+  kind: ExplainKind,
   cacheKey: string,
   facts: unknown,
 ): Promise<Explanation | ExplainFailure> {

@@ -2,217 +2,274 @@ import { useMemo } from "react";
 import { usePoolState } from "@/hooks/usePoolState";
 import { useDetectorConfig } from "@/hooks/useDetectorConfig";
 import { useDetectorSeries } from "@/hooks/useDetectorSeries";
-import { usePoolTotals, useWalletTotals } from "@/hooks/useBackend";
+import { usePoolTotals, useWalletTotals, useTape } from "@/hooks/useBackend";
 import { fmtPct, fmtUsd, fmtNum } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
-import { Gauge } from "@/components/ui/Gauge";
-import { EvidenceChart } from "@/components/ui/EvidenceChart";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 import { AiNote } from "@/components/ui/AiNote";
 import { useExplain } from "@/hooks/useExplain";
-import { fallbackRegime, regimeFactsOf } from "@/lib/narrate";
+import { fallbackReport, type ReportFacts } from "@/lib/narrate";
+import { analyticsOf, counterfactualOf, biggestLeanOf } from "@/lib/analytics";
+import { SavingsChart, RegimeBar, FlowSplitChart, RiskMeter } from "@/components/ui/AnalyticsCharts";
 
-function regimeOf(trend: string) {
-  if (trend === "up") return { label: "Up-trend", color: "var(--up)", ring: "rgba(107,184,154,.15)" };
-  if (trend === "down") return { label: "Down-trend", color: "var(--down)", ring: "rgba(229,140,160,.15)" };
-  return { label: "Calm", color: "var(--lav)", ring: "rgba(142,136,216,.15)" };
-}
-
+/**
+ * The Analytics screen: a standing report on what this pool has actually done, rather than a
+ * second copy of the live gauges.
+ *
+ * The CUSUM evidence chart used to lead this page and now lives only on the Dashboard, where a
+ * live reading belongs. What replaced it is the set of questions an LP would actually ask -
+ * how often did it act, who paid, what did I keep, what would hurt me here - answered from the
+ * pool's own `DetectorSample` trace and swap tape, with a Gemini report over the same figures.
+ *
+ * Everything on this page is measured. Where a number cannot be computed from recorded data the
+ * card says so instead of rendering a zero, because on this page a confident zero is worse than
+ * an honest blank.
+ */
 export function Analytics() {
   const s = usePoolState();
   const cfg = useDetectorConfig();
   const totals = usePoolTotals().data;
   const users = useWalletTotals().data;
   const series = useDetectorSeries();
-  const regime = regimeOf(s.trend);
+  const tape = useTape(200).data ?? [];
+  const narrow = useIsNarrow();
 
-  // Narrate the current regime, keyed on the latest sampled block: the reading
-  // only changes when the detector takes a new sample, so that is exactly how
-  // often it is worth asking (and what the server caches under).
-  const facts = useMemo(() => regimeFactsOf(series.points, cfg), [series.points, cfg]);
-  const narration = useExplain({
-    kind: "regime",
-    cacheKey: facts ? String(series.points[series.points.length - 1]?.block_number ?? "") : null,
+  const a = useMemo(
+    () => analyticsOf(series.points, tape, { h: cfg.h, dFloor: cfg.dFloor }),
+    [series.points, tape, cfg.h, cfg.dFloor],
+  );
+  const cf = useMemo(() => counterfactualOf(tape), [tape]);
+  const biggest = useMemo(() => biggestLeanOf(tape), [tape]);
+
+  const facts: ReportFacts | null = useMemo(() => {
+    if (!series.points.length) return null;
+    const vol = a.flow.withTrend + a.flow.free;
+    return {
+      trend: s.trend,
+      riskLevel: a.risk.level,
+      progressToThresholdPct: a.risk.progress * 100,
+      gateBlocking: a.risk.gated,
+      dPct: s.directionalEfficiency * 100,
+      dFloorPct: cfg.dFloor * 100,
+      kappaPct: s.kappa * 100,
+      kappaMaxPct: cfg.kappaMax * 100,
+      sigmaPct: s.sigma * 100,
+      samples: a.samples,
+      engagedPct: a.engagedFrac * 100,
+      calmPct: a.regime.total ? (a.regime.calm / a.regime.total) * 100 : 0,
+      upPct: a.regime.total ? (a.regime.up / a.regime.total) * 100 : 0,
+      downPct: a.regime.total ? (a.regime.down / a.regime.total) * 100 : 0,
+      longestTrendRun: a.longestRun,
+      meanKappaWhenEngagedPct: a.meanKappaWhenEngaged * 100,
+      swaps: totals?.swap_count ?? tape.length,
+      volumeUsdc: totals?.volume_usdc ?? vol,
+      withTrendVolumeUsdc: a.flow.withTrend,
+      freeVolumeUsdc: a.flow.free,
+      paidSpreadPct: vol > 0 ? (a.flow.withTrend / vol) * 100 : 0,
+      keptByLpUsdc: a.flow.captured,
+    };
+  }, [series.points.length, a, s, cfg, totals, tape.length]);
+
+  // Keyed on the latest sampled block AND the swap count: the report covers both, so either
+  // changing is a genuinely different question and deserves its own cached answer.
+  const report = useExplain({
+    kind: "report",
+    cacheKey: facts
+      ? `${series.points[series.points.length - 1]?.block_number ?? 0}-${facts.swaps}`
+      : null,
     facts,
     fallback: facts
-      ? fallbackRegime(facts)
+      ? fallbackReport(facts)
       : "Waiting for the first detector samples — one is recorded per traded block.",
     auto: true,
   });
-  // Gauge scale fallback only, used before the on-chain config resolves; the real value is
-  // read from the hook. Kept in step with the deployed kappaMax so the gauge does not jump.
-  const kappaMax = cfg.kappaMax || 0.05;
-  const narrow = useIsNarrow();
 
   return (
     <div className="px-4 sm:px-6 pb-10 pt-5 flex flex-col" style={{ gap: 18 }}>
-      {/* the Brain deep-dive */}
+      {/* ---------------- the report ---------------- */}
       <div className="card grain overflow-hidden">
-        <div className="flex items-center justify-between gap-2 flex-wrap px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
+        <div
+          className="flex items-center justify-between gap-2 flex-wrap px-6 py-4"
+          style={{ borderBottom: "1px solid var(--divider)" }}
+        >
           <div className="flex items-center gap-2.5">
             <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
-            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Detector · two-sided CUSUM</span>
-            <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>· quickest-change, data-dependent firing</span>
+            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+              Pool report
+            </span>
+            <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>
+              · written over this pool's own trace
+            </span>
           </div>
-          <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ fontSize: 12, fontWeight: 700, color: regime.color, background: regime.ring }}>
-            <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: regime.color }} /> live
-          </div>
+          <span
+            className="rounded-full px-3 py-1.5"
+            style={{ fontSize: 11.5, fontWeight: 700, color: "var(--faint)", background: "var(--surface-2)" }}
+          >
+            {a.samples} samples · {totals?.swap_count ?? 0} swaps
+          </span>
         </div>
 
-        <div className="grid gap-6 p-4 sm:p-6" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1.5fr) minmax(0,1fr)" }}>
+        <div
+          className="grid gap-6 p-4 sm:p-6"
+          style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1.35fr) minmax(0,1fr)" }}
+        >
           <div style={{ minWidth: 0 }}>
-            <EvidenceChart points={series.points} thresholdH={cfg.h} height={210} loading={series.loading} />
-            <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-              <Readout label="regime" value={regime.label} color={regime.color} />
-              <Readout label="spread · sell WETH" value={fmtPct(s.spreadZeroForOne)} color={s.spreadZeroForOne > 0 ? "var(--down)" : "var(--text-2)"} />
-              <Readout label="spread · buy WETH" value={fmtPct(s.spreadOneForZero)} color={s.spreadOneForZero > 0 ? "var(--up)" : "var(--text-2)"} />
-              <Readout label="volatility σ̂" value={fmtPct(s.sigma)} color="var(--text-2)" />
-              <Readout label="base fee" value={fmtPct(s.fee)} color={s.fee > 0 ? "var(--honey-deep)" : "var(--text-2)"} />
-            </div>
+            <AiNote explained={report} />
           </div>
-          <div className="flex flex-col items-center justify-center gap-5">
-            <div className="flex gap-6 flex-wrap justify-center">
-              <Gauge value={s.kappa} max={kappaMax} label="κ · lean" color="var(--honey)" suffix="%" scale={100} />
-              <Gauge value={s.directionalEfficiency} max={1} label="D · efficiency" color="var(--lav)" suffix="%" scale={100} />
-            </div>
-            <p className="text-center" style={{ fontSize: 12, lineHeight: 1.65, color: "var(--text-3)", maxWidth: 280 }}>
-              Two one-sided CUSUM statistics run on the pool's own log-returns. A trend is declared only when one
-              crosses the threshold <b style={{ color: "var(--text-2)" }}>h</b>, at a moment that depends on the data
-              and never on a fixed block count.
+          <div style={{ minWidth: 0 }}>
+            <SectionLabel icon="target" text="Right now" />
+            <RiskMeter risk={a.risk} dPct={s.directionalEfficiency} dFloorPct={cfg.dFloor} />
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- what it kept, and who paid ---------------- */}
+      <div
+        className="grid gap-4.5"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.15fr) minmax(0,1fr)", gap: 18 }}
+      >
+        <div className="card p-6">
+          <SectionLabel icon="chart" text="Value kept for liquidity providers" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+            Cumulative spread retained from flow that pushed into a detected trend. On a plain
+            constant-product pool this is value that would simply have left.
+          </p>
+          <SavingsChart points={a.savings} />
+          <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}>
+            <Mini label="kept, all time" value={totals && totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} color="var(--up-deep)" />
+            <Mini label="charged as spread" value={cf.charged > 0 ? fmtUsd(cf.charged, { dp: 2 }) : "—"} color="var(--honey-deep)" />
+            <Mini label="volume leaned on" value={cf.withTrendNotional > 0 ? fmtUsd(cf.withTrendNotional, { dp: 0 }) : "—"} color="var(--text-2)" />
+          </div>
+          {biggest && (
+            <p style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.55, marginTop: 12 }}>
+              Largest single lean: <b style={{ color: "var(--text-2)" }}>{fmtUsd(biggest.notional_usdc, { dp: 0 })}</b>{" "}
+              {biggest.side === "buy_weth" ? "buying" : "selling"} WETH into a {biggest.trend}-trend, charged{" "}
+              <b style={{ color: "var(--honey-deep)" }}>{fmtPct(biggest.spread_frac)}</b>.
             </p>
-          </div>
+          )}
         </div>
 
-        <div className="px-4 sm:px-6 pb-5">
-          <AiNote explained={narration} />
+        <div className="card p-6">
+          <SectionLabel icon="shield" text="Who actually paid" />
+          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+            The spread is aimed, not broadcast. Counter-trend flow and everything in a calm market
+            trades at the plain pool price.
+          </p>
+          <FlowSplitChart flow={a.flow} />
         </div>
       </div>
 
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1fr) minmax(0,1.1fr)", gap: 18 }}>
-        {/* detector configuration */}
-        <div className="card p-6">
-          <div className="flex items-center gap-2.5 mb-1">
-            <span style={{ color: "var(--lav)" }}><Icon name="target" size={18} /></span>
-            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Detector configuration</span>
-          </div>
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, marginBottom: 16 }}>
-            Immutable parameters the live hook was deployed with. Every one is injected and derived from an
-            interpretable target, so none are hard-coded by feel.
-          </p>
-
-          <ParamRow sym="k" name="CUSUM slack" desc="drift below this is ignored as noise" value={cfg.k.toFixed(4)} />
-          <ParamRow sym="h" name="Threshold" desc="evidence needed to declare a trend (set from ARL₀)" value={cfg.h.toFixed(4)} />
-          <ParamRow sym="sMax" name="Statistic cap" desc="evidence level where κ saturates" value={cfg.sMax.toFixed(4)} />
-          <ParamRow sym="λ" name="EWMA decay" desc={`signal memory ≈ ${cfg.effWindow ? fmtNum(cfg.effWindow, 1) : "—"} steps`} value={cfg.lambda.toFixed(3)} />
-          <ParamRow sym="D_floor" name="Efficiency floor" desc="min directional-efficiency to engage" value={fmtPct(cfg.dFloor)} />
-          <ParamRow sym="κ_max" name="Lean cap (security)" desc="hard ceiling on the directional spread" value={fmtPct(cfg.kappaMax)} />
-          <ParamRow sym="d_max" name="Spread ceiling" desc="max directional spread charged" value={fmtPct(cfg.dMax)} last />
-
-          <div className="mt-4 flex items-center justify-between" style={{ fontSize: 11, color: "var(--faint)" }}>
-            <span>last detector sample</span>
-            <span style={{ fontWeight: 700, color: "var(--text-3)" }}>block #{cfg.lastSampledBlock || "—"}</span>
-          </div>
-        </div>
-
-        {/* manipulation-cost / moat */}
-        <div className="card p-6">
-          <div className="flex items-center gap-2.5 mb-1">
-            <span style={{ color: "var(--up)" }}><Icon name="shield" size={18} /></span>
-            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Why faking a trend doesn't pay</span>
-          </div>
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, marginBottom: 16 }}>
-            The security bound is an inequality:
-            <b style={{ color: "var(--text-2)" }}> max gain from a fake trend &lt; min cost to trigger one.</b> For the
-            spread lever shipped here it holds by construction, with the entire trigger cost as margin.
-          </p>
-
-          {/* the inequality, visualized */}
-          <div className="flex flex-col gap-3 mb-5">
-            <CostBar label="Max extractable by faking" value="$0" frac={0.02} color="var(--down)"
-              note="the soft side trades at the plain x·y=k price, so there is zero edge" />
-            <CostBar label="Min cost to trigger the detector" value="≈ 0.045 WETH" frac={1} color="var(--up)"
-              note="~5 blocks of genuine round-trip price impact, which buys nothing" />
-          </div>
-
-          <div className="flex flex-col gap-2.5">
-            <Layer n={1} title="Data-dependent firing" body="No fixed N to game, so an attacker can't precompute when the curve leans. Multi-block sampling means one block can't move the statistic." />
-            <Layer n={2} title="Bounded prize" body="The spread is a one-sided, non-negative haircut on with-trend flow. There is no soft-side discount to harvest." />
-            <Layer n={3} title="Arbitrage punishment" body="Faking a trend means pushing price off fair value, which arbitrageurs immediately harvest back." />
-          </div>
+      {/* ---------------- regime history ---------------- */}
+      <div className="card p-6">
+        <SectionLabel icon="brain" text="What the detector has seen" />
+        <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+          Every sampled block, classified by what was actually charged. A block where κ is zero counts as calm, whatever the detector’s trend label still says.
+        </p>
+        <RegimeBar split={a.regime} />
+        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
+          <Mini label="engaged" value={a.samples ? `${(a.engagedFrac * 100).toFixed(0)}%` : "—"} color="var(--honey-deep)" sub="of sampled blocks" />
+          <Mini label="mean κ when leaning" value={a.meanKappaWhenEngaged > 0 ? fmtPct(a.meanKappaWhenEngaged) : "—"} color="var(--honey-deep)" sub={`cap ${fmtPct(cfg.kappaMax)}`} />
+          <Mini label="longest unbroken lean" value={a.longestRun ? `${a.longestRun} blocks` : "—"} color="var(--lav-deep)" sub="κ continuously engaged" />
+          <Mini label="mean volatility σ̂" value={a.meanSigma > 0 ? fmtPct(a.meanSigma) : "—"} color="var(--text-2)" sub="per sampled block" />
         </div>
       </div>
 
-      {/* LVR headline */}
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
-        <HeadStat label="LVR reduction vs x·y=k" value="22.9%" color="var(--up)" tinted sub="synthetic stress path, mean of 5 seeds" />
-        <HeadStat label="on 12 months of real ETH/USDC" value="2.4%" color="var(--lav)" sub="calibrated detector; 4.1% in the trending half" />
-        <HeadStat label="vs equal-spread vol fee" value="11.5%" color="var(--lav)" sub="same average spread, synthetic path" />
-        <HeadStat label="LVR avoided · live" value={totals && totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} color="var(--green-label)" sub={`${totals?.swap_count ?? 0} swaps tracked`} />
+      {/* ---------------- configuration, explained ---------------- */}
+      <div className="card p-6">
+        <SectionLabel icon="target" text="Why this pool is tuned the way it is" />
+        <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+          Immutable parameters the live hook was deployed with. Each is derived from an
+          interpretable target rather than chosen by feel, and the reasoning is in the README's
+          four-year parameter study.
+        </p>
+
+        <ParamRow sym="k" name="CUSUM slack" value={cfg.k.toFixed(4)}
+          desc="Drift below this is ignored as noise."
+          why="Swept across four years; moving it either way costs LP value, so it is left where it was." />
+        <ParamRow sym="h" name="Threshold" value={cfg.h.toFixed(4)}
+          desc="Evidence needed before a trend is declared."
+          why="Set from a target false-alarm rate (ARL₀), never from a block count — so there is no countdown to game." />
+        <ParamRow sym="sMax" name="Statistic cap" value={cfg.sMax.toFixed(4)}
+          desc="Evidence level at which κ saturates."
+          why="Sits at the knee: higher changes nothing, lower costs real value." />
+        <ParamRow sym="λ" name="EWMA decay" value={cfg.lambda.toFixed(3)}
+          desc={`Signal memory ≈ ${cfg.effWindow ? fmtNum(cfg.effWindow, 1) : "—"} samples.`}
+          why="Paired with D_floor: the gate only means something relative to the noise this window implies. Changing one without the other silently moves the gate." />
+        <ParamRow sym="D_floor" name="Efficiency floor" value={fmtPct(cfg.dFloor)}
+          desc="How one-way a move must look before the pool acts."
+          why={`Set at about 0.79 noise-widths of directionality. For a driftless walk D averages 1/√n, so a fixed floor means nothing except relative to λ.`} />
+        <ParamRow sym="κ_max" name="Lean cap" value={fmtPct(cfg.kappaMax)}
+          desc="The hardest this pool can ever lean."
+          why="A security bound, not a tuning knob: it caps the most a faked trend could ever be worth, and halving it tightened that bound." />
+        <ParamRow sym="d_max" name="Ramp rate" value={fmtPct(cfg.dMax)} last
+          desc="Most κ can move in a single block."
+          why="Rate-limits the spread so no single block can swing the quote far enough to be worth engineering." />
+
+        <div className="mt-4 flex items-center justify-between" style={{ fontSize: 11, color: "var(--faint)" }}>
+          <span>last detector sample</span>
+          <span style={{ fontWeight: 700, color: "var(--text-3)" }}>block #{cfg.lastSampledBlock || "—"}</span>
+        </div>
+      </div>
+
+      {/* ---------------- study results + usage ---------------- */}
+      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 18 }}>
+        <HeadStat label="LP value vs a 30bps pool" value="+6.4%" color="var(--up)" tinted sub="4 years of real ETH/USDC" />
+        <HeadStat label="Arbitrage extraction cut" value="32%" color="var(--up)" sub="same four-year replay" />
+        <HeadStat label="LVR reduction, synthetic" value="50.6%" color="var(--lav)" sub="mean of 5 seeded stress paths" />
+        <HeadStat label="LP advantage, 12m real" value="+$34k" color="var(--lav)" sub="vs x·y=k, matched friction budget" />
         <HeadStat label="Detection delay" value="≈ 6 blocks" color="var(--honey-deep)" sub="after a real trend onset" />
       </div>
 
-      {/* usage */}
       <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
         <HeadStat label="Wallets connected" value={users ? fmtNum(users.total_wallets, 0) : "—"} color="var(--text)" sub="all time" />
         <HeadStat label="New this week" value={users ? fmtNum(users.new_7d, 0) : "—"} color="var(--lav-deep)" sub="first connection in 7 days" />
         <HeadStat label="Returning" value={users ? fmtNum(users.returning_wallets, 0) : "—"} color="var(--up)" sub="more than one session" />
         <HeadStat label="Active · 24h" value={users ? fmtNum(users.active_24h, 0) : "—"} color="var(--honey-deep)" sub="seen in the last day" />
       </div>
+
       <p style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1.6, textAlign: "center", maxWidth: 760, margin: "0 auto" }}>
-        Back-test percentages are measured on a seeded regime-switching path, not a named pair, and the engine is
-        data-ready so the same machinery yields production numbers once a real return series is supplied. Not
-        investment advice; testnet deployment.
+        Study percentages are measured on historical replays documented in the README; live figures
+        are this testnet pool's own recorded activity. The report above is generated from these same
+        numbers and may phrase them loosely. Not investment advice; testnet deployment.
       </p>
     </div>
   );
 }
 
-function Readout({ label, value, color }: { label: string; value: string; color: string }) {
+function SectionLabel({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="flex items-center gap-2.5 mb-1.5">
+      <span style={{ color: "var(--lav)" }}><Icon name={icon} size={17} /></span>
+      <span className="font-display" style={{ fontSize: 14.5, fontWeight: 700, color: "var(--text)" }}>{text}</span>
+    </div>
+  );
+}
+
+function Mini({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
     <div className="rounded-md px-3 py-2.5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
+      <div className="font-display" style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
 
-function ParamRow({ sym, name, desc, value, last }: { sym: string; name: string; desc: string; value: string; last?: boolean }) {
+function ParamRow({
+  sym, name, desc, why, value, last,
+}: { sym: string; name: string; desc: string; why: string; value: string; last?: boolean }) {
   return (
-    <div className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: last ? "none" : "1px solid var(--divider)" }}>
-      <div className="flex items-center gap-3" style={{ minWidth: 0 }}>
-        <span className="font-display" style={{ fontSize: 13, fontWeight: 800, color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 8, padding: "3px 9px", minWidth: 52, textAlign: "center" }}>{sym}</span>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-2)" }}>{name}</div>
-          <div style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.4 }}>{desc}</div>
+    <div style={{ padding: "11px 0", borderBottom: last ? "none" : "1px solid var(--divider)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3" style={{ minWidth: 0 }}>
+          <span className="font-display" style={{ fontSize: 13, fontWeight: 800, color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 8, padding: "3px 9px", minWidth: 56, textAlign: "center", flexShrink: 0 }}>{sym}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-2)" }}>{name}</div>
+            <div style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.45 }}>{desc}</div>
+            <div style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1.5, marginTop: 3 }}>{why}</div>
+          </div>
         </div>
-      </div>
-      <span className="font-display" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>{value}</span>
-    </div>
-  );
-}
-
-function CostBar({ label, value, frac, color, note }: { label: string; value: string; frac: number; color: string; note: string }) {
-  return (
-    <div>
-      <div className="flex justify-between mb-1.5" style={{ fontSize: 12 }}>
-        <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{label}</span>
-        <span className="font-display" style={{ color, fontWeight: 800 }}>{value}</span>
-      </div>
-      <div style={{ height: 9, borderRadius: 5, background: "var(--track)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.max(3, frac * 100)}%`, background: color, borderRadius: 5 }} />
-      </div>
-      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 5, lineHeight: 1.45 }}>{note}</div>
-    </div>
-  );
-}
-
-function Layer({ n, title, body }: { n: number; title: string; body: string }) {
-  return (
-    <div className="flex gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
-      <span className="font-display" style={{ fontSize: 12, fontWeight: 800, color: "var(--up-deep)", background: "var(--green-bg)", border: "1px solid var(--green-border)", borderRadius: 99, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>
-      <div>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: "var(--text-2)" }}>{title}</div>
-        <div style={{ fontSize: 11.5, color: "var(--text-3)", lineHeight: 1.5, marginTop: 2 }}>{body}</div>
+        <span className="font-display" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>{value}</span>
       </div>
     </div>
   );
