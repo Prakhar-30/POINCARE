@@ -57,7 +57,7 @@ function FaucetButton() {
 export function AppFooter() {
   return (
     <footer className="px-6 py-7 mt-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}>
-      <div className="mx-auto flex flex-wrap items-center justify-between gap-5" style={{ maxWidth: 1180 }}>
+      <div className="mx-auto flex flex-wrap items-center justify-between gap-5" style={{ maxWidth: 1312 }}>
         <div className="flex items-center gap-4 flex-wrap">
           <Wordmark size={26} />
           <span className="flex items-center gap-1.5" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-3)" }}>
@@ -83,11 +83,11 @@ export function AppFooter() {
         </div>
       </div>
 
-      <div className="mx-auto mt-5" style={{ maxWidth: 1180 }}>
+      <div className="mx-auto mt-5" style={{ maxWidth: 1312 }}>
         <FaucetButton />
       </div>
 
-      <div className="mx-auto mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1180, borderTop: "1px solid var(--divider)" }}>
+      <div className="mx-auto mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1312, borderTop: "1px solid var(--divider)" }}>
         <span style={{ fontSize: 11, color: "var(--faint)" }}>
           Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.
         </span>

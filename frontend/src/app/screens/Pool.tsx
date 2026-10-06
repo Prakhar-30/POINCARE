@@ -29,7 +29,7 @@ export function Pool() {
   return (
     <>
     <TxSteps stepper={lp.stepper} title={mode === "add" ? "Adding liquidity" : "Removing liquidity"} />
-    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-10 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
       <div className="card p-5 sm:p-6 min-w-0">
         <div className="flex gap-1 mb-5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 4 }}>
           {(["add", "remove"] as const).map((m) => (

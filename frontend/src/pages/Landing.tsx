@@ -42,7 +42,8 @@ export function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
       {/* nav */}
-      <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
+      <nav className="sticky top-0 z-50 px-4 sm:px-6 md:px-10" style={{ background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
+        <div className="mx-auto flex items-center" style={{ height: 70, maxWidth: 1180 }}>
         <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
           <Mark size={34} />
           <span className="font-display hidden sm:block" style={{ fontWeight: 700, fontSize: 19, color: "var(--text)", letterSpacing: ".5px" }}>Poincaré</span>
@@ -53,6 +54,7 @@ export function Landing() {
           <button onClick={scrollToId("moat")} className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>The moat</button>
           <ThemeToggle />
           <LaunchButton />
+        </div>
         </div>
       </nav>
       <AnnouncementMarquee />
@@ -97,7 +99,7 @@ export function Landing() {
       </header>
 
       {/* numbers */}
-      <section className="px-6 md:px-10 py-4">
+      <section className="px-6 md:px-10 pt-2 pb-4">
         <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
           <NumberCard kpi="−22.9%" label="LVR on the stress path" sub="mean of 5 seeded runs (19–30%)" />
           <NumberCard kpi="12 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
@@ -107,7 +109,7 @@ export function Landing() {
       </section>
 
       {/* what it does */}
-      <section className="px-6 md:px-10 py-16">
+      <section className="px-6 md:px-10 py-20">
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="What it is" title="Two parts, kept honest" />
           <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -122,7 +124,7 @@ export function Landing() {
       </section>
 
       {/* how it works */}
-      <section id="how" className="px-6 md:px-10 py-16" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+      <section id="how" className="px-6 md:px-10 py-20" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionTitle eyebrow="How it works" title="Watch · detect · lean" />
           <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,7 +136,7 @@ export function Landing() {
       </section>
 
       {/* moat */}
-      <section id="moat" className="px-6 md:px-10 py-16">
+      <section id="moat" className="px-6 md:px-10 py-20">
         <div className="mx-auto grid gap-8 items-center grid-cols-1 lg:grid-cols-2" style={{ maxWidth: 1180 }}>
           <motion.div {...fade()}>
             <SectionTitle eyebrow="Why you can't game it" title="The manipulator pays their own toll" align="left" />
@@ -226,7 +228,7 @@ function SectionTitle({ eyebrow, title, align = "center" }: { eyebrow: string; t
   return (
     <div style={{ textAlign: align }}>
       <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".6px", color: "var(--lav)", textTransform: "uppercase" }}>{eyebrow}</div>
-      <h2 className="font-display mt-2" style={{ fontSize: "clamp(24px,3vw,34px)", fontWeight: 700, color: "var(--text)" }}>{title}</h2>
+      <h2 className="font-display mt-2.5" style={{ fontSize: "clamp(26px,3.2vw,36px)", fontWeight: 700, lineHeight: 1.15, color: "var(--text)" }}>{title}</h2>
     </div>
   );
 }

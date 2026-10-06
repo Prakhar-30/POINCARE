@@ -52,7 +52,7 @@ export function Dashboard() {
   const kappaMax = cfg.kappaMax || 0.05;
 
   return (
-    <div className="px-4 sm:px-6 pb-8">
+    <div className="px-4 sm:px-6 pb-10">
       {/* stat bar */}
       <div className="grid gap-3.5 pt-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
         <Stat label="Total value locked" value={s.loading ? "—" : fmtUsd(tvl, { compact: true })} />

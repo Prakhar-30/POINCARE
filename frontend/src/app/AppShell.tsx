@@ -36,12 +36,12 @@ export function AppShell() {
       <TopNav tab={tab} setTab={setTab} />
       <WrongNetworkBanner />
       <AnnouncementMarquee />
-      <div className="flex-1">
+      <main className="flex-1 w-full mx-auto" style={{ maxWidth: 1360 }}>
         {tab === "dashboard" && <Dashboard />}
         {tab === "trade" && <Trade />}
         {tab === "pool" && <Pool />}
         {tab === "analytics" && <Analytics />}
-      </div>
+      </main>
       <AppFooter />
     </div>
   );

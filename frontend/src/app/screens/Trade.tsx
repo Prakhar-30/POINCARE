@@ -68,7 +68,7 @@ export function Trade() {
   return (
     <>
     <TxSteps stepper={stepper} title="Swapping" />
-    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
+    <div className="grid gap-4.5 px-4 sm:px-6 pb-10 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,420px) minmax(0,1fr) 320px", gap: 18 }}>
       {/* Swap form; spacing tuned so its lower edge lines up with the tape and
           comparison cards in the other columns. */}
       <div className="card p-4 sm:p-5 min-w-0">

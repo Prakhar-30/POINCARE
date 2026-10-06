@@ -11,15 +11,18 @@ const ITEMS = [
   "calibrated on 4 years of real ETH/USDC",
 ];
 
+const FADE = "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)";
+
 function Group({ hidden }: { hidden?: boolean }) {
   return (
     <span className="marquee-group" aria-hidden={hidden}>
       {ITEMS.map((t, i) => (
-        <span key={i} className="inline-flex items-center gap-2.5" style={{ paddingRight: 52 }}>
+        <span key={i} className="inline-flex items-center gap-2.5" style={{ paddingRight: 30 }}>
           <span style={{ color: "#ffe9a8", display: "inline-flex", filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }}>
-            <Icon name="shield" size={15} strokeWidth={2.2} />
+            <Icon name={i === 0 ? "shield" : "check"} size={15} strokeWidth={2.2} />
           </span>
           <span>{t}</span>
+          <span aria-hidden style={{ marginLeft: 30, width: 4, height: 4, borderRadius: 99, background: "rgba(255,255,255,.45)" }} />
         </span>
       ))}
     </span>
@@ -44,9 +47,12 @@ export function AnnouncementMarquee() {
         textShadow: "0 1px 2px rgba(0,0,0,.18)",
       }}
     >
-      <div className="marquee-track">
-        <Group />
-        <Group hidden />
+      {/* Soft fade at both edges (on the text only, not the band) so items glide in and out. */}
+      <div style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
+        <div className="marquee-track">
+          <Group />
+          <Group hidden />
+        </div>
       </div>
     </div>
   );
