@@ -1,4 +1,4 @@
-import { Wordmark } from "@/components/brand/Logo";
+import { Mark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useFaucet } from "@/hooks/useSwap";
@@ -11,11 +11,11 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
       href={`${EXPLORER}/address/${address}`}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1.5 transition-colors"
-      style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}
+      className="inline-flex items-center gap-1.5 transition-colors hover:text-lav"
+      style={{ fontSize: 12, color: "var(--text-3)" }}
     >
       <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
+      <span className="num" style={{ color: "var(--text-2)" }}>{shorten(address)}</span>
       <Icon name="external" size={12} />
     </a>
   );
@@ -29,16 +29,8 @@ function FaucetButton() {
       <button
         onClick={() => faucet.mint()}
         disabled={faucet.minting}
-        className="inline-flex items-center gap-2 font-bold"
-        style={{
-          background: "var(--lav-soft)",
-          color: "var(--lav-deep)",
-          border: "1px solid var(--lav-border, var(--border))",
-          borderRadius: 12,
-          padding: "9px 14px",
-          fontSize: 12.5,
-          cursor: faucet.minting ? "default" : "pointer",
-        }}
+        className="btn btn-ghost"
+        style={{ height: 36, padding: "0 14px", fontSize: 13, fontWeight: 500, color: "var(--lav-deep)", cursor: faucet.minting ? "default" : "pointer" }}
       >
         <span className="flex items-center" style={{ marginRight: 1 }}>
           <TokenIcon sym="USDC" size={16} />
@@ -46,7 +38,7 @@ function FaucetButton() {
         </span>
         {faucet.minting ? "Sending…" : "Get test tokens · 50k USDC + 20 WETH"}
       </button>
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".3px", color: "var(--faint)", textTransform: "uppercase" }}>
+      <span className="num" style={{ fontSize: 11, letterSpacing: ".04em", color: "var(--muted)", textTransform: "uppercase" }}>
         Testnet only · test tokens, no value
       </span>
     </div>
@@ -56,17 +48,18 @@ function FaucetButton() {
 /** Footer for the wallet-gated app. Links contract addresses out to the explorer. */
 export function AppFooter() {
   return (
-    <footer className="px-6 py-7 mt-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}>
-      <div className="mx-auto flex flex-wrap items-center justify-between gap-5" style={{ maxWidth: 1180 }}>
-        <div className="flex items-center gap-4 flex-wrap">
-          <Wordmark size={26} />
-          <span className="flex items-center gap-1.5" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-3)" }}>
-            <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-            {CHAIN_NAME} · testnet · research preview
+    <footer className="px-4 sm:px-7 py-6 mt-4" style={{ borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
+      <div className="mx-auto flex flex-col gap-5" style={{ maxWidth: 1320 }}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <span className="flex items-center gap-2.5" style={{ fontSize: 13, color: "var(--text-3)" }}>
+            <Mark size={22} />
+            <span style={{ fontWeight: 600, color: "var(--text)" }}>Poincaré</span>
+            <span className="num hidden sm:inline" style={{ fontSize: 12 }}>{CHAIN_NAME} · testnet · research preview</span>
           </span>
+          <FaucetButton />
         </div>
 
-        <div className="flex items-center gap-5 flex-wrap">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <ExplorerLink label="Hook" address={CONTRACTS.hook} />
           <ExplorerLink label="Pool manager" address={CONTRACTS.poolManager} />
           <ExplorerLink label="Router" address={CONTRACTS.router} />
@@ -75,23 +68,17 @@ export function AppFooter() {
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 transition-colors hover:text-lav"
-            style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}
+            style={{ fontSize: 12, color: "var(--text-2)" }}
           >
             <Icon name="xSocial" size={13} />
             @Poincare_AMM
           </a>
         </div>
-      </div>
 
-      <div className="mx-auto mt-5" style={{ maxWidth: 1180 }}>
-        <FaucetButton />
-      </div>
-
-      <div className="mx-auto mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1180, borderTop: "1px solid var(--divider)" }}>
-        <span style={{ fontSize: 11, color: "var(--faint)" }}>
-          Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.
-        </span>
-        <span style={{ fontSize: 11, color: "var(--faint)" }}>Prices off the pool's own reserves · no oracle, no keeper.</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4" style={{ borderTop: "1px solid var(--divider)", fontSize: 12, color: "var(--muted)" }}>
+          <span>Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.</span>
+          <span>Prices off the pool's own reserves · no oracle, no keeper.</span>
+        </div>
       </div>
     </footer>
   );

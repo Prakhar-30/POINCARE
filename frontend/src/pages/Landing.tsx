@@ -1,201 +1,199 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mark, Wordmark } from "@/components/brand/Logo";
+import { Mark } from "@/components/brand/Logo";
 import { CurveVisual } from "@/components/brand/CurveVisual";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 
+const REPO = "https://github.com/Prakhar-30/POINCARE";
+const SECURITY_REVIEW = `${REPO}#11-security-review`;
+
 const fade = (delay = 0) => ({
-  initial: { opacity: 0, y: 16 },
+  initial: { opacity: 0, y: 14 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, margin: "-60px" },
-  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const, delay },
+  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay },
 });
 
-// In-page smooth scroll (HashRouter owns the URL hash, so we can't use href="#id").
 const scrollToId = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-function LaunchButton({ size = "md" }: { size?: "md" | "lg" }) {
-  const lg = size === "lg";
+function LaunchButton({ large }: { large?: boolean }) {
   return (
-    <Link
-      to="/app"
-      className="group inline-flex items-center gap-2 font-bold transition-transform hover:-translate-y-0.5"
-      style={{
-        color: "#fff",
-        background: "var(--lav)",
-        borderRadius: 16,
-        padding: lg ? "15px 26px" : "11px 20px",
-        fontSize: lg ? 15.5 : 14,
-        boxShadow: "0 10px 26px rgba(142,136,216,.36)",
-      }}
-    >
-      Launch App
-      <Icon name="arrowRight" size={lg ? 19 : 17} className="transition-transform group-hover:translate-x-0.5" />
+    <Link to="/app" className="btn btn-primary group" style={large ? { height: 48, padding: "0 22px" } : { height: 40, fontSize: 14, padding: "0 16px" }}>
+      Launch app
+      <Icon name="arrowRight" size={16} className="transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
 
 export function Landing() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
-      {/* nav */}
-      <nav className="sticky top-0 z-50 flex items-center px-4 sm:px-6 md:px-10" style={{ height: 70, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--nav-border)" }}>
-        <button onClick={scrollTop} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
-          <Mark size={34} />
-          <span className="font-display hidden sm:block" style={{ fontWeight: 700, fontSize: 19, color: "var(--text)", letterSpacing: ".5px" }}>Poincaré</span>
-          <span className="hidden sm:inline text-lav" style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".5px", background: "var(--lav-soft)", borderRadius: 20, padding: "3px 9px" }}>v4</span>
-        </button>
-        <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <button onClick={scrollToId("how")} className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>How it works</button>
-          <button onClick={scrollToId("moat")} className="hidden sm:block text-sm font-bold px-3 py-2 rounded-xl transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>The moat</button>
-          <ThemeToggle />
-          <LaunchButton />
-        </div>
-      </nav>
+    <div className="min-h-screen" style={{ background: "var(--app-bg)", color: "var(--text)" }}>
       <AnnouncementMarquee />
 
+      {/* nav */}
+      <nav className="sticky top-0 z-50" style={{ background: "var(--nav-bg)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--border)" }}>
+        <div className="wrap flex items-center gap-8" style={{ height: 64 }}>
+          <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2.5 shrink-0" style={{ cursor: "pointer" }}>
+            <Mark size={30} />
+            <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-.01em" }}>Poincaré</span>
+          </button>
+          <div className="hidden md:flex items-center gap-7" style={{ fontSize: 14, fontWeight: 500 }}>
+            <NavLink onClick={scrollToId("how")}>How it works</NavLink>
+            <NavLink onClick={scrollToId("recognition")}>Recognition</NavLink>
+            <NavLink onClick={scrollToId("security")}>Security</NavLink>
+            <a href={REPO} target="_blank" rel="noreferrer" className="transition-colors hover:text-lav" style={{ color: "var(--text-3)" }}>Docs</a>
+          </div>
+          <div className="ml-auto flex items-center gap-2.5">
+            <ThemeToggle />
+            <LaunchButton />
+          </div>
+        </div>
+      </nav>
+
       {/* hero */}
-      <header className="px-6 md:px-10 pt-14 md:pt-20 pb-10">
-        <div className="mx-auto grid items-center gap-10 lg:gap-14 grid-cols-1 lg:grid-cols-[1.05fr_1fr]" style={{ maxWidth: 1180 }}>
-          <div>
-            <motion.div {...fade(0)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 mb-6" style={{ background: "var(--lav-soft)", color: "var(--lav-deep)", fontSize: 12, fontWeight: 800 }}>
-              <Icon name="spark" size={14} /> Adaptive liquidity · live on Unichain Sepolia
-            </motion.div>
-
-            <motion.h1 {...fade(0.06)} className="font-display" style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 700, lineHeight: 1.06, color: "var(--text)", letterSpacing: "-.5px" }}>
-              An AMM that detects real trends
-              <span style={{ color: "var(--lav-deep)" }}> and leans against them.</span>
+      <header className="wrap" style={{ paddingTop: "clamp(48px, 8vw, 88px)", paddingBottom: 72 }}>
+        <div className="grid items-center gap-12 lg:gap-14 grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
+          <div className="flex flex-col" style={{ gap: 24 }}>
+            <motion.div {...fade(0)} className="eyebrow">Uniswap v4 hook · adaptive liquidity</motion.div>
+            <motion.h1 {...fade(0.05)} className="m-0" style={{ fontSize: "clamp(38px, 5.4vw, 60px)", lineHeight: 1.03, letterSpacing: "-.035em", fontWeight: 600 }}>
+              Liquidity that reads the trend and prices against it.
             </motion.h1>
-
-            <motion.p {...fade(0.12)} className="mt-5 max-w-xl" style={{ fontSize: 17, lineHeight: 1.65, color: "var(--text-2)" }}>
-              Poincaré is a Uniswap v4 hook governed by a <span style={{ fontWeight: 700, color: "var(--text)" }}>CUSUM change-point detector</span>.
-              When it confirms a real directional trend, it widens the spread on the side that bleeds
-              liquidity providers and keeps the base price everywhere else. No oracle. No keeper. Only the pool's own price.
+            <motion.p {...fade(0.1)} className="m-0" style={{ fontSize: 18, lineHeight: 1.6, color: "var(--text-2)", maxWidth: 540 }}>
+              A <span style={{ fontWeight: 600, color: "var(--text)" }}>CUSUM change-point detector</span> watches the pool's own price.
+              When a real directional move is confirmed, the with-trend side pays a bounded spread that goes straight to LPs.
+              No oracle. No keeper.
             </motion.p>
-
-            <motion.div {...fade(0.18)} className="mt-8 flex items-center gap-4 flex-wrap">
-              <LaunchButton size="lg" />
-              <button onClick={scrollToId("how")} className="inline-flex items-center gap-2 font-bold" style={{ color: "var(--text-2)", fontSize: 15, cursor: "pointer" }}>
-                See how it works <Icon name="arrowRight" size={16} />
+            <motion.div {...fade(0.15)} className="flex flex-wrap gap-3">
+              <LaunchButton large />
+              <button type="button" onClick={scrollToId("how")} className="btn btn-ghost" style={{ height: 48 }}>
+                Read the mechanism
               </button>
             </motion.div>
-
-            <motion.div {...fade(0.24)} className="mt-9 flex items-center gap-5 flex-wrap" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-3)" }}>
-              <Trust icon="shield" text="Manipulation-bounded by design" />
-              <Trust icon="check" text="228 tests · 384k-op invariant suite" />
-              <Trust icon="target" text="No oracle, no AVS" />
+            <motion.div {...fade(0.2)} className="flex flex-wrap items-center gap-x-4 gap-y-2" style={{ fontSize: 13, color: "var(--text-3)", paddingTop: 4 }}>
+              <span>UHI10 hookathon winner</span>
+              <Slash />
+              <span>Olympix security review · 9/9 fixed</span>
+              <Slash />
+              <span>228 tests · 384k-op invariants</span>
             </motion.div>
           </div>
 
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} className="min-w-0">
             <CurveVisual />
           </motion.div>
         </div>
       </header>
 
-      {/* numbers */}
-      <section className="px-6 md:px-10 py-4">
-        <motion.div {...fade()} className="mx-auto grid gap-3.5 grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1180 }}>
-          <NumberCard kpi="−22.9%" label="LVR on the stress path" sub="mean of 5 seeded runs (19–30%)" />
-          <NumberCard kpi="12 mo" label="real ETH/USDC replay" sub="never worse than baseline" tint />
-          <NumberCard kpi="0%" label="spread on the stabilising side" sub="counter-trend and calm flow, always" />
-          <NumberCard kpi="0" label="external dependencies" sub="prices off its own reserves" />
+      {/* results band */}
+      <section style={{ background: "var(--surface)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+        <motion.div {...fade()} className="wrap grid grid-cols-2 md:grid-cols-4">
+          <Result kpi="−22.9%" label="LVR on the stress path" sub="mean of 5 seeded runs (19–30%)" good />
+          <Result kpi="12 mo" label="Real ETH/USDC replay" sub="never worse than baseline" />
+          <Result kpi="0%" label="Spread on stabilising flow" sub="counter-trend and calm, always" />
+          <Result kpi="0" label="External dependencies" sub="prices off its own reserves" last />
         </motion.div>
-      </section>
-
-      {/* what it does */}
-      <section className="px-6 md:px-10 py-16">
-        <div className="mx-auto" style={{ maxWidth: 1180 }}>
-          <SectionTitle eyebrow="What it is" title="Two parts, kept honest" />
-          <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <Feature icon="brain" color="var(--lav)" title="The detector"
-              body="A two-sided CUSUM quickest-change detector runs on every swap. It fires at a data-dependent moment rather than a fixed block count, so there's no countdown to game. Provably optimal for the speed-vs-false-alarm trade-off." />
-            <Feature icon="wave" color="var(--honey)" title="The curve"
-              body="An asymmetric bonding curve. When a trend is confirmed, the with-trend (toxic) side is charged a small directional spread the LPs keep. The stabilising side stays at the base price. A real bid-ask, written into the geometry." />
-            <Feature icon="shield" color="var(--up)" title="The moat"
-              body="To fool the detector you must genuinely move the price, which means spending real money and feeding arbitrageurs. Faking a trend is negative-EV. The protection is bounded by math, not wished away." />
-          </div>
-        </div>
       </section>
 
       {/* how it works */}
-      <section id="how" className="px-6 md:px-10 py-16" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
-        <div className="mx-auto" style={{ maxWidth: 1180 }}>
-          <SectionTitle eyebrow="How it works" title="Watch · detect · lean" />
-          <div className="grid gap-5 mt-9 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <Step n="01" title="Watch its own price" body="Each swap, the hook samples the pool's reserve-implied price once per block and feeds the signed log-return to the detector. No oracle is consulted." />
-            <Step n="02" title="Accumulate evidence" body="Two CUSUM statistics build evidence for an up- or down-trend. Noise never crosses the threshold; a real, sustained move does, and quickly when the drift is strong." />
-            <Step n="03" title="Lean the curve" body="On firing, the control law ramps a bounded, rate-limited spread onto the with-trend side and routes it back to LPs. When the trend fades, the curve returns to symmetric." />
+      <section id="how" className="wrap" style={{ paddingTop: 104, paddingBottom: 96, scrollMarginTop: 64 }}>
+        <SectionHead eyebrow="How it works" title="Watch. Detect. Lean." body="Every swap runs through the same three steps inside the hook. Nothing is off-chain, nothing is scheduled." />
+        <div className="grid gap-4 mt-12 grid-cols-1 md:grid-cols-3">
+          <Step n="01" tag="Watch" title="Sample its own price" body="Once per block the hook reads the reserve-implied price and feeds the signed log-return to the detector. No oracle is consulted." delay={0} />
+          <Step n="02" tag="Detect" title="Accumulate evidence" body="Two CUSUM statistics build evidence for an up- or down-trend. Noise never crosses the threshold; a real, sustained move does, and quickly when the drift is strong." delay={0.05} />
+          <Step n="03" tag="Lean" title="Price the toxic side" body="On firing, the control law ramps a bounded, rate-limited spread onto with-trend flow and routes it to LPs. When the trend fades, the curve returns to symmetric." delay={0.1} />
+        </div>
+      </section>
+
+      {/* recognition and review */}
+      <section id="recognition" style={{ background: "var(--surface)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", scrollMarginTop: 64 }}>
+        <div className="wrap" style={{ paddingTop: 96, paddingBottom: 96 }}>
+          <SectionHead
+            eyebrow="Recognition and review"
+            title="Selected, funded, reviewed."
+            body="Poincaré was selected as a UHI10 winner and then by the Uniswap Foundation Security Fund, which sponsored an independent security review."
+          />
+          <div className="grid gap-4 mt-12 grid-cols-1 md:grid-cols-3">
+            <Recognition
+              icon="spark"
+              tag="Uniswap Hook Incubator 10"
+              title="Hookathon winner"
+              body="Submitted to the UHI10 hookathon, where it was selected as one of the winners."
+              delay={0}
+            />
+            <Recognition
+              icon="layers"
+              tag="Uniswap Foundation"
+              title="Security Fund selection"
+              body="Subsequently selected by the Uniswap Foundation Security Fund, which sponsored a security review by Olympix."
+              delay={0.05}
+            />
+            <Recognition
+              icon="shield"
+              tag="Olympix review"
+              title="9 of 9 findings fixed"
+              body="All nine reported findings are fixed, and each carries a regression test that fails on the pre-fix code."
+              href={SECURITY_REVIEW}
+              cta="Read §11 · Security review"
+              delay={0.1}
+            />
           </div>
         </div>
       </section>
 
-      {/* moat */}
-      <section id="moat" className="px-6 md:px-10 py-16">
-        <div className="mx-auto grid gap-8 items-center grid-cols-1 lg:grid-cols-2" style={{ maxWidth: 1180 }}>
-          <motion.div {...fade()}>
-            <SectionTitle eyebrow="Why you can't game it" title="The manipulator pays their own toll" align="left" />
-            <p className="mt-4" style={{ fontSize: 15.5, lineHeight: 1.7, color: "var(--text-2)" }}>
-              To push the detector past its threshold, an attacker has to trade the price in one direction, repeatedly,
-              with real capital. Every one of those trades pays price impact, and the moment detection fires they also pay
-              the with-trend spread they just triggered. Arbitrageurs snap the price back the instant they stop.
+      {/* security model */}
+      <section id="security" style={{ background: "var(--ink)", color: "var(--ink-text)", scrollMarginTop: 64 }}>
+        <div className="wrap grid gap-12 lg:gap-16 items-center grid-cols-1 lg:grid-cols-2" style={{ paddingTop: 96, paddingBottom: 96 }}>
+          <motion.div {...fade()} className="flex flex-col gap-4">
+            <div className="eyebrow" style={{ color: "#c2bcf5" }}>Security model</div>
+            <h2 className="m-0" style={{ fontSize: "clamp(30px, 3.6vw, 40px)", lineHeight: 1.1, letterSpacing: "-.03em", fontWeight: 600 }}>
+              A manipulator pays their own toll.
+            </h2>
+            <p className="m-0" style={{ fontSize: 16, lineHeight: 1.65, color: "var(--ink-text-2)" }}>
+              To push the detector past its threshold, an attacker has to trade one way, repeatedly, with real capital.
+              Every trade pays price impact, and once detection fires they also pay the with-trend spread they triggered.
+              Arbitrageurs snap the price back the moment they stop.
             </p>
-            <div className="mt-6 flex flex-col gap-2.5">
-              <MoatRow label="Cost to fake a trend" value="impact + κ·notional" tone="down" />
-              <MoatRow label="Payoff if it works" value="marginal, LPs keep the spread" tone="muted" />
-              <MoatRow label="Net for the attacker" value="negative-EV" tone="up" />
-            </div>
           </motion.div>
-          <motion.div {...fade(0.1)} className="card grain relative overflow-hidden p-8">
-            <div className="anim-floaty" style={{ position: "absolute", right: -30, top: -30, width: 150, height: 150, borderRadius: 99, background: "radial-gradient(circle, rgba(142,136,216,.18), transparent 70%)" }} />
-            <Mark size={46} />
-            <blockquote className="font-display mt-5" style={{ fontSize: 21, fontWeight: 600, lineHeight: 1.45, color: "var(--text)" }}>
-              "The only way to fool the detector is to genuinely move the market. Which is exactly what it's supposed to react to."
-            </blockquote>
-            <p className="mt-4" style={{ fontSize: 13, color: "var(--text-3)" }}>
-              Three layers: a data-dependent firing time, a one-sided bounded spread, and natural arbitrage.
-            </p>
+          <motion.div {...fade(0.08)} style={{ border: "1px solid var(--ink-border)", borderRadius: "var(--r-xl)", overflow: "hidden" }}>
+            <MoatRow label="Cost to fake a trend" value="impact + κ·notional" color="#ef9db0" />
+            <MoatRow label="Payoff if it works" value="marginal · LPs keep the spread" />
+            <MoatRow label="Net for the attacker" value="negative EV" color="#8fd8ba" strong />
           </motion.div>
         </div>
       </section>
 
-      {/* final CTA */}
-      <section className="px-6 md:px-10 pb-20">
-        <motion.div {...fade()} className="mx-auto relative grain overflow-hidden text-center" style={{ maxWidth: 1180, borderRadius: 28, padding: "60px 24px", background: "linear-gradient(135deg, var(--lav-soft), var(--surface))", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}>
-          <h2 className="font-display" style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 700, color: "var(--text)" }}>
-            Trade or provide liquidity on a pool that protects you.
-          </h2>
-          <p className="mt-3 mx-auto" style={{ maxWidth: 540, fontSize: 15.5, color: "var(--text-2)", lineHeight: 1.6 }}>
-            Connect a wallet on Unichain Sepolia and watch the detector work in real time. Test tokens are free.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <LaunchButton size="lg" />
+      {/* CTA */}
+      <section className="wrap" style={{ paddingTop: 96, paddingBottom: 96 }}>
+        <motion.div {...fade()} className="panel grid gap-8 items-center grid-cols-1 md:grid-cols-[1.4fr_1fr]" style={{ padding: "clamp(28px, 4vw, 48px)" }}>
+          <div className="flex flex-col gap-2.5">
+            <h2 className="m-0" style={{ fontSize: "clamp(24px, 3vw, 32px)", letterSpacing: "-.025em", fontWeight: 600 }}>
+              Trade or provide liquidity on a pool that protects you.
+            </h2>
+            <p className="m-0" style={{ fontSize: 15, color: "var(--text-2)" }}>
+              Connect a wallet on Unichain Sepolia. Test tokens are free from the in-app faucet.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3 md:justify-end">
+            <a className="btn btn-ghost" href={REPO} target="_blank" rel="noreferrer">View source</a>
+            <LaunchButton large />
           </div>
         </motion.div>
       </section>
 
-      {/* footer */}
-      <footer className="px-6 md:px-10 py-8" style={{ borderTop: "1px solid var(--border)" }}>
-        <div className="mx-auto flex items-center justify-between flex-wrap gap-4" style={{ maxWidth: 1180 }}>
-          <Wordmark size={28} />
-          <div className="flex items-center gap-4 flex-wrap">
-            <a
-              href="https://x.com/Poincare_AMM"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-bold transition-colors hover:text-lav"
-              style={{ color: "var(--text-2)" }}
-            >
-              <Icon name="xSocial" size={13} />
-              @Poincare_AMM
+      <footer style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="wrap flex flex-wrap items-center justify-between gap-4" style={{ minHeight: 72, paddingTop: 16, paddingBottom: 16, fontSize: 13, color: "var(--text-3)" }}>
+          <span className="flex items-center gap-2.5">
+            <Mark size={22} />
+            Poincaré · Unichain Sepolia · research preview
+          </span>
+          <div className="flex items-center gap-5">
+            <a href="https://x.com/Poincare_AMM" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 transition-colors hover:text-lav" style={{ color: "var(--text-2)" }}>
+              <Icon name="xSocial" size={13} /> @Poincare_AMM
             </a>
-            <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--text-3)" }}>
-              <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-              Unichain Sepolia · testnet · research preview
-            </div>
+            <a href={REPO} target="_blank" rel="noreferrer" className="transition-colors hover:text-lav" style={{ color: "var(--text-2)" }}>GitHub</a>
           </div>
         </div>
       </footer>
@@ -203,62 +201,75 @@ export function Landing() {
   );
 }
 
-function Trust({ icon, text }: { icon: IconName; text: string }) {
+function NavLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span style={{ color: "var(--lav)" }}><Icon name={icon} size={15} /></span>
-      {text}
-    </span>
+    <button type="button" onClick={onClick} className="transition-colors hover:text-lav" style={{ color: "var(--text-3)", cursor: "pointer" }}>
+      {children}
+    </button>
   );
 }
 
-function NumberCard({ kpi, label, sub, tint }: { kpi: string; label: string; sub: string; tint?: boolean }) {
+function Slash() {
+  return <span aria-hidden style={{ color: "var(--faint)" }}>/</span>;
+}
+
+function SectionHead({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
   return (
-    <div className="rounded-card p-5" style={{ background: tint ? "var(--green-stat-bg)" : "var(--surface)", border: `1px solid ${tint ? "var(--green-border)" : "var(--border)"}`, boxShadow: "var(--shadow-sm)" }}>
-      <div className="font-display" style={{ fontSize: 30, fontWeight: 700, color: tint ? "var(--green-label)" : "var(--lav-deep)" }}>{kpi}</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)", marginTop: 4 }}>{label}</div>
-      <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{sub}</div>
+    <motion.div {...fade()} className="flex flex-col gap-3" style={{ maxWidth: 640 }}>
+      <div className="eyebrow">{eyebrow}</div>
+      <h2 className="m-0" style={{ fontSize: "clamp(30px, 3.6vw, 40px)", lineHeight: 1.1, letterSpacing: "-.03em", fontWeight: 600 }}>{title}</h2>
+      <p className="m-0" style={{ fontSize: 16, lineHeight: 1.6, color: "var(--text-2)" }}>{body}</p>
+    </motion.div>
+  );
+}
+
+function Result({ kpi, label, sub, good, last }: { kpi: string; label: string; sub: string; good?: boolean; last?: boolean }) {
+  return (
+    <div className={`py-7 pr-5 md:pl-6 md:first:pl-0 ${last ? "" : "md:border-r"}`} style={{ borderColor: "var(--divider)" }}>
+      <div className="num" style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 600, color: good ? "var(--up-deep)" : "var(--text)" }}>{kpi}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{sub}</div>
     </div>
   );
 }
 
-function SectionTitle({ eyebrow, title, align = "center" }: { eyebrow: string; title: string; align?: "center" | "left" }) {
+function Step({ n, tag, title, body, delay }: { n: string; tag: string; title: string; body: string; delay: number }) {
   return (
-    <div style={{ textAlign: align }}>
-      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".6px", color: "var(--lav)", textTransform: "uppercase" }}>{eyebrow}</div>
-      <h2 className="font-display mt-2" style={{ fontSize: "clamp(24px,3vw,34px)", fontWeight: 700, color: "var(--text)" }}>{title}</h2>
-    </div>
+    <motion.div {...fade(delay)} className="panel flex flex-col gap-3.5" style={{ padding: 28 }}>
+      <div className="num" style={{ fontSize: 12, color: "var(--lav-deep)", letterSpacing: ".06em" }}>{n} · {tag.toUpperCase()}</div>
+      <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.01em" }}>{title}</div>
+      <p className="m-0" style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-2)" }}>{body}</p>
+    </motion.div>
   );
 }
 
-function Feature({ icon, color, title, body }: { icon: IconName; color: string; title: string; body: string }) {
+function Recognition({
+  icon, tag, title, body, href, cta, delay,
+}: { icon: IconName; tag: string; title: string; body: string; href?: string; cta?: string; delay: number }) {
   return (
-    <motion.div {...fade()} className="card p-6">
-      <div className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 14, background: "var(--surface-2)", border: "1px solid var(--border)", color }}>
-        <Icon name={icon} size={22} />
+    <motion.div {...fade(delay)} className="flex flex-col gap-3.5" style={{ padding: 28, borderRadius: "var(--r-card)", border: "1px solid var(--border)", background: "var(--page)" }}>
+      <div className="flex items-center justify-between">
+        <span className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "var(--r-sm)", background: "var(--lav-soft)", color: "var(--lav-deep)" }}>
+          <Icon name={icon} size={18} />
+        </span>
+        <span className="num" style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".04em", textTransform: "uppercase" }}>{tag}</span>
       </div>
-      <h3 className="font-display mt-4" style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{title}</h3>
-      <p className="mt-2" style={{ fontSize: 14, lineHeight: 1.65, color: "var(--text-3)" }}>{body}</p>
+      <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.01em", marginTop: 6 }}>{title}</div>
+      <p className="m-0" style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-2)" }}>{body}</p>
+      {href && (
+        <a href={href} target="_blank" rel="noreferrer" className="mt-auto inline-flex items-center gap-1.5" style={{ fontSize: 13, fontWeight: 500, color: "var(--lav-deep)", paddingTop: 6 }}>
+          {cta} <Icon name="external" size={13} />
+        </a>
+      )}
     </motion.div>
   );
 }
 
-function Step({ n, title, body }: { n: string; title: string; body: string }) {
+function MoatRow({ label, value, color, strong }: { label: string; value: string; color?: string; strong?: boolean }) {
   return (
-    <motion.div {...fade()} className="card-quiet p-6">
-      <div className="font-display" style={{ fontSize: 14, fontWeight: 700, color: "var(--lav)" }}>{n}</div>
-      <h3 className="font-display mt-2" style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{title}</h3>
-      <p className="mt-2" style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--text-3)" }}>{body}</p>
-    </motion.div>
-  );
-}
-
-function MoatRow({ label, value, tone }: { label: string; value: string; tone: "up" | "down" | "muted" }) {
-  const color = tone === "up" ? "var(--green-label)" : tone === "down" ? "var(--down-deep)" : "var(--text-2)";
-  return (
-    <div className="flex items-center justify-between rounded-md px-4 py-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-      <span style={{ fontSize: 13, color: "var(--text-3)" }}>{label}</span>
-      <span style={{ fontSize: 13.5, fontWeight: 800, color }}>{value}</span>
+    <div className="flex flex-wrap items-center justify-between gap-3" style={{ padding: "20px 24px", borderTop: "1px solid var(--ink-border)", marginTop: -1, background: strong ? "var(--ink-2)" : undefined }}>
+      <span style={{ color: strong ? "var(--ink-text)" : "var(--ink-text-2)", fontWeight: strong ? 600 : 400 }}>{label}</span>
+      <span className="num" style={{ color: color ?? "var(--ink-text)", fontWeight: strong ? 600 : 400 }}>{value}</span>
     </div>
   );
 }

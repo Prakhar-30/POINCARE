@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { ACTIVE_CHAIN_ID, LIVE_CHAIN_IDS, setActiveChain } from "@/config/contracts";
-import { TopNav, type Tab } from "./TopNav";
+import { TopNav } from "./TopNav";
+import { Sidebar, type Tab } from "./Sidebar";
 import { WalletGate } from "./WalletGate";
 import { Dashboard } from "./screens/Dashboard";
 import { Trade } from "./screens/Trade";
@@ -25,24 +26,32 @@ function useChainSync() {
 
 export function AppShell() {
   const { isConnected } = useAccount();
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [tab, setTabState] = useState<Tab>("dashboard");
   useWalletIdentity();
   useChainSync();
+
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    window.scrollTo({ top: 0 });
+  };
 
   if (!isConnected) return <WalletGate />;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
-      <TopNav tab={tab} setTab={setTab} />
-      <WrongNetworkBanner />
-      <AnnouncementMarquee />
-      <div className="flex-1">
-        {tab === "dashboard" && <Dashboard />}
-        {tab === "trade" && <Trade />}
-        {tab === "pool" && <Pool />}
-        {tab === "analytics" && <Analytics />}
+    <div className="min-h-screen flex" style={{ background: "var(--app-bg)" }}>
+      <Sidebar tab={tab} setTab={setTab} />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <AnnouncementMarquee />
+        <TopNav tab={tab} setTab={setTab} />
+        <WrongNetworkBanner />
+        <main className="flex-1 w-full mx-auto" style={{ maxWidth: 1320 }}>
+          {tab === "dashboard" && <Dashboard />}
+          {tab === "trade" && <Trade />}
+          {tab === "pool" && <Pool />}
+          {tab === "analytics" && <Analytics />}
+        </main>
+        <AppFooter />
       </div>
-      <AppFooter />
     </div>
   );
 }

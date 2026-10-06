@@ -11,7 +11,6 @@ import { Icon } from "@/components/ui/Icon";
 import { BondingCurve } from "@/components/ui/BondingCurve";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
-import { useIsNarrow } from "@/hooks/useMediaQuery";
 
 export function Pool() {
   const s = usePoolState();
@@ -19,101 +18,108 @@ export function Pool() {
   const bal = useBalances();
   const totals = usePoolTotals().data;
   const lp = useLiquidity(() => { pos.refetch(); bal.refetch(); });
-  const narrow = useIsNarrow();
 
   const [mode, setMode] = useState<"add" | "remove">("add");
 
   const price = pos.price || s.price;
   const lpLvr = totals ? totals.lvr_avoided * pos.sharePct : 0;
 
+  const hasPos = pos.shares > 0;
+
   return (
     <>
     <TxSteps stepper={lp.stepper} title={mode === "add" ? "Adding liquidity" : "Removing liquidity"} />
-    <div className="grid gap-4.5 px-4 sm:px-6 pb-8 pt-5 items-start" style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,440px) minmax(0,1fr)", gap: 18 }}>
-      <div className="card p-5 sm:p-6 min-w-0">
-        <div className="flex gap-1 mb-5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 4 }}>
-          {(["add", "remove"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); lp.reset(); }}
-              className="flex-1 font-bold"
-              style={{
-                padding: "9px", borderRadius: 10, fontSize: 13, letterSpacing: ".2px", transition: "all .15s",
-                background: mode === m ? "var(--surface)" : "transparent",
-                color: mode === m ? "var(--text)" : "var(--muted)",
-                boxShadow: mode === m ? "var(--shadow-sm)" : "none",
-              }}
-            >
-              {m === "add" ? "Add liquidity" : "Remove"}
-            </button>
-          ))}
+    <div className="flex flex-col px-4 sm:px-7 py-6" style={{ gap: 20 }}>
+      {/* position strip */}
+      <div className="kpi-strip">
+        <Kpi label="Your position" value={hasPos ? fmtUsd(pos.valueUsdc) : "—"} />
+        <Kpi label="Pool share" value={hasPos ? fmtPct(pos.sharePct) : "—"} />
+        <Kpi label="LP shares" value={hasPos ? fmtNum(pos.shares, 4) : "—"} />
+        <div className="kpi-good">
+          <div className="lbl" style={{ color: "var(--green-label)" }}>Your share of LVR kept</div>
+          <div className="num" style={{ fontSize: 22, fontWeight: 600, marginTop: 6, color: "var(--green-label)" }}>
+            {pos.sharePct > 0 ? fmtUsd(lpLvr, { dp: 2 }) : "—"}
+          </div>
         </div>
-
-        {mode === "add"
-          ? <AddPanel price={price} bal={bal} lp={lp} />
-          : <RemovePanel pos={pos} lp={lp} />}
       </div>
 
-      <div className="flex flex-col gap-4.5 min-w-0" style={{ gap: 18 }}>
-        <div className="card grain overflow-hidden">
-          <div className="flex items-center justify-between gap-2 flex-wrap px-5 sm:px-6 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
-            <div className="flex items-center gap-2.5">
-              <span style={{ color: "var(--lav)" }}><Icon name="curve" size={18} /></span>
-              <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Live bonding curve</span>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--faint)" }}>{fmtUsd(price)} / WETH</span>
+      <div className="grid gap-5 items-start grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px]">
+        {/* ticket */}
+        <section className="panel p-5 min-w-0 xl:order-2 xl:sticky" style={{ top: 84, boxShadow: "var(--shadow-lg)" }}>
+          <div className="seg w-full mb-4" role="group" aria-label="Add or remove liquidity" style={{ padding: 4 }}>
+            {(["add", "remove"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => { setMode(m); lp.reset(); }}
+                className="flex-1"
+                style={{ height: 36, fontSize: 14 }}
+              >
+                {m === "add" ? "Add" : "Remove"}
+              </button>
+            ))}
           </div>
-          <div className="p-5 sm:p-6 pt-5">
-            <BondingCurve r0={pos.r0} r1={pos.r1} spreadZeroForOne={s.spreadZeroForOne} spreadOneForZero={s.spreadOneForZero} trend={s.trend} />
-            <p className="mt-4" style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-3)" }}>
-              Liquidity sits on the constant-product invariant. When the CUSUM detector flags a trend, the with-trend
-              side of the curve steepens by the directional spread, and that captured value is what a normal pool leaks
-              to arbitrageurs as LVR. In calm markets both slopes coincide and the pool trades deep and symmetric.
-            </p>
-          </div>
-        </div>
 
-        <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
-          <div className="card-quiet p-5">
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".3px", color: "var(--text-3)", marginBottom: 14 }}>Your position</div>
-            {pos.shares > 0 ? (
-              <>
-                <Row label="Pool value" value={fmtUsd(pos.valueUsdc)} big />
-                <Row label="Pool share" value={fmtPct(pos.sharePct)} />
-                <Row label="WETH" value={`${fmtNum(pos.underlying1, 4)}`} />
-                <Row label="USDC" value={`${fmtNum(pos.underlying0, 2)}`} />
-                <Row label="LP shares" value={fmtNum(pos.shares, 4)} />
-              </>
-            ) : (
-              <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.7, padding: "8px 0" }}>
-                You have no liquidity yet. Add USDC and WETH at the current ratio to start earning the directional spread.
+          {mode === "add"
+            ? <AddPanel price={price} bal={bal} lp={lp} />
+            : <RemovePanel pos={pos} lp={lp} />}
+        </section>
+
+        <div className="flex flex-col min-w-0 xl:order-1" style={{ gap: 20 }}>
+          <section className="panel overflow-hidden">
+            <div className="panel-head">
+              <div className="flex items-center gap-2.5">
+                <span style={{ color: "var(--lav-deep)" }}><Icon name="curve" size={17} /></span>
+                <h2 className="panel-title">Bonding curve · live</h2>
               </div>
-            )}
-          </div>
+              <span className="panel-sub num">{fmtUsd(price)} / WETH</span>
+            </div>
+            <div className="p-5">
+              <BondingCurve r0={pos.r0} r1={pos.r1} spreadZeroForOne={s.spreadZeroForOne} spreadOneForZero={s.spreadOneForZero} trend={s.trend} />
+              <p className="m-0 mt-4" style={{ fontSize: 13, lineHeight: 1.65, color: "var(--text-2)" }}>
+                Liquidity sits on the constant-product invariant. When the CUSUM detector flags a trend, the with-trend
+                side of the curve steepens by the directional spread, and that captured value is what a normal pool leaks
+                to arbitrageurs as LVR. In calm markets both slopes coincide and the pool trades deep and symmetric.
+              </p>
+            </div>
+          </section>
 
-          <div
-            className="relative overflow-hidden"
-            style={{ border: "1px solid var(--green-border)", borderRadius: "var(--r-card)", background: "var(--green-bg)", padding: 20, boxShadow: "var(--shadow-glow-up)" }}
-          >
-            <div className="anim-floaty" style={{ position: "absolute", right: -24, top: -24, width: 110, height: 110, borderRadius: 99, background: "radial-gradient(circle, rgba(107,184,154,.22), transparent 70%)" }} />
-            <div className="flex items-center gap-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--green-label)", marginBottom: 10 }}>
-              <Icon name="spark" size={15} /> Your LVR avoided
+          <section className="panel">
+            <div className="panel-head"><h2 className="panel-title">Your position</h2></div>
+            <div className="px-5 py-1.5">
+              {hasPos ? (
+                <>
+                  <div className="kv"><span>WETH</span><span className="num">{fmtNum(pos.underlying1, 4)}</span></div>
+                  <div className="kv"><span>USDC</span><span className="num">{fmtNum(pos.underlying0, 2)}</span></div>
+                  <div className="kv"><span>Value</span><span className="num">{fmtUsd(pos.valueUsdc)}</span></div>
+                  <div className="kv"><span>Pool-wide LVR kept</span><span className="num">{totals ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"}</span></div>
+                </>
+              ) : (
+                <p className="m-0 py-3" style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.65 }}>
+                  You have no liquidity yet. Add USDC and WETH at the current ratio to start earning the directional spread.
+                </p>
+              )}
             </div>
-            <div className="font-display" style={{ fontSize: 28, fontWeight: 700, color: "var(--green-label)", lineHeight: 1 }}>
-              {pos.sharePct > 0 ? fmtUsd(lpLvr, { dp: 2 }) : "—"}
-            </div>
-            <div style={{ marginTop: 9, fontSize: 11.5, fontWeight: 600, color: "var(--green-rate)" }}>
-              your {fmtPct(pos.sharePct)} share of {totals ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} captured pool-wide
-            </div>
-            <div style={{ marginTop: 13, paddingTop: 12, borderTop: "1px solid var(--green-border)", fontSize: 11, color: "var(--green-sub)", lineHeight: 1.6 }}>
-              Spread the pool charged with-trend flow, retained for LPs instead of leaking to arbitrageurs. Accrues as
-              trades are recorded. Not guaranteed.
-            </div>
-          </div>
+          </section>
+
+          <p className="m-0" style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)" }}>
+            LVR kept is the spread the pool charged with-trend flow, retained for LPs instead of leaking to arbitrageurs.
+            It accrues as trades are recorded and is not guaranteed.
+          </p>
         </div>
       </div>
     </div>
     </>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="lbl">{label}</div>
+      <div className="num truncate" style={{ fontSize: 22, fontWeight: 600, marginTop: 6 }}>{value}</div>
+    </div>
   );
 }
 
@@ -148,23 +154,23 @@ function AddPanel({ price, bal, lp }: { price: number; bal: ReturnType<typeof us
 
   return (
     <>
-      <LiqInput label="USDC" sub={`balance ${fmtNum(bal.usdc, 2)}`} value={usdc} onInput={onUsdc} />
-      <div className="flex items-center justify-center" style={{ margin: "10px 0", color: "var(--faint)" }}><Icon name="plus" size={16} /></div>
-      <LiqInput label="WETH" sub={`balance ${fmtNum(bal.weth, 4)}`} value={weth} onInput={onWeth} />
+      <LiqInput label="USDC" sub={`Balance ${fmtNum(bal.usdc, 2)}`} value={usdc} onInput={onUsdc} />
+      <div className="flex items-center justify-center" style={{ margin: "8px 0", color: "var(--muted)" }}><Icon name="plus" size={15} /></div>
+      <LiqInput label="WETH" sub={`Balance ${fmtNum(bal.weth, 4)}`} value={weth} onInput={onWeth} />
 
-      <div className="mt-4 flex flex-col gap-2.5 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
+      <div className="mt-3">
         <Detail label="Deposit value" value={fmtUsd(valueUsdc)} />
         <Detail label="Pool ratio" value={`${fmtUsd(price)} / WETH`} />
         <Detail label="Added at" value="current reserve ratio" />
       </div>
 
-      <button onClick={onAdd} disabled={disabled} className="mt-5 w-full font-bold"
+      <button type="button" onClick={onAdd} disabled={disabled} className="btn btn-primary btn-block mt-4"
         style={ctaStyle(disabled, lp.status === "success")}>
         {busy ? "Confirming…" : lp.status === "success" ? "Added ✓" : insufficient ? "Insufficient balance" : "Add liquidity"}
       </button>
 
       {(bal.usdc < u || bal.weth < w) && (
-        <p className="mt-3 text-center" style={{ fontSize: 11, color: "var(--muted)" }}>Need test tokens? Grab them from the Trade tab faucet.</p>
+        <p className="mt-3 mb-0 text-center" style={{ fontSize: 12, color: "var(--muted)" }}>Need test tokens? Use “Get test tokens” in the sidebar or footer.</p>
       )}
     </>
   );
@@ -189,62 +195,58 @@ function RemovePanel({ pos, lp }: { pos: ReturnType<typeof usePosition>; lp: Ret
   }
 
   if (pos.shares <= 0) {
-    return <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.7, padding: "20px 4px" }}>No liquidity to remove. Add some first.</div>;
+    return <div style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.7, padding: "20px 4px" }}>No liquidity to remove. Add some first.</div>;
   }
 
   return (
     <>
-      <div className="flex items-baseline justify-between mb-1">
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>Amount to remove</span>
-        <span className="font-display" style={{ fontSize: 30, fontWeight: 800, color: "var(--text)" }}>{pct}%</span>
+      <div className="field">
+        <label htmlFor="remove-pct" className="lbl">Amount to remove</label>
+        <div className="num" style={{ fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1.1, marginTop: 6 }}>{pct}%</div>
+        <input id="remove-pct" type="range" min={1} max={100} value={pct} onChange={(e) => setPct(Number(e.target.value))}
+          style={{ width: "100%", accentColor: "var(--primary)", margin: "12px 0 2px" }} />
       </div>
-      <input type="range" min={1} max={100} value={pct} onChange={(e) => setPct(Number(e.target.value))}
-        style={{ width: "100%", accentColor: "var(--lav)", margin: "8px 0 4px" }} />
-      <div className="flex gap-2 mt-2">
+      <div className="flex gap-1.5 mt-2.5">
         {[25, 50, 75, 100].map((p) => (
-          <button key={p} onClick={() => setPct(p)} className="flex-1 font-bold"
-            style={{ padding: "8px", borderRadius: 10, fontSize: 12, background: pct === p ? "var(--lav-soft)" : "var(--surface-2)", color: pct === p ? "var(--lav-deep)" : "var(--muted)", border: "1px solid var(--border)" }}>
+          <button key={p} type="button" onClick={() => setPct(p)} className="num flex-1"
+            style={{ height: 34, borderRadius: "var(--r-sm)", fontSize: 13, background: "var(--surface)", color: pct === p ? "var(--lav-deep)" : "var(--text-3)", border: `1px solid ${pct === p ? "var(--lav)" : "var(--border)"}`, cursor: "pointer" }}>
             {p === 100 ? "Max" : `${p}%`}
           </button>
         ))}
       </div>
 
-      <div className="mt-5 flex flex-col gap-2.5 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
+      <div className="mt-3">
         <Detail label="You receive · USDC" value={fmtNum(out0, 2)} />
         <Detail label="You receive · WETH" value={fmtNum(out1, 4)} />
         <Detail label="Value" value={fmtUsd(valueUsdc)} />
       </div>
 
-      <button onClick={onRemove} disabled={disabled} className="mt-5 w-full font-bold"
-        style={ctaStyle(disabled, lp.status === "success", "var(--down-deep)", "rgba(229,140,160,.3)")}>
+      <button type="button" onClick={onRemove} disabled={disabled} className="btn btn-primary btn-block mt-4"
+        style={ctaStyle(disabled, lp.status === "success", "var(--ink)")}>
         {busy ? "Confirming…" : lp.status === "success" ? "Removed ✓" : "Remove liquidity"}
       </button>
     </>
   );
 }
 
-function ctaStyle(disabled: boolean, success: boolean, base = "var(--up-deep)", glow = "rgba(107,184,154,.3)"): CSSProperties {
-  return {
-    color: "#fff",
-    background: disabled ? "var(--faint)" : success ? "var(--up)" : base,
-    borderRadius: 16, padding: "15px", fontSize: 14.5, letterSpacing: ".3px",
-    boxShadow: disabled ? "none" : `0 8px 20px ${glow}`,
-    cursor: disabled ? "not-allowed" : "pointer", transition: "background .2s",
-  };
+function ctaStyle(disabled: boolean, success: boolean, base?: string): CSSProperties | undefined {
+  if (success) return { background: "var(--up-deep)" };
+  return base && !disabled ? { background: base } : undefined;
 }
 
 function LiqInput({ label, sub, value, onInput }: { label: string; sub: string; value: string; onInput: (v: string) => void }) {
+  const id = `liq-${label.toLowerCase()}`;
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 16, background: "var(--surface-2)", padding: "15px 16px" }}>
-      <div className="flex justify-between" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 9 }}>
-        <span>{label}</span><span>{sub}</span>
+    <div className="field">
+      <div className="flex justify-between lbl" style={{ marginBottom: 8 }}>
+        <label htmlFor={id}>{label}</label><span className="num">{sub}</span>
       </div>
       <div className="flex items-center gap-2.5">
-        <input value={value} onChange={(e) => onInput(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
-          style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 26, fontWeight: 800 }} />
-        <div className="flex items-center gap-2" style={{ background: "var(--surface)", border: "1px solid var(--nav-border)", borderRadius: 22, padding: "7px 13px 7px 8px", boxShadow: "var(--shadow-sm)" }}>
+        <input id={id} className="num" value={value} onChange={(e) => onInput(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
+          style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 24, fontWeight: 500 }} />
+        <div className="flex items-center gap-2 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 99, padding: "6px 12px 6px 7px" }}>
           <TokenIcon sym={label} size={20} />
-          <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{label}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{label}</span>
         </div>
       </div>
     </div>
@@ -253,18 +255,6 @@ function LiqInput({ label, sub, value, onInput }: { label: string; sub: string; 
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between" style={{ fontSize: 12 }}>
-      <span style={{ color: "var(--text-3)" }}>{label}</span>
-      <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{value}</span>
-    </div>
-  );
-}
-
-function Row({ label, value, big }: { label: string; value: string; big?: boolean }) {
-  return (
-    <div className="flex justify-between items-center" style={{ padding: "7px 0" }}>
-      <span style={{ fontSize: 12.5, color: "var(--text-3)" }}>{label}</span>
-      <span style={{ fontSize: big ? 18 : 13, fontWeight: big ? 800 : 700, color: big ? "var(--text)" : "var(--text-2)" }}>{value}</span>
-    </div>
+    <div className="kv"><span>{label}</span><span className="num">{value}</span></div>
   );
 }

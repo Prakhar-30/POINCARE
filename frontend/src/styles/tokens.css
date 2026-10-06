@@ -1,104 +1,120 @@
 /* ============================================================================
-   Poincaré design tokens: soft finance palette (Nunito + Quicksand).
-   Ported from the "Poincare Soft" study and extended with a proper elevation,
-   radius and motion scale so the UI reads crafted, not templated.
-   Light is default; [data-theme="dark"] overrides.
+   Poincaré design tokens: the original soft finance palette (lavender, mint,
+   rose, honey) on a sharper, denser system: Geist + Geist Mono, hairline
+   borders, tight radii and near-flat elevation.
+   Light is default; the dark block below overrides.
    ========================================================================== */
 :root {
   /* surfaces */
-  --page: #f4f1f9;
+  --page: #f6f4fa;
   --surface: #ffffff;
-  --surface-2: #faf8fd;
+  --surface-2: #faf9fd;
   --surface-3: #f3effa;
   --scope-bg: #fbfafe;
-  --border: #eeeaf4;
-  --border-strong: #e3ddee;
-  --divider: #f1edf7;
+  --border: #e7e2ef;
+  --border-strong: #d9d2e6;
+  --divider: #efebf5;
   --divider-2: #f6f2fb;
 
   /* chrome */
-  --nav-bg: rgba(255, 255, 255, 0.78);
-  --nav-border: #ebe6f3;
-  --nav-pill: #eeebf6;
+  --nav-bg: rgba(255, 255, 255, 0.9);
+  --nav-border: #e7e2ef;
+  --nav-pill: #f3f0f9;
+  --nav-active: #efedfb;
   --track: #f1edf7;
 
   /* text */
-  --text: #3f3a56;
-  --text-2: #5c5775;
-  --text-3: #8a85a0;
-  --muted: #a39db8;
+  --text: #2a2640;
+  --text-2: #4f4a68;
+  --text-3: #6e6986;
+  --muted: #8a85a0;
   --faint: #b6b1c8;
 
   /* brand + semantic */
   --up: #6bb89a;
-  --up-deep: #4e9c7e;
+  --up-deep: #3f8a6c;
   --up-dim: #a8d8c4;
   --down: #e58ca0;
-  --down-deep: #c96a82;
+  --down-deep: #c25a74;
   --down-dim: #f2c0cc;
   --lav: #8e88d8;
-  --lav-deep: #6f68c8;
+  --lav-deep: #5b54b8;
   --lav-dim: #c5c1ed;
-  --lav-soft: #eeebfa;
+  --lav-soft: #efedfb;
   --honey: #e6b25f;
-  --honey-deep: #d49a45;
+  --honey-deep: #9a6f24;
   --usdc: #7ca8e0;
   --eth: #9d96e0;
 
+  /* primary action */
+  --primary: #5b54b8;
+  --primary-hover: #4a43a6;
+  --primary-fg: #ffffff;
+
+  /* ink: the dark bands (security section, connect aside, ticker) */
+  --ink: #1e1b2c;
+  --ink-2: #252237;
+  --ink-border: #36304a;
+  --ink-text: #efeaf7;
+  --ink-text-2: #b8b1cc;
+
   /* tinted cards */
-  --green-bg: linear-gradient(150deg, #eaf6f0, #f4fbf7);
+  --green-bg: #f4fbf7;
   --green-border: #d6ebe0;
-  --green-label: #4e9c7e;
-  --green-sub: #7c9c8e;
-  --green-rate: #6bae92;
-  --green-stat-bg: linear-gradient(135deg, #eaf6f0, #f2faf6);
+  --green-label: #3f8a6c;
+  --green-sub: #5f8a78;
+  --green-rate: #4e9c7e;
+  --green-stat-bg: #f4fbf7;
   --change-up-bg: #eaf6f0;
   --change-down-bg: #fbecf0;
-  --warn-bg: linear-gradient(150deg, #fbf4e5, #fdf9f0);
+  --warn-bg: #fbf4e5;
   --warn-border: #f0e2c8;
-  --warn-label: #c99a3e;
+  --warn-label: #9a6f24;
   --warn-text: #6e6884;
   --warn-inner-bg: #ffffff;
   --warn-inner-border: #f1ead8;
 
-  /* elevation */
-  --shadow-sm: 0 2px 14px rgba(123, 113, 158, 0.07);
-  --shadow-card: 0 4px 20px rgba(123, 113, 158, 0.08);
-  --shadow-lg: 0 18px 50px rgba(123, 113, 158, 0.16);
-  --shadow-glow-up: 0 10px 30px rgba(107, 184, 154, 0.22);
-  --scrim: rgba(60, 54, 88, 0.32);
+  /* elevation: near-flat, borders do the separating */
+  --shadow-sm: 0 1px 2px rgba(42, 38, 64, 0.04);
+  --shadow-card: 0 1px 2px rgba(42, 38, 64, 0.04);
+  --shadow-lg: 0 24px 48px -24px rgba(60, 50, 110, 0.24);
+  --shadow-glow-up: none;
+  --scrim: rgba(30, 27, 44, 0.42);
 
   /* radii */
-  --r-sm: 12px;
-  --r-md: 16px;
-  --r-card: 22px;
-  --r-xl: 28px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-card: 12px;
+  --r-xl: 16px;
 
-  /* page background wash */
-  --app-bg: radial-gradient(900px 500px at 85% -10%, rgba(142, 136, 216, 0.1), transparent 60%),
-    radial-gradient(720px 460px at 4% 6%, rgba(107, 184, 154, 0.08), transparent 55%), #f4f1f9;
+  /* layout */
+  --sidebar-w: 232px;
+
+  /* page background */
+  --app-bg: #f6f4fa;
 }
 
 [data-theme="dark"] {
   --page: #16131f;
-  --surface: #232031;
-  --surface-2: #1e1b2a;
-  --surface-3: #272338;
+  --surface: #1f1c2b;
+  --surface-2: #1a1726;
+  --surface-3: #262236;
   --scope-bg: #1a1726;
-  --border: #312c42;
+  --border: #2e2940;
   --border-strong: #3b3550;
   --divider: #2a2639;
   --divider-2: #241f31;
 
-  --nav-bg: rgba(22, 19, 31, 0.82);
+  --nav-bg: rgba(31, 28, 43, 0.9);
   --nav-border: #2e2940;
-  --nav-pill: #221e30;
+  --nav-pill: #262236;
+  --nav-active: #2c2742;
   --track: #2a2539;
 
-  --text: #efeaf7;
+  --text: #f2eff8;
   --text-2: #cbc4dc;
-  --text-3: #9e97b2;
-  --muted: #837c97;
+  --text-3: #a39cb6;
+  --muted: #8a839e;
   --faint: #655f79;
 
   --up: #74c6a4;
@@ -116,27 +132,36 @@
   --usdc: #7ca8e0;
   --eth: #9d96e0;
 
-  --green-bg: linear-gradient(150deg, #1e392f, #1a2e27);
+  --primary: #6f68c8;
+  --primary-hover: #7d76d4;
+  --primary-fg: #ffffff;
+
+  --ink: #110f19;
+  --ink-2: #1a1726;
+  --ink-border: #2e2940;
+  --ink-text: #efeaf7;
+  --ink-text-2: #a39cb6;
+
+  --green-bg: #1b2e27;
   --green-border: #2c4a3c;
   --green-label: #8fd8ba;
   --green-sub: #7fb3a0;
   --green-rate: #74c6a4;
-  --green-stat-bg: linear-gradient(135deg, #1e392f, #1a2e27);
+  --green-stat-bg: #1b2e27;
   --change-up-bg: #1e392f;
   --change-down-bg: #3a2530;
-  --warn-bg: linear-gradient(150deg, #322b1b, #272217);
+  --warn-bg: #2b2518;
   --warn-border: #4a3f28;
   --warn-label: #ecbe6e;
   --warn-text: #b8b0c4;
-  --warn-inner-bg: #1e1b2a;
+  --warn-inner-bg: #1a1726;
   --warn-inner-border: #3a331f;
 
-  --shadow-sm: 0 2px 16px rgba(0, 0, 0, 0.26);
-  --shadow-card: 0 6px 24px rgba(0, 0, 0, 0.34);
-  --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.46);
-  --shadow-glow-up: 0 10px 30px rgba(116, 198, 164, 0.18);
-  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 24px 48px -20px rgba(0, 0, 0, 0.6);
+  --shadow-glow-up: none;
+  --scrim: rgba(0, 0, 0, 0.6);
 
-  --app-bg: radial-gradient(900px 500px at 85% -10%, rgba(142, 136, 216, 0.18), transparent 60%),
-    radial-gradient(720px 460px at 4% 6%, rgba(107, 184, 154, 0.12), transparent 55%), #16131f;
+  --app-bg: #16131f;
 }

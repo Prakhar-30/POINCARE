@@ -39,11 +39,11 @@ export function Gauge({
           transform="rotate(-90 46 46)"
           style={{ transition: "stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)" }}
         />
-        <text x="46" y="44" textAnchor="middle" fontSize="18" fontWeight="800" fontFamily="Nunito" style={{ fill: "var(--text)" }}>
+        <text x="46" y="44" textAnchor="middle" fontSize="18" fontWeight="600" fontFamily="Geist Mono" style={{ fill: "var(--text)" }}>
           {display}
           {suffix}
         </text>
-        <text x="46" y="58" textAnchor="middle" fontSize="8.5" fontWeight="700" fontFamily="Nunito" style={{ fill: "var(--muted)" }}>
+        <text x="46" y="58" textAnchor="middle" fontSize="8.5" fontWeight="500" fontFamily="Geist" style={{ fill: "var(--muted)" }}>
           of {Math.round(max * scale)}
           {suffix}
         </text>

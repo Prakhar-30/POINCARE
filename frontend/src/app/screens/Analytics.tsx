@@ -4,7 +4,7 @@ import { useDetectorConfig } from "@/hooks/useDetectorConfig";
 import { useDetectorSeries } from "@/hooks/useDetectorSeries";
 import { usePoolTotals, useWalletTotals, useTape } from "@/hooks/useBackend";
 import { fmtPct, fmtUsd, fmtNum } from "@/lib/format";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
 import { AiNote } from "@/components/ui/AiNote";
 import { useExplain } from "@/hooks/useExplain";
@@ -97,32 +97,22 @@ export function Analytics() {
   });
 
   return (
-    <div className="px-4 sm:px-6 pb-10 pt-5 flex flex-col" style={{ gap: 18 }}>
+    <div className="px-4 sm:px-7 py-6 flex flex-col" style={{ gap: 20 }}>
       {/* ---------------- the report ---------------- */}
-      <div className="card grain overflow-hidden">
-        <div
-          className="flex items-center justify-between gap-2 flex-wrap px-6 py-4"
-          style={{ borderBottom: "1px solid var(--divider)" }}
-        >
+      <div className="panel overflow-hidden">
+        <div className="panel-head">
           <div className="flex items-center gap-2.5">
-            <span style={{ color: "var(--lav)" }}><Icon name="brain" size={18} /></span>
-            <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
-              Pool report
-            </span>
-            <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600, color: "var(--faint)" }}>
-              · written over this pool's own trace
-            </span>
+            <span style={{ color: "var(--lav-deep)" }}><Icon name="brain" size={17} /></span>
+            <h2 className="panel-title">Pool report</h2>
+            <span className="panel-sub hidden md:inline">written over this pool's own trace</span>
           </div>
-          <span
-            className="rounded-full px-3 py-1.5"
-            style={{ fontSize: 11.5, fontWeight: 700, color: "var(--faint)", background: "var(--surface-2)" }}
-          >
+          <span className="pill" style={{ color: "var(--text-3)", background: "var(--nav-pill)" }}>
             {a.samples} samples · {totals?.swap_count ?? 0} swaps
           </span>
         </div>
 
         <div
-          className="grid gap-6 p-4 sm:p-6"
+          className="grid gap-6 p-5"
           style={{ gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1.35fr) minmax(0,1fr)" }}
         >
           <div style={{ minWidth: 0 }}>
@@ -137,12 +127,12 @@ export function Analytics() {
 
       {/* ---------------- what it kept, and who paid ---------------- */}
       <div
-        className="grid gap-4.5"
-        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.15fr) minmax(0,1fr)", gap: 18 }}
+        className="grid"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.15fr) minmax(0,1fr)", gap: 20 }}
       >
-        <div className="card p-6">
-          <SectionLabel icon="chart" text="Value kept for liquidity providers" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+        <div className="panel p-6">
+          <SectionLabel icon="analytics" text="Value kept for liquidity providers" />
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             Cumulative spread retained from flow that pushed into a detected trend. On a plain
             constant-product pool this is value that would simply have left.
           </p>
@@ -153,7 +143,7 @@ export function Analytics() {
             <Mini label="volume leaned on" value={cf.withTrendNotional > 0 ? fmtUsd(cf.withTrendNotional, { dp: 0 }) : "—"} color="var(--text-2)" />
           </div>
           {biggest && (
-            <p style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.55, marginTop: 12 }}>
+            <p style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.55, margin: "12px 0 0" }}>
               Largest single lean: <b style={{ color: "var(--text-2)" }}>{fmtUsd(biggest.notional_usdc, { dp: 0 })}</b>{" "}
               {biggest.side === "buy_weth" ? "buying" : "selling"} WETH into a {biggest.trend}-trend, charged{" "}
               <b style={{ color: "var(--honey-deep)" }}>{fmtPct(biggest.spread_frac)}</b>.
@@ -161,9 +151,9 @@ export function Analytics() {
           )}
         </div>
 
-        <div className="card p-6">
+        <div className="panel p-6">
           <SectionLabel icon="shield" text="Who actually paid" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             The spread is aimed, not broadcast. Counter-trend flow and everything in a calm market
             trades at the plain pool price.
           </p>
@@ -172,9 +162,9 @@ export function Analytics() {
       </div>
 
       {/* ---------------- regime history ---------------- */}
-      <div className="card p-6">
+      <div className="panel p-6">
         <SectionLabel icon="brain" text="What the detector has seen" />
-        <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+        <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
           Every sampled block, classified by what was actually charged. A block where κ is zero counts as calm, whatever the detector’s trend label still says.
         </p>
         <RegimeBar split={a.regime} />
@@ -188,12 +178,12 @@ export function Analytics() {
 
       {/* ---------------- historic tape ---------------- */}
       <div
-        className="grid gap-4.5"
-        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.25fr) minmax(0,1fr)", gap: 18 }}
+        className="grid"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "minmax(0,1.25fr) minmax(0,1fr)", gap: 20 }}
       >
-        <div className="card p-6">
-          <SectionLabel icon="chart" text="Activity by day" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+        <div className="panel p-6">
+          <SectionLabel icon="analytics" text="Activity by day" />
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             Volume traded each day, with the value the pool kept drawn over it on its own scale.
             The two do not track each other, which is the point: what the LP keeps depends on when
             the flow arrived, not just how much of it there was.
@@ -201,9 +191,9 @@ export function Analytics() {
           <DailyColumns days={days} />
         </div>
 
-        <div className="card p-6">
+        <div className="panel p-6">
           <SectionLabel icon="target" text="How hard it actually leans" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 14px" }}>
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             Spread charged, as a share of the {fmtPct(cfg.kappaMax)} cap. A pool pinned at the top
             of this range is one whose cap is doing the work rather than its detector.
           </p>
@@ -212,12 +202,12 @@ export function Analytics() {
       </div>
 
       <div
-        className="grid gap-4.5"
-        style={{ gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 18 }}
+        className="grid"
+        style={{ gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 20 }}
       >
-        <div className="card p-6">
+        <div className="panel p-6">
           <SectionLabel icon="brain" text="Which direction paid" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             Value kept, split by the trend that was running when it was charged.
           </p>
           <Donut
@@ -227,9 +217,9 @@ export function Analytics() {
           />
         </div>
 
-        <div className="card p-6">
+        <div className="panel p-6">
           <SectionLabel icon="swap" text="Flow direction" />
-          <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
             All notional, by side. Direction alone decides nothing — only direction relative to a
             detected trend does.
           </p>
@@ -246,9 +236,9 @@ export function Analytics() {
       </div>
 
       {/* ---------------- configuration, explained ---------------- */}
-      <div className="card p-6">
+      <div className="panel p-6">
         <SectionLabel icon="target" text="Why this pool is tuned the way it is" />
-        <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 16px" }}>
+        <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
           Immutable parameters the live hook was deployed with. Each is derived from an
           interpretable target rather than chosen by feel, and the reasoning is in the README's
           four-year parameter study.
@@ -276,29 +266,29 @@ export function Analytics() {
           desc="Most κ can move in a single block."
           why="Rate-limits the spread so no single block can swing the quote far enough to be worth engineering." />
 
-        <div className="mt-4 flex items-center justify-between" style={{ fontSize: 11, color: "var(--faint)" }}>
-          <span>last detector sample</span>
-          <span style={{ fontWeight: 700, color: "var(--text-3)" }}>block #{cfg.lastSampledBlock || "—"}</span>
+        <div className="mt-4 flex items-center justify-between" style={{ fontSize: 12, color: "var(--muted)" }}>
+          <span>Last detector sample</span>
+          <span className="num" style={{ color: "var(--text-2)" }}>block #{cfg.lastSampledBlock || "—"}</span>
         </div>
       </div>
 
       {/* ---------------- study results + usage ---------------- */}
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 18 }}>
-        <HeadStat label="LP value vs a 30bps pool" value="+6.4%" color="var(--up)" tinted sub="4 years of real ETH/USDC" />
-        <HeadStat label="Arbitrage extraction cut" value="32%" color="var(--up)" sub="same four-year replay" />
-        <HeadStat label="LVR reduction, synthetic" value="50.6%" color="var(--lav)" sub="mean of 5 seeded stress paths" />
-        <HeadStat label="LP advantage, 12m real" value="+$34k" color="var(--lav)" sub="vs x·y=k, matched friction budget" />
+      <div className="kpi-strip">
+        <HeadStat label="LP value vs a 30bps pool" value="+6.4%" color="var(--green-label)" tinted sub="4 years of real ETH/USDC" />
+        <HeadStat label="Arbitrage extraction cut" value="32%" color="var(--up-deep)" sub="same four-year replay" />
+        <HeadStat label="LVR reduction, synthetic" value="50.6%" color="var(--lav-deep)" sub="mean of 5 seeded stress paths" />
+        <HeadStat label="LP advantage, 12m real" value="+$34k" color="var(--lav-deep)" sub="vs x·y=k, matched friction budget" />
         <HeadStat label="Detection delay" value="≈ 6 blocks" color="var(--honey-deep)" sub="after a real trend onset" />
       </div>
 
-      <div className="grid gap-4.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18 }}>
+      <div className="kpi-strip">
         <HeadStat label="Wallets connected" value={users ? fmtNum(users.total_wallets, 0) : "—"} color="var(--text)" sub="all time" />
         <HeadStat label="New this week" value={users ? fmtNum(users.new_7d, 0) : "—"} color="var(--lav-deep)" sub="first connection in 7 days" />
-        <HeadStat label="Returning" value={users ? fmtNum(users.returning_wallets, 0) : "—"} color="var(--up)" sub="more than one session" />
+        <HeadStat label="Returning" value={users ? fmtNum(users.returning_wallets, 0) : "—"} color="var(--up-deep)" sub="more than one session" />
         <HeadStat label="Active · 24h" value={users ? fmtNum(users.active_24h, 0) : "—"} color="var(--honey-deep)" sub="seen in the last day" />
       </div>
 
-      <p style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1.6, textAlign: "center", maxWidth: 760, margin: "0 auto" }}>
+      <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, maxWidth: 820, margin: 0 }}>
         Study percentages are measured on historical replays documented in the README; live figures
         are this testnet pool's own recorded activity. The report above is generated from these same
         numbers and may phrase them loosely. Not investment advice; testnet deployment.
@@ -307,21 +297,21 @@ export function Analytics() {
   );
 }
 
-function SectionLabel({ icon, text }: { icon: string; text: string }) {
+function SectionLabel({ icon, text }: { icon: IconName; text: string }) {
   return (
-    <div className="flex items-center gap-2.5 mb-1.5">
-      <span style={{ color: "var(--lav)" }}><Icon name={icon} size={17} /></span>
-      <span className="font-display" style={{ fontSize: 14.5, fontWeight: 700, color: "var(--text)" }}>{text}</span>
+    <div className="flex items-center gap-2.5 mb-2">
+      <span style={{ color: "var(--lav-deep)" }}><Icon name={icon} size={16} /></span>
+      <h2 className="panel-title" style={{ fontSize: 15 }}>{text}</h2>
     </div>
   );
 }
 
 function Mini({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
-    <div className="rounded-md px-3 py-2.5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>{label}</div>
-      <div className="font-display" style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{sub}</div>}
+    <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: "10px 12px" }}>
+      <div className="lbl">{label}</div>
+      <div className="num" style={{ fontSize: 15, fontWeight: 600, color, marginTop: 4 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -330,17 +320,17 @@ function ParamRow({
   sym, name, desc, why, value, last,
 }: { sym: string; name: string; desc: string; why: string; value: string; last?: boolean }) {
   return (
-    <div style={{ padding: "11px 0", borderBottom: last ? "none" : "1px solid var(--divider)" }}>
+    <div style={{ padding: "12px 0", borderBottom: last ? "none" : "1px solid var(--divider)" }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3" style={{ minWidth: 0 }}>
-          <span className="font-display" style={{ fontSize: 13, fontWeight: 800, color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 8, padding: "3px 9px", minWidth: 56, textAlign: "center", flexShrink: 0 }}>{sym}</span>
+          <span className="num" style={{ fontSize: 12, fontWeight: 500, color: "var(--lav-deep)", background: "var(--lav-soft)", borderRadius: 6, padding: "3px 8px", minWidth: 60, textAlign: "center", flexShrink: 0 }}>{sym}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-2)" }}>{name}</div>
-            <div style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.45 }}>{desc}</div>
-            <div style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1.5, marginTop: 3 }}>{why}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{name}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5, marginTop: 1 }}>{desc}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginTop: 3 }}>{why}</div>
           </div>
         </div>
-        <span className="font-display" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>{value}</span>
+        <span className="num" style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>{value}</span>
       </div>
     </div>
   );
@@ -348,10 +338,10 @@ function ParamRow({
 
 function HeadStat({ label, value, color, sub, tinted }: { label: string; value: string; color: string; sub: string; tinted?: boolean }) {
   return (
-    <div style={{ background: tinted ? "var(--green-stat-bg)" : "var(--surface)", border: `1px solid ${tinted ? "var(--green-border)" : "var(--border)"}`, borderRadius: "var(--r-card)", padding: 18, boxShadow: "var(--shadow-sm)" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>{label}</div>
-      <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6, lineHeight: 1.4 }}>{sub}</div>
+    <div className={tinted ? "kpi-good" : undefined}>
+      <div className="lbl" style={tinted ? { color: "var(--green-label)" } : undefined}>{label}</div>
+      <div className="num" style={{ fontSize: 22, fontWeight: 600, color, marginTop: 6 }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 4, lineHeight: 1.4 }}>{sub}</div>
     </div>
   );
 }

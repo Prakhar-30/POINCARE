@@ -86,7 +86,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <Icon name={m.icon} size={16} />
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--text)" }}>{t.title}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{t.title}</div>
                   {t.message && (
                     <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5, marginTop: 2 }}>{t.message}</div>
                   )}

@@ -39,15 +39,15 @@ export function Tape({
   badge?: string;
 }) {
   return (
-    <div className="card-quiet overflow-hidden">
-      <div className="flex justify-between items-center px-5 py-3.5" style={{ borderBottom: "1px solid var(--divider)" }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text-3)" }}>Trade tape</span>
-        <span className="flex items-center gap-1.5" style={{ fontSize: 11, fontWeight: 700, color: "var(--green-label)" }}>
+    <div className="panel overflow-hidden">
+      <div className="panel-head">
+        <h2 className="panel-title">Trade tape</h2>
+        <span className="num flex items-center gap-1.5" style={{ fontSize: 11, color: "var(--green-label)" }}>
           <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
           {badge}
         </span>
       </div>
-      <div className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 10, fontWeight: 700, color: "var(--faint)", borderBottom: "1px solid var(--divider-2)" }}>
+      <div className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 11, fontWeight: 500, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>
         <span>side</span>
         <span className="text-right">price</span>
         <span className="text-right">size · WETH</span>
@@ -70,15 +70,15 @@ export function Tape({
                 animate={{ opacity: 1, backgroundColor: "rgba(0,0,0,0)" }}
                 transition={{ duration: 0.9 }}
                 className="grid items-center px-5 py-2"
-                style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, borderBottom: "1px solid var(--divider-2)" }}
+                style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12.5, borderBottom: "1px solid var(--divider-2)" }}
               >
-                <span style={{ color: buy ? "var(--up)" : "var(--down)", fontWeight: 800 }}>{buy ? "buy" : "sell"}</span>
-                <span className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
-                <span className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
+                <span style={{ color: buy ? "var(--up-deep)" : "var(--down-deep)", fontWeight: 600 }}>{buy ? "Buy" : "Sell"}</span>
+                <span className="num text-right truncate" style={{ color: "var(--text)" }}>{fmtUsd(priceOf(t))}</span>
+                <span className="num text-right truncate" style={{ color: "var(--text-2)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
                 <span
-                  className="text-right"
+                  className="num text-right"
                   title={replay ? "Historical replay of real ETH/USDC market data; this is the original market date." : undefined}
-                  style={{ color: replay ? "var(--lav)" : "var(--faint)", fontSize: 11, fontWeight: replay ? 700 : undefined }}
+                  style={{ color: replay ? "var(--lav-deep)" : "var(--muted)", fontSize: 11 }}
                 >
                   {replay ? "◦ " : ""}{when(t.ts)}
                 </span>
@@ -99,10 +99,11 @@ export function Tape({
         <button
           onClick={onLoadMore}
           disabled={loadingMore}
-          className="w-full text-center font-bold"
+          className="w-full text-center"
           style={{
             padding: "11px",
-            fontSize: 12,
+            fontSize: 12.5,
+            fontWeight: 500,
             color: "var(--lav-deep)",
             background: "var(--surface-2)",
             borderTop: "1px solid var(--divider)",

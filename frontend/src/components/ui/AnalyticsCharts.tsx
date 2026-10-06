@@ -63,7 +63,7 @@ export function SavingsChart({
       <path d={area} fill="url(#savingsFill)" />
       <path d={line.trim()} fill="none" stroke="var(--up)" strokeWidth="2" strokeLinejoin="round" />
       <circle cx={sx(n - 1)} cy={sy(points[n - 1].v)} r="3.5" fill="var(--up)" />
-      <text x={W - pad} y={16} textAnchor="end" fontSize="11" fontWeight="800" fill="var(--up)">
+      <text x={W - pad} y={16} textAnchor="end" fontSize="11" fontWeight="600" fill="var(--up)">
         {fmtUsd(points[n - 1].v, { dp: 2 })}
       </text>
     </svg>
@@ -139,7 +139,7 @@ function Row({ label, sub, value, frac, color }: { label: string; sub: string; v
     <div>
       <div className="flex justify-between items-baseline mb-1" style={{ fontSize: 12 }}>
         <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{label}</span>
-        <span className="font-display" style={{ color, fontWeight: 800 }}>{value}</span>
+        <span className="font-display" style={{ color, fontWeight: 600 }}>{value}</span>
       </div>
       <div style={{ height: 8, borderRadius: 4, background: "var(--track)", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${Math.max(2, frac * 100)}%`, background: color, borderRadius: 4 }} />
@@ -161,7 +161,7 @@ export function RiskMeter({ risk, dPct, dFloorPct }: { risk: RiskState; dPct: nu
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <span
           className="rounded-full px-3 py-1.5"
-          style={{ fontSize: 12, fontWeight: 800, color: tone, background: bg }}
+          style={{ fontSize: 12, fontWeight: 600, color: tone, background: bg }}
         >
           {risk.label}
         </span>
@@ -182,7 +182,7 @@ export function RiskMeter({ risk, dPct, dFloorPct }: { risk: RiskState; dPct: nu
       <div className="mt-3.5 rounded-md p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
         <div className="flex justify-between mb-1.5" style={{ fontSize: 11.5 }}>
           <span style={{ color: "var(--text-3)", fontWeight: 700 }}>directional efficiency D</span>
-          <span style={{ fontWeight: 800, color: risk.gated ? "var(--down)" : "var(--up-deep)" }}>
+          <span style={{ fontWeight: 600, color: risk.gated ? "var(--down)" : "var(--up-deep)" }}>
             {fmtPct(dPct)} {risk.gated ? "· below floor" : "· above floor"}
           </span>
         </div>
@@ -244,7 +244,7 @@ export function Donut({
             return el;
           })}
         </g>
-        <text x={R} y={R - 2} textAnchor="middle" fontSize="16" fontWeight="800" fill="var(--text)">
+        <text x={R} y={R - 2} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--text)">
           {centerValue}
         </text>
         <text x={R} y={R + 13} textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--faint)">
@@ -257,7 +257,7 @@ export function Donut({
           <div key={s.label} className="flex items-center gap-2" style={{ fontSize: 11.5 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
             <span style={{ color: "var(--text-3)", fontWeight: 700 }}>{s.label}</span>
-            <span className="font-display" style={{ color: "var(--text)", fontWeight: 800 }}>
+            <span className="font-display" style={{ color: "var(--text)", fontWeight: 600 }}>
               {Math.round((s.value / total) * 100)}%
             </span>
           </div>
@@ -329,8 +329,8 @@ export function DailyColumns({ days, height = 170 }: { days: DayBucket[]; height
           </text>
         ) : null,
       )}
-      <text x={padX} y={10} fontSize="9" fontWeight="800" fill="var(--lav-deep)">volume</text>
-      <text x={W - padX} y={10} textAnchor="end" fontSize="9" fontWeight="800" fill="var(--up-deep)">value kept</text>
+      <text x={padX} y={10} fontSize="9" fontWeight="600" fill="var(--lav-deep)">volume</text>
+      <text x={W - padX} y={10} textAnchor="end" fontSize="9" fontWeight="600" fill="var(--up-deep)">value kept</text>
     </svg>
   );
 }
@@ -345,7 +345,7 @@ export function KappaHistogram({ buckets }: { buckets: Bucket[] }) {
     <div className="flex items-end gap-2" style={{ height: 120 }}>
       {buckets.map((b) => (
         <div key={b.label} className="flex flex-col items-center justify-end flex-1" style={{ height: "100%" }}>
-          <span style={{ fontSize: 9.5, fontWeight: 800, color: "var(--honey-deep)", marginBottom: 3 }}>
+          <span style={{ fontSize: 9.5, fontWeight: 600, color: "var(--honey-deep)", marginBottom: 3 }}>
             {b.n || ""}
           </span>
           <div

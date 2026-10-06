@@ -110,7 +110,7 @@ export function CurveVisual() {
         </defs>
 
         {/* ---------- headline: what it was worth ---------- */}
-        <text x={L} y={34} fontSize="25" fontWeight="800" fill={HERO.adv[i] >= 0 ? "var(--up)" : "var(--faint)"}>
+        <text x={L} y={34} fontSize="25" fontWeight="600" fill={HERO.adv[i] >= 0 ? "var(--up)" : "var(--faint)"}>
           {HERO.adv[i] >= 0 ? "+" : "−"}${Math.abs(HERO.adv[i]).toLocaleString()}
         </text>
         <text x={L} y={50} fontSize="9.5" fontWeight="700" fill="var(--text-3)">
@@ -128,7 +128,7 @@ export function CurveVisual() {
         <g transform={`translate(${W - R - BADGE_W}, 16)`}>
           <rect width={BADGE_W} height="22" rx="11" fill="rgba(217,140,0,.13)" stroke="var(--border)" />
           <circle cx="13" cy="11" r="3.5" fill="var(--honey)" />
-          <text x="25" y="15" fontSize="9.5" fontWeight="800" fill="var(--honey-deep)">
+          <text x="25" y="15" fontSize="9.5" fontWeight="600" fill="var(--honey-deep)">
             κ charged on {ENGAGED} of {N} samples
           </text>
         </g>

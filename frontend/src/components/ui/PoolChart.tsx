@@ -78,11 +78,11 @@ export function PoolChart({ height = 220 }: { height?: number }) {
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: ".3px" }}>WETH / USDC · pool price</div>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="font-display" style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>
+            <span className="num" style={{ fontSize: 24, fontWeight: 600, color: "var(--text)" }}>
               {last > 0 ? fmtUsd(last) : "—"}
             </span>
             {pts.length >= 2 && (
-              <span style={{ fontSize: 12.5, fontWeight: 800, color: accent }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: accent }}>
                 {up ? "▲" : "▼"} {Math.abs(changePct).toFixed(2)}%
               </span>
             )}

@@ -25,7 +25,7 @@ export function TxSteps({ stepper, title }: { stepper: Stepper; title: string })
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
-            style={{ width: 380, maxWidth: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 22, boxShadow: "var(--shadow-lg)", overflow: "hidden" }}
+            style={{ width: 380, maxWidth: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "var(--shadow-lg)", overflow: "hidden" }}
           >
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
               <span className="font-display" style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>

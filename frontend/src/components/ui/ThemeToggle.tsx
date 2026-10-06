@@ -8,14 +8,14 @@ export function ThemeToggle() {
       onClick={toggle}
       title="Toggle theme"
       aria-label="Toggle colour theme"
-      className="flex items-center justify-center rounded-full transition-colors hover:text-lav"
+      className="flex items-center justify-center shrink-0 transition-colors hover:text-lav"
       style={{
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
+        borderRadius: "var(--r-sm)",
         background: "var(--surface)",
-        border: "1px solid var(--nav-border)",
+        border: "1px solid var(--border)",
         color: "var(--text-3)",
-        boxShadow: "var(--shadow-sm)",
       }}
     >
       <Icon name={theme === "dark" ? "sun" : "moon"} size={17} />
