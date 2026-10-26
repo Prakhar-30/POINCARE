@@ -103,10 +103,10 @@ Unichain Sepolia (chain id 1301), testnet only:
 
 | | |
 |---|---|
-| Hook | [`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`](https://sepolia.uniscan.xyz/address/0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88) |
-| Lens | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
+| Hook | [`0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88`](https://sepolia.uniscan.xyz/address/0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88) |
+| Lens | `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2` |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` (canonical v4) |
-| Deployed | block 62883477 |
+| Deployed | block 66190311 (26 October 2026) |
 
 Every sampled block emits a `DetectorSample` event carrying the full detector trace (price, `r`,
 S⁺/S⁻, D, σ̂, κ, trend, fee), so the frontend in `frontend/` charts the *real* on-chain statistic
@@ -119,7 +119,7 @@ rather than a re-simulation. The demo pool's flow is script-driven (`frontend/re
 
 | Item | Status |
 |---|---|
-| Independent scoped review | **Done (2026-10).** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run first and every finding fixed. An independent scoped review by SFS-Labs (Mathias Steinbach) followed, with a remediation follow-up: no Critical, High or Medium issue confirmed within the reviewed scope; its two Lows and the code-level Notes are fixed with regression tests, and the rest are dispositioned (`SECURITY.md`). It is not a certification, and the fixes reach chain with the next deployment. |
+| Independent scoped review | **Done (2026-10).** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run first and every finding fixed. An independent scoped review by SFS-Labs (Mathias Steinbach) followed, with a remediation follow-up: no Critical, High or Medium issue confirmed within the reviewed scope; its two Lows and the code-level Notes are fixed with regression tests, and the rest are dispositioned (`SECURITY.md`). It is not a certification. The fixes are live in the deployment above. |
 | Adaptive (σ-normalized) detector | Built, tested, backtested — but gated OFF in the live deployment until its quantitative manipulation-cost bound is derived (OPEN_ITEMS **V1**). |
 | Depth / curvature lever | **Closed (E1), not deferred.** The naive version is arb-drainable; we reproduced the drain, then built a round-trip-safe version anyway and measured it across four years of real ETH/USDC. It lost by roughly thirty to one. No depth-asymmetry mode exists in the codebase and none is planned; `test/DeployedConfig.t.sol` pins `alphaWad == 0`. See `AsymmetricCurve.sol`'s safety note. |
 | ERC-6909 claim donations | **Closed.** Reserves are shadow-accounted, so a donation moves nothing the hook prices from: not the detector's sampled price, not share pricing, not redemption. Donated claims are stranded. See `SECURITY.md` and `invariant_shadowReservesBackedByClaims`. |

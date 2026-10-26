@@ -42,8 +42,8 @@ rather than sitting alongside it. Line numbers are against the current `main`.
 
 | | |
 |---|---|
-| Hook | `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88` |
-| Lens (quoter) | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
+| Hook | `0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88` |
+| Lens (quoter) | `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2` |
 | App | https://poincare-beta.vercel.app |
 
 **Integrating?** The canonical `V4Quoter` prices this pool correctly — it simulates the swap, so
@@ -726,8 +726,8 @@ python analysis/simulation/plot_fouryear.py
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
-`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`, Lens `0x5d360309c7564270c5604067d7fa85e7d2508e02`,
-deployed at block 62883477 against the canonical v4 `PoolManager`
+`0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88`, Lens `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2`,
+deployed at block 66190311 (26 October 2026) against the canonical v4 `PoolManager`
 `0x00B036B58a818B1BC34d502D3fE730Db729e62AC`, with a demo WETH/USDC pool, a faucet, and a
 web app (`frontend/`) that trades, provides liquidity, and charts the detector's real
 `DetectorSample` trace block by block. Addresses of record:
@@ -737,7 +737,7 @@ web app (`frontend/`) that trades, provides liquidity, and charts the detector's
 Security Fund**. Every reported finding was fixed and each has a regression test that fails on
 the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain
 cases in `PriceLib.t.sol`). An independent scoped review by **SFS-Labs** followed in
-2026-10; its fixes are in the code and ship with the next deployment. Both finding tables are in
+2026-10; its fixes are live in the current deployment. Both finding tables are in
 [§11](#11-security-review).
 
 **Built (MVP + the 2026-07 feature pass):** the directional-spread pricing engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
@@ -758,7 +758,7 @@ cases in `PriceLib.t.sol`). An independent scoped review by **SFS-Labs** followe
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
 5. ~~**Independent scoped review**~~ **Done (2026-10, SFS-Labs), with a remediation follow-up.**
    Not a certification. Fixes merged with regression tests; they
-   reach chain with the next deployment. See [§11](#11-security-review).
+   are live on Unichain Sepolia since block 66190311. See [§11](#11-security-review).
 
 > **Not on this roadmap, and deliberately:** a depth or curvature lever. It was built,
 > made round-trip safe and split-invariant, measured across four years, and lost by roughly
@@ -849,8 +849,7 @@ and raised three points: the intended key could still be initialized by an outsi
 Every code fix ships with a regression test in `test/regression/SfsLabsFindings.t.sol`, and
 no Olympix fix was touched. The full disposition, with the evidence for each call, is in
 [`SECURITY.md`](./SECURITY.md) and tracked in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md)
-§M. The Unichain Sepolia deployment in §10 predates these fixes. They take effect on the next
-deployment.
+§M. They are live in the Unichain Sepolia deployment in §10 (block 66190311, 26 October 2026).
 
 ---
 

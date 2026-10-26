@@ -368,5 +368,5 @@ pre-fix code. Full disposition and evidence: `SECURITY.md`, *Independent scoped 
 | N-8 | JIT liquidity / multi-block MEV economics. | 🟠 residual | Documented as open economic risk; not provable from bounded κ and fee alone. |
 
 Scope note: this is the independent scoped review A9 was held open for, and A9 is closed against it.
-It is an independent scoped review, not a certification. Its fixes reach chain with the next
-deployment.
+It is an independent scoped review, not a certification. Its fixes are live on Unichain Sepolia
+since block 66190311 (26 October 2026).

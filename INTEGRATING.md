@@ -17,8 +17,8 @@ Use the Lens if either matters to you; use `V4Quoter` if neither does.
 
 | | Unichain Sepolia (chain 1301) |
 |---|---|
-| Hook | `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88` |
-| **Lens (quote here)** | `0x5d360309c7564270c5604067d7fa85e7d2508e02` |
+| Hook | `0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88` |
+| **Lens (quote here)** | `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2` |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` |
 | Pool key | `currency0` = USDC, `currency1` = WETH, `fee` = `DYNAMIC_FEE_FLAG`, `tickSpacing` = 60 |
 
