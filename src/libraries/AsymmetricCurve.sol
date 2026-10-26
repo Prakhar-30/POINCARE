@@ -69,6 +69,19 @@ library AsymmetricCurve {
         return FullMath.mulDiv(y + b, WAD, x + a);
     }
 
+    /// @dev Resolution of `marginalPrice`. WAD is too coarse for the detector: a pair whose
+    ///      raw-unit ratio is small (a low-priced token against a low-decimals one) can floor
+    ///      its WAD mid to ~10, where one unit is a ~10% log-return. At 1e36 a unit stays far
+    ///      below any detector threshold for every ratio a real pair reaches, and the result
+    ///      cannot overflow: with uint128 reserves the mid is below ~2^130, so mid·1e36 < 2^250.
+    uint256 internal constant MID_SCALE = 1e36;
+
+    /// @notice Marginal price (y+b)/(x+a) at `MID_SCALE` resolution. `/ (MID_SCALE / WAD)`
+    ///         recovers `marginalPriceWad` exactly (nested floor division).
+    function marginalPrice(uint256 x, uint256 y, uint256 a, uint256 b) internal pure returns (uint256) {
+        return FullMath.mulDiv(y + b, MID_SCALE, x + a);
+    }
+
     // Directional spread layer. The with-trend side is charged a non-negative spread on
     // top of the symmetric base curve; the stabilising side trades at the base price.
     // Arb-safe by construction: a base round trip already returns at most the input, and

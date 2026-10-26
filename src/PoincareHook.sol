@@ -156,7 +156,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint64 private _kappa;
     Cusum.Trend private _trend;
     uint64 private _lastSampledBlock; // slot 3
-    uint256 private _lastSampledPriceWad; // slot 4
+    uint256 private _lastSampledMid; // slot 4, at AsymmetricCurve.MID_SCALE resolution
 
     // Base-depth anchor, set once at the first deposit and supply-scaled after.
     uint128 private _a0;
@@ -195,7 +195,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     struct DetectorSnap {
         bool advanced; // a new-block sample happened (state to persist)
         bool hasReturn; // a log-return was processed (false for the first baseline sample)
-        uint256 priceWad; // sampled executable mid (only when advanced)
+        uint256 mid; // sampled executable mid at MID_SCALE resolution (only when advanced)
         int256 r; // clipped log-return (only when hasReturn)
         int256 sPos;
         int256 sNeg;
@@ -385,19 +385,21 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         if (block.number == _lastSampledBlock || r0 == 0 || r1 == 0) return s;
 
-        // Nonzero reserves are not enough: at an extreme ratio the marginal price can floor
+        // The mid is taken at MID_SCALE, not WAD: a WAD mid floors small raw-unit ratios to a
+        // handful of units, aliasing real moves into large apparent log-returns. Nonzero
+        // reserves are still not enough at a truly extreme ratio, where even this can floor
         // to 0. Skip the sample (no 0 baseline to blind the detector, no lnWad(0) revert)
         // and fall back to stored state so the swap still prices.
-        uint256 priceWad = AsymmetricCurve.marginalPriceWad(r0, r1, s.offsetA, s.offsetB);
-        if (priceWad == 0) return s;
+        uint256 mid = AsymmetricCurve.marginalPrice(r0, r1, s.offsetA, s.offsetB);
+        if (mid == 0) return s;
 
         s.advanced = true;
-        s.priceWad = priceWad;
-        uint256 prev = _lastSampledPriceWad;
+        s.mid = mid;
+        uint256 prev = _lastSampledMid;
         if (prev == 0) return s; // first ever sample: establish the baseline, no return yet
 
         s.hasReturn = true;
-        int256 r = PriceLib.logReturnWad(prev, s.priceWad);
+        int256 r = PriceLib.logReturnWad(prev, s.mid);
 
         // Huber clip + (adaptive) standardization. Sigma is taken BEFORE folding this
         // sample, so a sample is never standardized by itself, and the clip bounds any
@@ -449,7 +451,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         s = _projectDetector(r0, r1);
         if (!s.advanced) return s;
 
-        _lastSampledPriceWad = s.priceWad;
+        _lastSampledMid = s.mid;
         _lastSampledBlock = uint64(block.number);
         if (!s.hasReturn) return s; // baseline sample: statistics unchanged
 
@@ -462,7 +464,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         emit DetectorSample(
             block.number,
-            s.priceWad,
+            _midToWad(s.mid),
             s.r,
             s.sPos,
             s.sNeg,
@@ -655,7 +657,13 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
     /// @notice Executable mid sampled at the last detector update (WAD).
     function lastSampledPriceWad() external view returns (uint256) {
-        return _lastSampledPriceWad;
+        return _midToWad(_lastSampledMid);
+    }
+
+    /// @dev The detector keeps its mid at MID_SCALE; everything it reports is WAD, exactly
+    ///      `AsymmetricCurve.marginalPriceWad` of the same reserves.
+    function _midToWad(uint256 mid) private pure returns (uint256) {
+        return mid / (AsymmetricCurve.MID_SCALE / WAD);
     }
 
     /// @notice Block of the last detector update.

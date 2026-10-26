@@ -26,8 +26,9 @@ library PriceLib {
         return FullMath.mulDiv(reserve1, WAD, reserve0);
     }
 
-    /// @notice Signed log-return between two WAD prices: ln(newPrice / prevPrice), WAD.
-    ///         Both prices must be > 0.
+    /// @notice Signed log-return between two prices: ln(newPrice / prevPrice), WAD. Both
+    ///         prices must be > 0 and share one scale; only their ratio is used, so the hook
+    ///         feeds it the detector's higher-resolution mid (`AsymmetricCurve.MID_SCALE`).
     /// @dev    `lnWad` needs a positive `int256`. An extreme move can floor the ratio to 0 or
     ///         push it past `int256.max` (the cast wraps negative), both reverting `lnWad`.
     ///         Clamp into the safe domain; the detector Huber-clips this increment right
