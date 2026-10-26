@@ -65,7 +65,8 @@ abstract contract PoincareTestBase is BaseTest {
         );
     }
 
-    /// @dev Deploy the hook at `poincareHookAddress(ns)`, pinned to the pool on `currency0/1`.
+    /// @dev Deploy the hook at `poincareHookAddress(ns)`, pinned to the pool on `currency0/1`,
+    ///      with this test contract as its initializer.
     function deployPoincare(PoincareConfig memory cfg, uint16 ns, Currency currency0, Currency currency1)
         internal
         returns (PoincareHook hook)
@@ -73,7 +74,7 @@ abstract contract PoincareTestBase is BaseTest {
         address flags = poincareHookAddress(ns);
         deployCodeTo(
             "PoincareHook.sol:PoincareHook",
-            abi.encode(poolManager, cfg, poincareKey(currency0, currency1, address(0))),
+            abi.encode(poolManager, cfg, poincareKey(currency0, currency1, address(0)), address(this)),
             flags
         );
         hook = PoincareHook(payable(flags));

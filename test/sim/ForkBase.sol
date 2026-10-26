@@ -86,7 +86,7 @@ abstract contract ForkBase is Test {
             ) ^ (_salt() << 144)
         );
         key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(flags));
-        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, _config(), key), flags);
+        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, _config(), key, address(this)), flags);
         hook = PoincareHook(payable(flags));
 
         pm.initialize(key, Constants.SQRT_PRICE_1_1);

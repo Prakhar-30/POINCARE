@@ -103,6 +103,7 @@ const HOOK_CTOR = [
     { name: "feeGamma", type: "uint256" }, { name: "feeCap", type: "uint256" }, { name: "alphaWad", type: "uint256" },
   ] },
   POOL_KEY_T, // the one pool this hook will accept; `hooks` left zero (see below)
+  { type: "address" }, // the only address allowed to initialize it: this deployer
 ];
 const HOOK_VIEW_ABI = [
   { type: "function", name: "poolKey", stateMutability: "view", inputs: [], outputs: [POOL_KEY_T] },
@@ -162,7 +163,7 @@ async function main() {
   const poolKey = { currency0: usdcAddr, currency1: wethAddr, fee: 0x800000, tickSpacing: 60, hooks: ZERO };
 
   // Mine and CREATE2-deploy the hook (permission flags live in the address).
-  const hookInit = deployData(HOOK_ART, [{ type: "constructor", inputs: HOOK_CTOR }], [POOL_MANAGER, CFG, poolKey]);
+  const hookInit = deployData(HOOK_ART, [{ type: "constructor", inputs: HOOK_CTOR }], [POOL_MANAGER, CFG, poolKey, account.address]);
   const initHash = keccak256(hookInit);
   let salt = 0n, hookAddr;
   for (;;) {

@@ -244,9 +244,10 @@ contract DeployPoincareUnichain is Script {
                 | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
         PoincareConfig memory cfg = _config();
-        bytes memory args = abi.encode(pm, cfg, key);
+        // The broadcaster initializes the pool below, so it is the only address allowed to.
+        bytes memory args = abi.encode(pm, cfg, key, msg.sender);
         (address hookAddr, bytes32 salt) = HookMiner.find(CREATE2_FACTORY, flags, type(PoincareHook).creationCode, args);
-        hook = new PoincareHook{salt: salt}(pm, cfg, key);
+        hook = new PoincareHook{salt: salt}(pm, cfg, key, msg.sender);
         require(address(hook) == hookAddr, "hook address mismatch");
     }
 

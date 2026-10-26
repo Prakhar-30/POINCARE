@@ -76,6 +76,22 @@ contract ShsLabsFindingsTest is PoincareTestBase {
         assertEq(PoolId.unwrap(hook.poolKey().toId()), PoolId.unwrap(pinned.toId()), "bound to the pinned pool");
     }
 
+    function test_L1_outsiderCannotInitializeEvenTheIntendedKey() public {
+        // The follow-up residual: pinning the key alone still let anyone initialize the
+        // intended key first, at a price of their choosing, so the deployer's own call reverted.
+        PoolKey memory pinned = poincareKey(currency0, currency1, address(hook));
+        address outsider = makeAddr("outsider");
+        assertEq(hook.initializer(), address(this), "initializer fixed at construction");
+
+        vm.prank(outsider);
+        vm.expectRevert(_wrappedInitRevert("unauthorized initializer"));
+        poolManager.initialize(pinned, Constants.SQRT_PRICE_1_4);
+
+        // The hook is still unbound, so the intended initializer goes through.
+        initPoincarePool(hook, currency0, currency1);
+        assertEq(PoolId.unwrap(hook.poolKey().toId()), PoolId.unwrap(pinned.toId()), "bound by the initializer");
+    }
+
     function test_L1_constructorRejectsMalformedKey() public {
         // Unsorted currencies can never be initialized, so the hook would be dead on arrival.
         vm.expectRevert(bytes("pool key cfg"));
@@ -86,8 +102,16 @@ contract ShsLabsFindingsTest is PoincareTestBase {
         vm.expectRevert(bytes("pool key cfg"));
         deployCodeTo(
             "PoincareHook.sol:PoincareHook",
-            abi.encode(poolManager, defaultConfig(), foreign),
+            abi.encode(poolManager, defaultConfig(), foreign, address(this)),
             poincareHookAddress(0x6666)
+        );
+
+        // No initializer means nobody could ever initialize the pinned pool.
+        vm.expectRevert(bytes("pool key cfg"));
+        deployCodeTo(
+            "PoincareHook.sol:PoincareHook",
+            abi.encode(poolManager, defaultConfig(), poincareKey(currency0, currency1, address(0)), address(0)),
+            poincareHookAddress(0x6667)
         );
     }
 

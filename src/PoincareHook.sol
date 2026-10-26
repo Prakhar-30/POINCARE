@@ -146,6 +146,12 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     ///         the hook to a pool of their choosing in between.
     PoolId public immutable expectedPoolId;
 
+    /// @notice The only address allowed to initialize that pool. Pinning the key alone still
+    ///         let anyone initialize the intended key first, which leaves the pool usable (its
+    ///         slot0 price never prices a swap here) but makes the deployer's own initialize
+    ///         revert. This has no power once the pool is initialized.
+    address public immutable initializer;
+
     // Detector state, packed to 4 slots. The downcasts are safe: sPos/sNeg live in
     // [0, sMax] with sMax <= int128.max (constructor-validated); |ewmaNet| <= ewmaTV <=
     // max|r| * WAD/(WAD-lambda) with a single-step |r| bounded by the lnWad domain
@@ -213,14 +219,17 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
     /// @param key The pool this hook will serve. `hooks` may be left unset: the hook address
     ///        is not known before deployment when it is mined, and it can only be this hook.
-    constructor(IPoolManager _poolManager, PoincareConfig memory cfg, PoolKey memory key)
+    /// @param initializer_ The address that will call `PoolManager.initialize` for `key`.
+    constructor(IPoolManager _poolManager, PoincareConfig memory cfg, PoolKey memory key, address initializer_)
         BaseHook(_poolManager)
         ERC20("Poincare LP", "POIN-LP")
     {
         require(address(key.hooks) == address(0) || address(key.hooks) == address(this), "pool key cfg");
         require(key.currency0 < key.currency1, "pool key cfg");
+        require(initializer_ != address(0), "pool key cfg");
         key.hooks = IHooks(address(this));
         expectedPoolId = key.toId();
+        initializer = initializer_;
 
         require(Cusum.isValidConfig(cfg.k, cfg.h), "cusum cfg");
         require(DirectionalSignal.isValidConfig(cfg.lambda), "ewma cfg");
@@ -254,12 +263,14 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         alphaWad = cfg.alphaWad;
     }
 
-    /// @dev Bind only the pool fixed at construction; see `expectedPoolId`.
+    /// @dev Bind only the pool fixed at construction, initialized by the address fixed with it;
+    ///      see `expectedPoolId` and `initializer`.
     function _beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
         internal
         override
         returns (bytes4)
     {
+        require(sender == initializer, "unauthorized initializer");
         require(PoolId.unwrap(key.toId()) == PoolId.unwrap(expectedPoolId), "unexpected pool key");
         return super._beforeInitialize(sender, key, sqrtPriceX96);
     }
