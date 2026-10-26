@@ -2,17 +2,19 @@
 
 ## In scope
 
-All contracts under `src/` — 7 files, ~685 source lines (cloc), Solidity 0.8.30, Foundry project (`via_ir = true` for the hook build):
+All contracts under `src/` — 7 files, 1,352 lines (`wc -l`, comments included; the 2026-10
+manual review counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
+project (`via_ir = true` for the hook build):
 
-| Contract | SLOC | Role |
+| Contract | Lines | Role |
 |---|---|---|
-| `src/PoincareHook.sol` | 361 | v4 hook: detector state, pricing, hook-owned liquidity, ERC-20 LP shares |
-| `src/PoincareLens.sol` | 67 | read-only quoter; must match hook execution to the wei |
-| `src/libraries/AsymmetricCurve.sol` | 96 | curve math: offset constant-product, fee + spread pipeline |
-| `src/libraries/Cusum.sol` | 58 | two-sided CUSUM change detector |
-| `src/libraries/DirectionalSignal.sol` | 43 | EWMA directional efficiency + volatility estimate |
-| `src/libraries/ControlLaw.sol` | 39 | evidence to bounded, rate-limited spread intensity |
-| `src/libraries/PriceLib.sol` | 21 | log-price math |
+| `src/PoincareHook.sol` | 731 | v4 hook: detector state, pricing, hook-owned liquidity, ERC-20 LP shares |
+| `src/PoincareLens.sol` | 126 | read-only quoter; must match hook execution to the wei |
+| `src/libraries/AsymmetricCurve.sol` | 172 | curve math: offset constant-product, fee + spread pipeline, detector mid |
+| `src/libraries/Cusum.sol` | 105 | two-sided CUSUM change detector |
+| `src/libraries/DirectionalSignal.sol` | 93 | EWMA directional efficiency + volatility estimate |
+| `src/libraries/ControlLaw.sol` | 74 | evidence to bounded, rate-limited spread intensity |
+| `src/libraries/PriceLib.sol` | 51 | log-price math |
 
 ## Out of scope
 
@@ -27,6 +29,7 @@ All contracts under `src/` — 7 files, ~685 source lines (cloc), Solidity 0.8.3
 4. **Once-per-block sampling.** The detector samples at most once per block, on pre-swap reserves, so an atomic push-and-unwind within one block can never feed it.
 5. **Bounded asymmetry.** The spread intensity kappa stays within `[kappaMin, kappaMax]` and moves at most `dMax` per block; the vol fee is capped at `feeCap`.
 6. **Quote fidelity.** `PoincareLens` quotes through the same libraries and per-block projection (`previewSpread` / `previewDetector`) as the swap path and must match execution exactly, including in a fresh block before the first swap.
+7. **Pool binding.** The hook binds only the PoolKey fixed at construction (`expectedPoolId`); any other key's `initialize` reverts, so nobody can bind a freshly deployed hook to a pool of their choosing before the intended one.
 
 ## Claim donations: closed by shadow accounting
 
@@ -52,7 +55,7 @@ Consequence worth stating plainly: donated claims are now **stranded**. They bac
 they are owned by nobody, and nothing can withdraw them, because withdrawals are priced off
 the shadow. That is intended — it leaves no reason to donate at all.
 
-## Prior review
+## Prior review: Olympix (2026-07)
 
 Poincaré was selected by the **Uniswap Foundation Security Fund**, which sponsored a security
 review by **Olympix**, run on the 2026-07 build. The currently deployed build carries one
@@ -76,9 +79,121 @@ fails on the pre-fix code and passes now:
 An automated scan is not a substitute for the external human audit, which remains required
 before mainnet.
 
+## Manual review (2026-10)
+
+An independent, manual, read-only review by **Mathias Steinbach** (independent Solidity
+reviewer), report `POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit
+`78d75e24`. Scope: the seven files above. The reviewer also ran the 222-test suite, Slither,
+Aderyn and Echidna in a private CI runner, and 50,000 off-chain integer-model trials of the curve
+arithmetic. The report describes itself as an individual review, not a firm audit or
+certification, and this repository presents it the same way.
+
+**Result: no Critical, High or Medium finding. Two Lows and eight Notes.** Both Lows and N-5 are
+fixed in code, each with a regression test in `test/regression/ManualReviewFindings.t.sol` that
+fails against the pre-fix code, and N-6's stale comment is corrected. The rest are dispositioned
+below with the evidence behind each call. None of the changes touches an Olympix
+fix: those regression tests pass unchanged, and the log-domain clamp and the zero-mid skip
+(Olympix L-2 / L-4) are reused as they were.
+
+| ID | Finding | Disposition | Evidence |
+|---|---|---|---|
+| L-1 | The inherited initializer binds whichever PoolKey arrives first, and deploy and initialize are separate transactions | **Fixed.** The constructor takes the intended key and stores `expectedPoolId`; `_beforeInitialize` rejects any other key. Both deploy paths confirm `poolKey()` before publishing | `test_L1_unexpectedPoolKey_cannotBindHook`, `test_L1_constructorRejectsMalformedKey` |
+| L-2 | The detector's WAD mid quantizes small raw-unit ratios (near 10, one unit is a ~9.5% log-return) | **Fixed.** The detector samples the mid at `MID_SCALE = 1e36`. Reported prices (`lastSampledPriceWad`, `DetectorSample.priceWad`) stay WAD and unchanged to the wei | `test_L2_detectorReturnMatchesTrueMove_atSmallRawRatios`, `test_L2_wadMidWouldHaveAliasedTheSameMove`, `test_L2_zeroMid_skipsThenRecovers`, `testFuzz_L2_reportedPriceIsUnchanged` |
+| N-1 | The trend label can flip before evidence reaches `h`, leaving residual κ on the new side when `dMax < kappaMax` | **Not reachable in the deployed configuration; no code change.** See below | `DeployedConfig.t.sol::test_rateLimitNeverBinds` |
+| N-2 | `dMax == kappaMax`, so the rate limit never binds | **Intentional, and re-verified.** See below | `GammaFourYear.t.sol::test_compose_deployedDMaxSweep` |
+| N-3 | `_liquidityLock` is a flag, not a nesting-safe counter | **Acknowledged; no reachable nesting today.** See below | — |
+| N-4 | A dust share burn can pay out zero of both tokens | **Acknowledged.** Rounding against the redeemer protects the pool; the loss is at most the burner's own dust | — |
+| N-5 | `rateLimit` could overflow on an extreme `dMax`; a `dFloor` above WAD makes the gate unreachable | **Fixed.** Overflow-free `rateLimit`; the constructor rejects `dFloor > WAD` | `testFuzz_N5_rateLimitNeverOverflows`, `test_N5_unboundedDMax_stillSwaps`, `test_N5_constructorRejectsUnreachableGate` |
+| N-6 | Arithmetic edge cases, and a stale NatSpec on reserves | **Comment fixed; arithmetic acknowledged.** See below | — |
+| N-7 | Fee-on-transfer and rebasing tokens need an explicit policy | **Documented.** See *Supported tokens* below | — |
+| N-8 | JIT liquidity and multi-block MEV economics not established | **Acknowledged residual risk.** See below | — |
+
+The reviewer's five client questions (same-block manipulation, round-trip draining,
+first-depositor inflation, Lens-versus-execution divergence, κ or fee beyond caps) all came back
+with no exploitable path found, each with the stated caveat that cross-block, multi-party and
+economic sequences were not proven safe.
+
+### N-1 and N-2: the rate limit, and why it stays non-binding
+
+`ControlLaw.step` moves κ toward the target for the current evidence by at most `dMax` a block.
+The deployed configuration sets `dMax = kappaMax = 0.05` with `kappaMin = 0`, so any two values in
+the band are at most `dMax` apart and κ always lands exactly on its target. κ carries no memory
+from one sample to the next.
+
+That settles N-1. A residual can only exist when κ lags its target. Here it never does: when
+the label flips on evidence below `h`, the target is `kappaMin = 0` and κ is 0; when the evidence
+is above `h`, κ is the target built from the new direction's evidence, so it lands on the
+correct side.
+
+For N-2, the question was whether a binding limit would serve LPs better, so it was measured.
+Four years of real ETH/USDC (7,776 four-hour bars, $2M seeded, LP value marked at the external
+price), at the deployed gate, changing only `dMax`:
+
+| `dMax` | LP value | vs deployed |
+|---|---:|---:|
+| 0.01 | 3,039,815 | −58 bps |
+| 0.02 | 3,047,668 | −32 bps |
+| 0.03 | 3,051,860 | −19 bps |
+| 0.04 | 3,055,551 | −7 bps |
+| **0.05 (deployed)** | **3,057,581** | — |
+
+LP value falls with every step of tightening. The earlier one-at-a-time sweep had shown that
+`dMax = 0.01` helps under the old gate but hurts once the gate is lowered: the two are
+sub-additive. A one-off variant of the harness (not committed) that also applied either N-1
+fix (relabel only past `h`, or reset κ on a direction flip) moved the binding rows by under
+7 bps and changed nothing at `dMax = 0.05`, as the argument above predicts.
+
+So the limit stays non-binding, and `test_rateLimitNeverBinds` pins it. Anyone who later makes
+it bind has to deal with N-1 first. Caveat: the study runs on 4-hour bars while the hook samples
+every block, so the ordering is the evidence here, not the exact basis points.
+
+### N-3: the liquidity lock
+
+`lockLiquidity` sets the transient flag to 1 and clears it to 0, so a nested liquidity call would
+clear it early for the outer one. That nesting is not reachable. Inside `removeLiquidity` the
+payout happens within `PoolManager.unlock`, and any nested `addLiquidity` or `removeLiquidity`
+must unlock again and reverts. The only external call outside an unlock is the native-ETH
+refund at the end of `addLiquidity`, after shares are minted and reserves booked, so nothing is
+left half-settled for a nested call to exploit. Saving and restoring the previous value would be
+more robust under future edits; any change to the liquidity call order should revisit this.
+
+### N-6: arithmetic edge cases
+
+- `Math.sqrt(amount0 * amount1)` on the first deposit can only overflow if both amounts are near
+  2^128, and an amount that large already fails the uint128 reserve check, so the deposit reverts
+  either way.
+- `PoincareLens.effectivePriceWad` multiplies `WAD * amountIn`, which overflows only for
+  `amountIn` above about 2^196. No swap can carry that (amounts are int128), so the view reverting
+  there costs nothing. Returning 0 for a zero amount is intentional: there is no price to report.
+- The stale header that described reserves as live claim balances is corrected.
+
+### Supported tokens (N-7)
+
+Supported: standard ERC-20s that transfer exactly the amount requested, and native ETH.
+
+Not supported:
+
+- **Fee-on-transfer tokens.** They fail safely. The PoolManager's `settle` credits what actually
+  arrived, the hook's delta is left unsettled, and the transaction reverts.
+- **Rebasing tokens.** A rebase changes the PoolManager's real balance but not the fixed claims
+  the hook holds, so a positive rebase accrues to nobody in the pool and a negative one leaves
+  those claims under-backed at the PoolManager.
+- **Tokens with transfer hooks** (ERC-777 style). They were not considered in this review.
+
+Claims donated to the hook are deliberately stranded (see above).
+
+### N-8: residual economic risk
+
+LP shares accrue fees and the retained spread, so liquidity added just before order flow and
+removed after captures part of it, as on any v4 pool. Bounding κ and the fee bounds what any
+single swap pays. It does not prove that every multi-block or sequencer-ordered strategy is
+unprofitable. The manipulation suite shows fake trends cost more than the spread they earn back,
+under the scenarios it models. Fully adversarial MEV, adversarial JIT, and Unichain/Base
+sequencer ordering remain open economic questions. They are listed as residual risk, not closed.
+
 ## Existing coverage
 
-228 passing Foundry tests: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and the Olympix regression suite above.
+239 passing Foundry tests in the default suite: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and both regression suites above. The fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`) need a Sepolia RPC and run separately.
 
 ## Deployment
 
@@ -86,6 +201,10 @@ Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
 `0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`, Lens `0x5d360309c7564270c5604067d7fa85e7d2508e02`,
 from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
 ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
+
+That deployment predates the 2026-10 manual review fixes above. The constructor now also takes
+the pinned PoolKey, so they take effect only on a fresh deployment, and any mainnet deployment
+is made from this build.
 
 ## Contact
 

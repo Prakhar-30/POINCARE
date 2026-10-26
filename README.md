@@ -339,6 +339,7 @@ It does not make liquidity provision risk-free: the LP still holds the assets an
 - **Calm and pegged pairs are handled gracefully**: low signal keeps the curve symmetric with the spread at zero (plain constant-product execution for everyone); a sudden depeg is just a detected trend the curve leans into. (A deep, stableswap-like *base* curve is a roadmap option, since the curve engine already supports virtual offsets; the MVP uses a constant-product base.)
 - **Liquidity- and flow-sensitive.** Deployable on long-tail pools, safest where there is real depth and a clean price series for the detector.
 - The detector raises and *bounds* the cost of manipulation; it does not claim to make it impossible. The manipulation-cost analysis is a first-class deliverable, not a footnote.
+- **Standard tokens only.** Plain ERC-20s that transfer exactly the amount requested, and native ETH. Fee-on-transfer tokens revert at settlement; rebasing tokens and tokens with transfer hooks are not supported. See [`SECURITY.md`](./SECURITY.md) (*Supported tokens*).
 
 ---
 
@@ -717,10 +718,11 @@ python analysis/simulation/plot_fouryear.py
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 228 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 239 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
-> regression test per finding from the **Olympix security review**, all fixed). The
+> regression test per finding fixed from the **Olympix security review** and the **2026-10
+> manual review**). The
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
@@ -791,6 +793,33 @@ above:
 So: the contracts were reviewed, every finding was fixed, and the currently deployed build
 carries one post-review logic change that was itself a fix. None of that substitutes for an
 independent audit, which is still required before mainnet.
+
+#### Manual review (2026-10)
+
+An independent manual review by Mathias Steinbach (report `POINCARE-MSR-78d75e24`, 24 October
+2026) read all seven contracts at commit `78d75e24`. It also independently re-ran the test suite,
+Slither, Aderyn and Echidna. **No Critical, High or Medium finding; two Lows and eight Notes.**
+
+- **L-1, fixed.** The inherited initializer bound whichever pool reached a fresh hook first, and
+  deploy and initialize are separate transactions. The hook is now pinned to its PoolKey at
+  construction and rejects every other.
+- **L-2, fixed.** The detector sampled its price in WAD, which quantizes pairs with a small
+  raw-unit ratio, such as a cheap 18-decimals token against a 6-decimals stable. It now samples
+  at 1e36. Every price the hook reports is unchanged.
+- **N-5, fixed.** An extreme `dMax` could overflow the rate limit and revert swaps, and a gate
+  above 1.0 could never open. The rate limit is now overflow-free, and the impossible gate is
+  rejected.
+- **N-6, corrected.** A stale comment.
+- **N-1 and N-2, kept, with evidence.** The deployed rate limit is deliberately non-binding. A
+  four-year sweep shows every binding value costs LP value, and non-binding is exactly what makes
+  N-1 unreachable. Both are now pinned by test.
+- **N-3, N-4, N-7 and N-8, documented.** They are written up as accepted behaviour, a supported-token
+  policy, and residual economic risk.
+
+Every code fix ships with a regression test in `test/regression/ManualReviewFindings.t.sol`, and
+no Olympix fix was touched. The full disposition, with the evidence for each call, is in
+[`SECURITY.md`](./SECURITY.md) and tracked in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §M. The Unichain Sepolia deployment in §10 predates these fixes.
+They take effect on the next deployment.
 
 | Severity | Finding | Fix |
 |---|---|---|

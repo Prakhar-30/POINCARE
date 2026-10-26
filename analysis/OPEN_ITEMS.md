@@ -346,3 +346,26 @@ and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceL
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 
 Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stays open.
+
+## M. Manual security review (2026-10)
+
+Independent manual review by Mathias Steinbach, report `POINCARE-MSR-78d75e24` (24 October 2026),
+pinned to commit `78d75e24`: no Critical, High or Medium finding, two Lows and eight Notes. Code
+fixes carry regression tests in `test/regression/ManualReviewFindings.t.sol` that fail on the
+pre-fix code. Full disposition and evidence: `SECURITY.md`, *Manual review (2026-10)*.
+
+| # | Finding | Status | Resolution |
+|---|---------|--------|-----|
+| L-1 | Inherited initializer binds the first PoolKey to arrive; deploy and initialize are separate txs. | ✅ | Constructor pins the key (`expectedPoolId`); `_beforeInitialize` rejects any other; both deploy paths verify `poolKey()`. |
+| L-2 | Detector's WAD mid quantizes small raw-unit price ratios. | ✅ | Detector samples `AsymmetricCurve.marginalPrice` at `MID_SCALE = 1e36`; reported WAD prices unchanged. |
+| N-1 | Trend relabel before evidence reaches `h` can leave residual κ when `dMax < kappaMax`. | ✅ (not reachable) | The deployed rate limit never binds, so κ has no memory; pinned by `DeployedConfig.t.sol::test_rateLimitNeverBinds`. Revisit if the limit is ever made to bind. |
+| N-2 | `dMax == kappaMax`: rate limit non-binding. | ✅ (intentional) | Four-year sweep at the deployed gate: every binding `dMax` (0.01–0.04) costs 7–58 bps of LP value (`test_compose_deployedDMaxSweep`). |
+| N-3 | `_liquidityLock` is a flag, not nesting-safe. | ✅ (accepted) | No reachable nesting: nested liquidity calls inside `unlock` revert, and the native refund runs after booking. Revisit on any reorder. |
+| N-4 | Dust burn can pay out zero. | ✅ (accepted) | Rounding against the redeemer; the loss is bounded by the burner's own dust. |
+| N-5 | `rateLimit` overflow on extreme `dMax`; `dFloor > WAD` unreachable gate. | ✅ | Overflow-free `rateLimit`; constructor rejects `dFloor > WAD`. |
+| N-6 | Arithmetic edges; stale reserve NatSpec. | ✅ | NatSpec corrected; arithmetic edges unreachable for holdable amounts (documented). |
+| N-7 | Token-behaviour policy. | ✅ (documented) | Standard ERC-20s and native ETH only; see `SECURITY.md` *Supported tokens*. |
+| N-8 | JIT liquidity / multi-block MEV economics. | 🟠 residual | Documented as open economic risk; not provable from bounded κ and fee alone. |
+
+Scope note: the report describes itself as an individual review, not a firm audit. A9 is left
+open for the project to decide whether it satisfies the pre-mainnet audit requirement.
