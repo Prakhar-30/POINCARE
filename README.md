@@ -736,7 +736,7 @@ web app (`frontend/`) that trades, provides liquidity, and charts the detector's
 **Security review:** the contracts were reviewed by **Olympix** under the **Uniswap Foundation
 Security Fund**. Every reported finding was fixed and each has a regression test that fails on
 the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain
-cases in `PriceLib.t.sol`). An independent scoped security review by **SFS-Labs** followed in
+cases in `PriceLib.t.sol`). An independent scoped review by **SFS-Labs** followed in
 2026-10; its fixes are in the code and ship with the next deployment. Both finding tables are in
 [§11](#11-security-review).
 
@@ -756,8 +756,8 @@ cases in `PriceLib.t.sol`). An independent scoped security review by **SFS-Labs*
    scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
    wants re-deriving against block-cadence data.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
-5. ~~**External security review**~~ **Done (2026-10, SFS-Labs), with a remediation follow-up.**
-   A scoped independent review, not a certification. Fixes merged with regression tests; they
+5. ~~**Independent scoped review**~~ **Done (2026-10, SFS-Labs), with a remediation follow-up.**
+   Not a certification. Fixes merged with regression tests; they
    reach chain with the next deployment. See [§11](#11-security-review).
 
 > **Not on this roadmap, and deliberately:** a depth or curvature lever. It was built,
@@ -795,7 +795,7 @@ above:
 
 So: the contracts were reviewed, every finding was fixed, and the currently deployed build
 carries one post-review logic change that was itself a fix. None of that substitutes for an
-independent human review, which followed in 2026-10 (below).
+independent scoped review, which followed in 2026-10 (below).
 
 | Severity | Finding | Fix |
 |---|---|---|
@@ -811,16 +811,16 @@ Finding, fix and test are mapped one to one in [`SECURITY.md`](./SECURITY.md) an
 [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §H.
 
 **What this does not mean.** A sponsored review is not a full external human audit, and we do not
-present it as one. An independent human review followed in 2026-10, below.
+present it as one. An independent scoped review followed in 2026-10, below.
 
-### Independent security review by SFS-Labs (2026-10)
+### Independent scoped review by SFS-Labs (2026-10)
 
-An independent scoped security review by **SFS-Labs** (Mathias Steinbach;
+An independent scoped review by **SFS-Labs** (Mathias Steinbach;
 [github.com/SFS-Labs](https://github.com/SFS-Labs)), report `POINCARE-MSR-78d75e24`
 (24 October 2026), pinned to commit `78d75e24`. It read all seven contracts and independently
 re-ran the test suite, Slither, Aderyn and Echidna. **No Critical, High or Medium issue confirmed
-within the reviewed scope; two Low findings and eight Notes reported.** It is a limited manual
-pre-launch review, not an audit certification.
+within the reviewed scope; two Low findings and eight Notes reported.** It is a manual pre-launch
+independent scoped review, not an audit certification.
 
 - **L-1, fixed.** The inherited initializer bound whichever pool reached a fresh hook first, and
   deploy and initialize are separate transactions. The hook is now pinned at construction to its

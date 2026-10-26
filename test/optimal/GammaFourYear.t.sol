@@ -1588,7 +1588,7 @@ contract GammaFourYearTest is Test {
 
     // The deployed configuration (`test_compose_gateOnly`) with its kappa rate limit made to
     // bind. Deployed, dMax equals kappaMax, so kappa can cross its whole range in one sample;
-    // the 2026-10 SFS-Labs review asked whether that is intentional (N-2). It is: every binding
+    // the 2026-10 SFS-Labs independent scoped review asked whether that is intentional (N-2). It is: every binding
     // value costs LP value, and the cost grows as the limit tightens.
     function _deployedWithDMax(string memory name, uint256 dMax) internal view {
         Cfg memory c = _live();

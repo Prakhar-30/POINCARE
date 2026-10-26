@@ -2,13 +2,13 @@
 
 ## In scope
 
-All contracts under `src/` — 7 files, 1,352 lines (`wc -l`, comments included; the 2026-10
-SFS-Labs review counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
-project (`via_ir = true` for the hook build):
+All contracts under `src/` — 7 files, 1,369 lines (`wc -l`, comments included; the 2026-10
+SFS-Labs independent scoped review counted 1,298 the same way at its pinned commit), Solidity
+0.8.30, Foundry project (`via_ir = true` for the hook build):
 
 | Contract | Lines | Role |
 |---|---|---|
-| `src/PoincareHook.sol` | 731 | v4 hook: detector state, pricing, hook-owned liquidity, ERC-20 LP shares |
+| `src/PoincareHook.sol` | 748 | v4 hook: detector state, pricing, hook-owned liquidity, ERC-20 LP shares |
 | `src/PoincareLens.sol` | 126 | read-only quoter; must match hook execution to the wei |
 | `src/libraries/AsymmetricCurve.sol` | 172 | curve math: offset constant-product, fee + spread pipeline, detector mid |
 | `src/libraries/Cusum.sol` | 105 | two-sided CUSUM change detector |
@@ -76,17 +76,17 @@ fails on the pre-fix code and passes now:
 | L-5 first-deposit seed flooring a virtual offset to zero | reject seeds where either anchored offset rounds to zero | `test_L5_offsetSeedFloorsToZero_reverts` |
 | L-7 exact-out routing dodging part of the spread | exact-out spread made the exact inverse of the exact-in haircut | `test_L7_exactOutSpread_notCheaperThanExactInInverse` |
 
-An automated scan is not a substitute for an external human review, which followed in 2026-10
-(below).
+An automated scan is not a substitute for a human review; an independent scoped review
+followed in 2026-10 (below).
 
-## Independent security review by SFS-Labs (2026-10)
+## Independent scoped review by SFS-Labs (2026-10)
 
-An independent, scoped, manual pre-launch security review by **SFS-Labs** (Mathias Steinbach;
+An independent scoped review (manual, pre-launch) by **SFS-Labs** (Mathias Steinbach;
 [github.com/SFS-Labs](https://github.com/SFS-Labs), [x.com/sfs_labs](https://x.com/sfs_labs)),
 report `POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit `78d75e24`.
 Scope: the seven files above. The reviewer also ran the 222-test suite, Slither, Aderyn and
 Echidna in a private CI runner, and 50,000 off-chain integer-model trials of the curve
-arithmetic. It is a limited independent review, not a firm audit, certification or guarantee,
+arithmetic. It is an independent scoped review, not a firm audit, certification or guarantee,
 and is presented here as exactly that.
 
 **Result: no Critical, High or Medium issue confirmed within the reviewed scope. Two Lows and
@@ -143,7 +143,7 @@ It raised three points, all addressed:
   behaviour. `test_L2_zeroMidAfterEstablishedBaseline_retainsStateThenRecovers`.
 
 The reviewer's attribution and wording notes are applied: the reviewer is SFS-Labs, and public
-wording (README, the frontend strip) describes a scoped independent review, not an audit or
+wording (README, the frontend strip) describes an independent scoped review, not an audit or
 certification.
 
 ### N-1 and N-2: the rate limit, and why it stays non-binding
@@ -235,7 +235,7 @@ Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
 from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
 ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
 
-That deployment predates the 2026-10 SFS-Labs review fixes above. The constructor now also takes
+That deployment predates the fixes from the 2026-10 independent scoped review above. The constructor now also takes
 the pinned PoolKey, so they take effect only on a fresh deployment, and any mainnet deployment
 is made from this build.
 

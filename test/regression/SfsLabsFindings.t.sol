@@ -21,7 +21,7 @@ import {AsymmetricCurve} from "../../src/libraries/AsymmetricCurve.sol";
 import {PriceLib} from "../../src/libraries/PriceLib.sol";
 import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
 
-/// @title SfsLabsFindingsTest: regression tests for the SFS-Labs security review (2026-10)
+/// @title SfsLabsFindingsTest: regression tests for the SFS-Labs independent scoped review (2026-10)
 /// @notice One test group per finding remediated in code (report POINCARE-MSR-78d75e24 and its
 ///         2026-10-26 remediation follow-up, by Mathias Steinbach), named after the report's
 ///         IDs. Each fails on the reviewed commit and passes now.

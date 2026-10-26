@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 // Every fix carries a regression test. Keep the claims literally true as the suite grows — the
 // count below is the number `forge test` actually reports, not a round number.
 const ITEMS = [
-  "Independent scoped security review by SFS-Labs (Mathias Steinbach), pinned to commit 78d75e24",
+  "Independent scoped review by SFS-Labs (Mathias Steinbach), pinned to commit 78d75e24",
   "no Critical/High/Medium issues confirmed within the reviewed scope; two Low findings reported, both fixed",
   "Pre-audit scanned by Olympix BugPoCer",
   "every Olympix finding fixed and regression-tested",
@@ -29,7 +29,7 @@ function Group({ hidden }: { hidden?: boolean }) {
   );
 }
 
-/** Scrolling announcement strip: the SFS-Labs review and Olympix pre-audit scan results. Pauses on hover. */
+/** Scrolling announcement strip: the SFS-Labs independent scoped review and Olympix pre-audit scan results. Pauses on hover. */
 export function AnnouncementMarquee() {
   return (
     <div
