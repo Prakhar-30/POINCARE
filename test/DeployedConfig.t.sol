@@ -94,6 +94,18 @@ contract DeployedConfigTest is Test {
         assertEq(_cfg().clipWad, 2e17, "clip 20% per block");
     }
 
+    /// @dev The kappa rate limit deliberately never binds: dMax spans the whole
+    ///      [kappaMin, kappaMax] band, so kappa always equals the ramp target of the current
+    ///      evidence. The 2026-10 manual review asked whether that is intentional (N-2). At
+    ///      the deployed gate every binding dMax tried, 0.01 to 0.04, cost LP value, and more
+    ///      the tighter it was (`GammaFourYear.t.sol::test_compose_deployedDMaxSweep`).
+    ///      It is also what keeps review note N-1 unreachable: kappa carries no memory, so a
+    ///      trend relabel can never leave a residual spread on the newly labelled side. Make
+    ///      the limit bind and N-1 has to be revisited first.
+    function test_rateLimitNeverBinds() public view {
+        assertGe(_cfg().dMax, _cfg().kappaMax - _cfg().kappaMin, "dMax must span the kappa band; see SECURITY.md");
+    }
+
     /// @dev Integer sqrt in WAD, so the r assertion above does not need a library import.
     function Math_sqrtWad(uint256 xWad) internal pure returns (uint256) {
         uint256 z = (xWad + 1) / 2;

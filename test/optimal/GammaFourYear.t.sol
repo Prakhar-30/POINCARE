@@ -1586,6 +1586,26 @@ contract GammaFourYearTest is Test {
         _cfg("gate + dMax + feeCap, kappaMax 0.03", c);
     }
 
+    // The deployed configuration (`test_compose_gateOnly`) with its kappa rate limit made to
+    // bind. Deployed, dMax equals kappaMax, so kappa can cross its whole range in one sample;
+    // the 2026-10 manual review asked whether that is intentional (N-2). It is: every binding
+    // value costs LP value, and the cost grows as the limit tightens.
+    function _deployedWithDMax(string memory name, uint256 dMax) internal view {
+        Cfg memory c = _live();
+        c.dFloor = 250e15;
+        c.kappaMax = 5e16;
+        c.dMax = dMax;
+        _cfg(name, c);
+    }
+
+    function test_compose_deployedDMaxSweep() public view sweepOnly {
+        _deployedWithDMax("deployed, dMax 0.01", 1e16);
+        _deployedWithDMax("deployed, dMax 0.02", 2e16);
+        _deployedWithDMax("deployed, dMax 0.03", 3e16);
+        _deployedWithDMax("deployed, dMax 0.04", 4e16);
+        _deployedWithDMax("deployed, dMax 0.05 (as deployed)", 5e16);
+    }
+
     // ------------------------------------------------------------------------------------
     // MATCHING THE OPERATING POINT, WHICH IS THE ONLY FAIR COMPARISON.
     //
