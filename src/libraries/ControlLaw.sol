@@ -37,10 +37,11 @@ library ControlLaw {
     }
 
     /// @notice Move `prev` toward `target` by at most `dMax`.
+    /// @dev    Compares the gap rather than computing `prev + dMax` up front, so no `dMax`
+    ///         can overflow it: the sum is only formed when it is below `target`.
     function rateLimit(uint256 prev, uint256 target, uint256 dMax) internal pure returns (uint256) {
         if (target > prev) {
-            uint256 up = prev + dMax;
-            return target < up ? target : up;
+            return target - prev > dMax ? prev + dMax : target;
         }
         uint256 down = prev > dMax ? prev - dMax : 0;
         return target > down ? target : down;

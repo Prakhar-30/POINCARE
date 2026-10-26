@@ -15,7 +15,8 @@ import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 import {BaseCustomAccounting} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomAccounting.sol";
 
-import {PoincareHook} from "../../src/PoincareHook.sol";
+import {PoincareHook, PoincareConfig} from "../../src/PoincareHook.sol";
+import {ControlLaw} from "../../src/libraries/ControlLaw.sol";
 import {AsymmetricCurve} from "../../src/libraries/AsymmetricCurve.sol";
 import {PriceLib} from "../../src/libraries/PriceLib.sol";
 import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
@@ -92,8 +93,11 @@ contract ManualReviewFindingsTest is PoincareTestBase {
     // L-2: the detector's mid no longer quantizes on small raw-unit price ratios.
 
     /// @dev A fresh hook on its own pool, seeded at `x0 : y0` raw units.
-    function _seededPool(uint16 ns, uint256 x0, uint256 y0) internal returns (PoincareHook h, PoolKey memory key) {
-        h = deployPoincare(defaultConfig(), ns, currency0, currency1);
+    function _seededPool(PoincareConfig memory cfg, uint16 ns, uint256 x0, uint256 y0)
+        internal
+        returns (PoincareHook h, PoolKey memory key)
+    {
+        h = deployPoincare(cfg, ns, currency0, currency1);
         key = initPoincarePool(h, currency0, currency1);
         MockERC20(Currency.unwrap(currency0)).mint(address(this), x0 * 2);
         MockERC20(Currency.unwrap(currency1)).mint(address(this), y0 * 2);
@@ -124,7 +128,7 @@ contract ManualReviewFindingsTest is PoincareTestBase {
         uint256[4] memory wadMids = [uint256(1), 10, 1_000, 3_000e18];
         for (uint256 i = 0; i < wadMids.length; i++) {
             uint256 y0 = x0 * wadMids[i] / WAD;
-            (PoincareHook h, PoolKey memory key) = _seededPool(uint16(0x7000 + i), x0, y0);
+            (PoincareHook h, PoolKey memory key) = _seededPool(defaultConfig(), uint16(0x7000 + i), x0, y0);
             assertEq(AsymmetricCurve.marginalPriceWad(x0, y0, 0, 0), wadMids[i], "seeded at the intended WAD mid");
 
             // The first swap samples the seed as the baseline, then moves price about -1%.
@@ -175,7 +179,7 @@ contract ManualReviewFindingsTest is PoincareTestBase {
 
     function test_L2_zeroMid_skipsThenRecovers() public {
         // A ratio extreme enough that even the MID_SCALE mid floors to 0: (1 * 1e36) / 1e38.
-        (PoincareHook h, PoolKey memory key) = _seededPool(0x7100, 1e38, 1);
+        (PoincareHook h, PoolKey memory key) = _seededPool(defaultConfig(), 0x7100, 1e38, 1);
         assertEq(AsymmetricCurve.marginalPrice(1e38, 1, 0, 0), 0, "mid floors to zero");
 
         // The swap still prices; the sample is skipped rather than recorded as a 0 baseline.
@@ -198,5 +202,43 @@ contract ManualReviewFindingsTest is PoincareTestBase {
         PoincareHook.DetectorSnap memory snap = h.previewDetector();
         assertTrue(snap.hasReturn, "returns flow again");
         assertApproxEqAbs(snap.r, _trueLogReturn(x0, y0, r0, r1), 1e6, "and they are the true move");
+    }
+
+    // N-5: no accepted configuration can make the control law revert, and a gate that could
+    // never open is rejected at construction.
+
+    function testFuzz_N5_rateLimitNeverOverflows(uint256 prev, uint256 target, uint256 dMax) public pure {
+        uint256 k = ControlLaw.rateLimit(prev, target, dMax);
+        uint256 gap = target > prev ? target - prev : prev - target;
+        // Moves toward the target, never past it, by at most dMax.
+        assertEq(k, gap > dMax ? (target > prev ? prev + dMax : prev - dMax) : target);
+    }
+
+    function test_N5_unboundedDMax_stillSwaps() public {
+        PoincareConfig memory cfg = defaultConfig();
+        cfg.dMax = type(uint256).max; // accepted by the constructor; overflowed `prev + dMax` before
+        (PoincareHook h, PoolKey memory key) = _seededPool(cfg, 0x7200, 10 ether, 10 ether);
+
+        // A gentle one-way move (~1% a block) builds evidence over several blocks, so kappa's
+        // target rises above an already-positive kappa: the case that formed `prev + dMax`.
+        bool climbedThroughMiddle;
+        for (uint256 i = 0; i < 8; i++) {
+            vm.roll(block.number + 1);
+            _swap(key, 0.05 ether, true);
+            uint256 k = h.kappa();
+            if (k > 0 && k < cfg.kappaMax) climbedThroughMiddle = true;
+        }
+        assertTrue(climbedThroughMiddle, "kappa passed through an intermediate value");
+        assertEq(h.kappa(), cfg.kappaMax, "and, with no rate limit, reached its target: the cap");
+    }
+
+    function test_N5_constructorRejectsUnreachableGate() public {
+        PoincareConfig memory cfg = defaultConfig();
+        cfg.dFloor = WAD + 1;
+        vm.expectRevert(bytes("gate cfg"));
+        deployPoincare(cfg, 0x7300, currency0, currency1);
+
+        cfg.dFloor = WAD; // a perfectly one-way path reaches D == WAD, so this stays legal
+        deployPoincare(cfg, 0x7301, currency0, currency1);
     }
 }

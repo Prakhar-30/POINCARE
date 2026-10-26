@@ -222,6 +222,9 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         require(Cusum.isValidConfig(cfg.k, cfg.h), "cusum cfg");
         require(DirectionalSignal.isValidConfig(cfg.lambda), "ewma cfg");
+        // D lives in [0, WAD]; a gate above that could never open and would silently turn
+        // the directional spread off for the life of the pool.
+        require(cfg.dFloor <= WAD, "gate cfg");
         require(
             ControlLaw.isValidConfig(ControlLaw.Config(cfg.h, cfg.sMax, cfg.kappaMin, cfg.kappaMax, cfg.dMax)),
             "control cfg"
