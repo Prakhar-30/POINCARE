@@ -48,25 +48,44 @@ abstract contract PoincareTestBase is BaseTest {
         c.clipWad = 4e18; //  Huber clip at 4σ per block
     }
 
-    /// @dev Deploy the hook at a mined-flags address. `ns` namespaces the address so several
-    ///      hooks can coexist in one test run.
-    function deployPoincare(PoincareConfig memory cfg, uint16 ns) internal returns (PoincareHook hook) {
-        address flags = address(
+    /// @dev The dynamic-fee key every test pool uses. `hooks` is left unset when the hook is
+    ///      not deployed yet; the constructor accepts that and fills in its own address.
+    function poincareKey(Currency currency0, Currency currency1, address hook) internal pure returns (PoolKey memory) {
+        return PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
+    }
+
+    /// @dev A hook address carrying Poincaré's permission flags. `ns` namespaces the address
+    ///      so several hooks can coexist in one test run.
+    function poincareHookAddress(uint16 ns) internal pure returns (address) {
+        return address(
             uint160(
                 Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
                     | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             ) ^ (uint160(ns) << 144)
         );
-        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(poolManager, cfg), flags);
+    }
+
+    /// @dev Deploy the hook at `poincareHookAddress(ns)`, pinned to the pool on `currency0/1`,
+    ///      with this test contract as its initializer.
+    function deployPoincare(PoincareConfig memory cfg, uint16 ns, Currency currency0, Currency currency1)
+        internal
+        returns (PoincareHook hook)
+    {
+        address flags = poincareHookAddress(ns);
+        deployCodeTo(
+            "PoincareHook.sol:PoincareHook",
+            abi.encode(poolManager, cfg, poincareKey(currency0, currency1, address(0)), address(this)),
+            flags
+        );
         hook = PoincareHook(payable(flags));
     }
 
-    /// @dev Initialise a v4 pool on `hook` for the given currency pair (dynamic-fee key).
+    /// @dev Initialise the v4 pool `hook` was deployed for.
     function initPoincarePool(PoincareHook hook, Currency currency0, Currency currency1)
         internal
         returns (PoolKey memory key)
     {
-        key = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(address(hook)));
+        key = poincareKey(currency0, currency1, address(hook));
         poolManager.initialize(key, Constants.SQRT_PRICE_1_1);
     }
 }

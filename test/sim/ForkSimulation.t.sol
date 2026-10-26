@@ -138,7 +138,11 @@ contract ForkSimulationTest is Test {
         cfg.kappaMin = KAPPA_MIN;
         cfg.kappaMax = kappaMax;
         cfg.dMax = D_MAX;
-        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, cfg), flags);
+        deployCodeTo(
+            "PoincareHook.sol:PoincareHook",
+            abi.encode(pm, cfg, PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(flags)), address(this)),
+            flags
+        );
         h = PoincareHook(payable(flags));
     }
 

@@ -85,10 +85,10 @@ abstract contract ForkBase is Test {
                     | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             ) ^ (_salt() << 144)
         );
-        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, _config()), flags);
+        key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(flags));
+        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, _config(), key, address(this)), flags);
         hook = PoincareHook(payable(flags));
 
-        key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
         pm.initialize(key, Constants.SQRT_PRICE_1_1);
 
         IERC20Minimal(Currency.unwrap(c0)).approve(address(hook), type(uint256).max);

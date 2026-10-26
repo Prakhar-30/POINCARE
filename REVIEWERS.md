@@ -21,7 +21,7 @@ on the with-trend (toxic) side while the stabilising side keeps trading at the b
 ## Run it
 
 ```bash
-forge test                      # 228 tests: unit, fuzz, invariant, manipulation, calibration, regression
+forge test                      # 243 tests: unit, fuzz, invariant, manipulation, calibration, regression
 FOUNDRY_PROFILE=fork forge test --match-path "test/sim/Fork*.t.sol"
                                 # 6 more, against a live Sepolia fork: quote-vs-execution
                                 # through the CANONICAL router. Needs SEPOLIA_RPC.
@@ -119,7 +119,7 @@ rather than a re-simulation. The demo pool's flow is script-driven (`frontend/re
 
 | Item | Status |
 |---|---|
-| External human security audit | **Required before mainnet.** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run and every finding fixed (`SECURITY.md`), which is not a substitute for an independent audit. |
+| Independent scoped review | **Done (2026-10).** An Olympix security review, sponsored by the Uniswap Foundation Security Fund, was run first and every finding fixed. An independent scoped review by SFS-Labs (Mathias Steinbach) followed, with a remediation follow-up: no Critical, High or Medium issue confirmed within the reviewed scope; its two Lows and the code-level Notes are fixed with regression tests, and the rest are dispositioned (`SECURITY.md`). It is not a certification, and the fixes reach chain with the next deployment. |
 | Adaptive (σ-normalized) detector | Built, tested, backtested — but gated OFF in the live deployment until its quantitative manipulation-cost bound is derived (OPEN_ITEMS **V1**). |
 | Depth / curvature lever | **Closed (E1), not deferred.** The naive version is arb-drainable; we reproduced the drain, then built a round-trip-safe version anyway and measured it across four years of real ETH/USDC. It lost by roughly thirty to one. No depth-asymmetry mode exists in the codebase and none is planned; `test/DeployedConfig.t.sol` pins `alphaWad == 0`. See `AsymmetricCurve.sol`'s safety note. |
 | ERC-6909 claim donations | **Closed.** Reserves are shadow-accounted, so a donation moves nothing the hook prices from: not the detector's sampled price, not share pricing, not redemption. Donated claims are stranded. See `SECURITY.md` and `invariant_shadowReservesBackedByClaims`. |

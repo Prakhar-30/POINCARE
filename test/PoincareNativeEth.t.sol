@@ -40,7 +40,7 @@ contract PoincareNativeEthTest is PoincareTestBase {
         MockERC20 token = deployToken();
         currency1 = Currency.wrap(address(token));
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, NATIVE, currency1);
         lens = new PoincareLens(hook);
         poolKey = initPoincarePool(hook, NATIVE, currency1);
 

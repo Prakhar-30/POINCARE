@@ -5,7 +5,9 @@ import {BaseCustomCurve} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomCu
 import {BaseHook} from "@openzeppelin/uniswap-hooks/src/base/BaseHook.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
@@ -77,9 +79,11 @@ struct PoincareConfig {
 /// @dev    Settlement is fully delegated to {BaseCustomCurve} (ERC-6909 claims,
 ///         take/settle, unlock); this contract only implements pricing and liquidity.
 ///
-///         Reserves are the hook's ERC-6909 claim balances, never a manually tracked
-///         variable, so they stay consistent through settlement. The detector watches
-///         the executable mid (r1+b)/(r0+a).
+///         Reserves are shadow-accounted (`_res0`/`_res1`): the hook books the exact
+///         amount it settles on every swap and liquidity change, rather than reading its
+///         ERC-6909 claim balances, so claims donated from outside cannot move pricing,
+///         the detector or redemption. See `_reserves`. The detector watches the
+///         executable mid (r1+b)/(r0+a).
 ///
 ///         All detector logic lives in the view `_projectDetector`; the swap path
 ///         persists its result and `previewSpread`/`previewDetector` expose the same
@@ -95,6 +99,7 @@ struct PoincareConfig {
 ///         be reintroduced.
 contract PoincareHook is BaseCustomCurve, ERC20 {
     using CurrencyLibrary for Currency;
+    using PoolIdLibrary for PoolKey;
     using Cusum for Cusum.State;
     using DirectionalSignal for DirectionalSignal.State;
 
@@ -135,6 +140,18 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint256 public immutable feeCap;
     uint256 public immutable alphaWad;
 
+    /// @notice The one pool this hook will accept, fixed at construction. The inherited
+    ///         initializer binds whichever key reaches it first, and deployment and
+    ///         initialization are separate transactions, so without this anyone could bind
+    ///         the hook to a pool of their choosing in between.
+    PoolId public immutable expectedPoolId;
+
+    /// @notice The only address allowed to initialize that pool. Pinning the key alone still
+    ///         let anyone initialize the intended key first, which leaves the pool usable (its
+    ///         slot0 price never prices a swap here) but makes the deployer's own initialize
+    ///         revert. This has no power once the pool is initialized.
+    address public immutable initializer;
+
     // Detector state, packed to 4 slots. The downcasts are safe: sPos/sNeg live in
     // [0, sMax] with sMax <= int128.max (constructor-validated); |ewmaNet| <= ewmaTV <=
     // max|r| * WAD/(WAD-lambda) with a single-step |r| bounded by the lnWad domain
@@ -147,7 +164,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint64 private _kappa;
     Cusum.Trend private _trend;
     uint64 private _lastSampledBlock; // slot 3
-    uint256 private _lastSampledPriceWad; // slot 4
+    uint256 private _lastSampledMid; // slot 4, at AsymmetricCurve.MID_SCALE resolution
 
     // Base-depth anchor, set once at the first deposit and supply-scaled after.
     uint128 private _a0;
@@ -182,11 +199,13 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     }
 
     /// @dev In-memory projection of one detector step; shared by the swap path and the
-    ///      read-only previews so the two can never drift.
+    ///      read-only previews so the two can never drift. Returned by `previewDetector`, so
+    ///      its layout is public ABI: new fields go at the end, existing ones keep their
+    ///      position and units.
     struct DetectorSnap {
         bool advanced; // a new-block sample happened (state to persist)
         bool hasReturn; // a log-return was processed (false for the first baseline sample)
-        uint256 priceWad; // sampled executable mid (only when advanced)
+        uint256 priceWad; // sampled executable mid, WAD (only when advanced)
         int256 r; // clipped log-return (only when hasReturn)
         int256 sPos;
         int256 sNeg;
@@ -198,14 +217,28 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         Cusum.Trend trend;
         uint256 offsetA; // current base offsets, returned to save a re-read
         uint256 offsetB;
+        uint256 mid; // the same mid at MID_SCALE resolution, which the detector runs on
     }
 
-    constructor(IPoolManager _poolManager, PoincareConfig memory cfg)
+    /// @param key The pool this hook will serve. `hooks` may be left unset: the hook address
+    ///        is not known before deployment when it is mined, and it can only be this hook.
+    /// @param initializer_ The address that will call `PoolManager.initialize` for `key`.
+    constructor(IPoolManager _poolManager, PoincareConfig memory cfg, PoolKey memory key, address initializer_)
         BaseHook(_poolManager)
         ERC20("Poincare LP", "POIN-LP")
     {
+        require(address(key.hooks) == address(0) || address(key.hooks) == address(this), "pool key cfg");
+        require(key.currency0 < key.currency1, "pool key cfg");
+        require(initializer_ != address(0), "pool key cfg");
+        key.hooks = IHooks(address(this));
+        expectedPoolId = key.toId();
+        initializer = initializer_;
+
         require(Cusum.isValidConfig(cfg.k, cfg.h), "cusum cfg");
         require(DirectionalSignal.isValidConfig(cfg.lambda), "ewma cfg");
+        // D lives in [0, WAD]; a gate above that could never open and would silently turn
+        // the directional spread off for the life of the pool.
+        require(cfg.dFloor <= WAD, "gate cfg");
         require(
             ControlLaw.isValidConfig(ControlLaw.Config(cfg.h, cfg.sMax, cfg.kappaMin, cfg.kappaMax, cfg.dMax)),
             "control cfg"
@@ -231,6 +264,18 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         feeGamma = cfg.feeGamma;
         feeCap = cfg.feeCap;
         alphaWad = cfg.alphaWad;
+    }
+
+    /// @dev Bind only the pool fixed at construction, initialized by the address fixed with it;
+    ///      see `expectedPoolId` and `initializer`.
+    function _beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
+        internal
+        override
+        returns (bytes4)
+    {
+        require(sender == initializer, "unauthorized initializer");
+        require(PoolId.unwrap(key.toId()) == PoolId.unwrap(expectedPoolId), "unexpected pool key");
+        return super._beforeInitialize(sender, key, sqrtPriceX96);
     }
 
     // reentrancy guard
@@ -359,19 +404,22 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         if (block.number == _lastSampledBlock || r0 == 0 || r1 == 0) return s;
 
-        // Nonzero reserves are not enough: at an extreme ratio the marginal price can floor
+        // The mid is taken at MID_SCALE, not WAD: a WAD mid floors small raw-unit ratios to a
+        // handful of units, aliasing real moves into large apparent log-returns. Nonzero
+        // reserves are still not enough at a truly extreme ratio, where even this can floor
         // to 0. Skip the sample (no 0 baseline to blind the detector, no lnWad(0) revert)
         // and fall back to stored state so the swap still prices.
-        uint256 priceWad = AsymmetricCurve.marginalPriceWad(r0, r1, s.offsetA, s.offsetB);
-        if (priceWad == 0) return s;
+        uint256 mid = AsymmetricCurve.marginalPrice(r0, r1, s.offsetA, s.offsetB);
+        if (mid == 0) return s;
 
         s.advanced = true;
-        s.priceWad = priceWad;
-        uint256 prev = _lastSampledPriceWad;
+        s.mid = mid;
+        s.priceWad = _midToWad(mid);
+        uint256 prev = _lastSampledMid;
         if (prev == 0) return s; // first ever sample: establish the baseline, no return yet
 
         s.hasReturn = true;
-        int256 r = PriceLib.logReturnWad(prev, s.priceWad);
+        int256 r = PriceLib.logReturnWad(prev, s.mid);
 
         // Huber clip + (adaptive) standardization. Sigma is taken BEFORE folding this
         // sample, so a sample is never standardized by itself, and the clip bounds any
@@ -423,7 +471,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         s = _projectDetector(r0, r1);
         if (!s.advanced) return s;
 
-        _lastSampledPriceWad = s.priceWad;
+        _lastSampledMid = s.mid;
         _lastSampledBlock = uint64(block.number);
         if (!s.hasReturn) return s; // baseline sample: statistics unchanged
 
@@ -528,6 +576,8 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         shares = params.liquidity;
         amount0 = FullMath.mulDiv(shares, r0, supply);
         amount1 = FullMath.mulDiv(shares, r1, supply);
+        // Both sides floor, so a dust burn could destroy shares for nothing; refuse it.
+        require(amount0 > 0 || amount1 > 0, "insufficient");
     }
 
     /// @dev Called after `_modifyLiquidity` has already settled, so `callerDelta` is the
@@ -582,7 +632,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     ///      The shadow only ever moves in `_settleReserves` (swaps) and `_bookLiquidity`
     ///      (add/remove), each applying the exact amount `BaseCustomCurve` settles in the
     ///      same call. It can therefore never exceed the real claim balance, which is the
-    ///      safe direction: a payout is always backed. `invariant_reservesMatchGhostAccounting`
+    ///      safe direction: a payout is always backed. `invariant_shadowReservesBackedByClaims`
     ///      asserts the two agree across randomized op sequences, so any drift fails a test
     ///      rather than becoming a silent solvency gap.
     ///
@@ -629,7 +679,13 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
     /// @notice Executable mid sampled at the last detector update (WAD).
     function lastSampledPriceWad() external view returns (uint256) {
-        return _lastSampledPriceWad;
+        return _midToWad(_lastSampledMid);
+    }
+
+    /// @dev The detector keeps its mid at MID_SCALE; every price field it reports in WAD is
+    ///      this, exactly `AsymmetricCurve.marginalPriceWad` of the same reserves.
+    function _midToWad(uint256 mid) private pure returns (uint256) {
+        return mid / (AsymmetricCurve.MID_SCALE / WAD);
     }
 
     /// @notice Block of the last detector update.

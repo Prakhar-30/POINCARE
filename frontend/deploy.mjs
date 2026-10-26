@@ -89,6 +89,10 @@ const ERC20_ABI = [
 ];
 const FAUCET_ABI = [{ type: "constructor", inputs: [{ type: "address" }, { type: "address" }] }];
 const LENS_ABI = [{ type: "constructor", inputs: [{ type: "address" }] }];
+const POOL_KEY_T = { type: "tuple", components: [
+  { name: "currency0", type: "address" }, { name: "currency1", type: "address" },
+  { name: "fee", type: "uint24" }, { name: "tickSpacing", type: "int24" }, { name: "hooks", type: "address" },
+] };
 const HOOK_CTOR = [
   { type: "address" },
   { type: "tuple", components: [
@@ -98,11 +102,12 @@ const HOOK_CTOR = [
     { name: "kappaMin", type: "uint256" }, { name: "kappaMax", type: "uint256" }, { name: "dMax", type: "uint256" },
     { name: "feeGamma", type: "uint256" }, { name: "feeCap", type: "uint256" }, { name: "alphaWad", type: "uint256" },
   ] },
+  POOL_KEY_T, // the one pool this hook will accept; `hooks` left zero (see below)
+  { type: "address" }, // the only address allowed to initialize it: this deployer
 ];
-const POOL_KEY_T = { type: "tuple", components: [
-  { name: "currency0", type: "address" }, { name: "currency1", type: "address" },
-  { name: "fee", type: "uint24" }, { name: "tickSpacing", type: "int24" }, { name: "hooks", type: "address" },
-] };
+const HOOK_VIEW_ABI = [
+  { type: "function", name: "poolKey", stateMutability: "view", inputs: [], outputs: [POOL_KEY_T] },
+];
 const PM_ABI = [
   { type: "function", name: "initialize", stateMutability: "nonpayable",
     inputs: [POOL_KEY_T, { name: "sqrtPriceX96", type: "uint160" }], outputs: [{ type: "int24" }] },
@@ -152,8 +157,13 @@ async function main() {
   const faucetRcpt = await send("deploy DemoFaucet", { data: deployData(FAUCET_ART, FAUCET_ABI, [wethAddr, usdcAddr]) }, 1_000_000n);
   const faucetAddr = faucetRcpt.contractAddress;
 
+  // The hook is pinned to this key at construction and rejects any other. `hooks` stays zero
+  // here: the hook address is mined from the constructor arguments, so it cannot be one of them.
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const poolKey = { currency0: usdcAddr, currency1: wethAddr, fee: 0x800000, tickSpacing: 60, hooks: ZERO };
+
   // Mine and CREATE2-deploy the hook (permission flags live in the address).
-  const hookInit = deployData(HOOK_ART, [{ type: "constructor", inputs: HOOK_CTOR }], [POOL_MANAGER, CFG]);
+  const hookInit = deployData(HOOK_ART, [{ type: "constructor", inputs: HOOK_CTOR }], [POOL_MANAGER, CFG, poolKey, account.address]);
   const initHash = keccak256(hookInit);
   let salt = 0n, hookAddr;
   for (;;) {
@@ -180,8 +190,15 @@ async function main() {
     send(desc, { to, data: encodeFunctionData({ abi, functionName: fn, args }) }, gas);
 
   // Initialise the pool; the custom curve prices off reserves, so sqrtPrice is cosmetic.
-  const poolKey = { currency0: usdcAddr, currency1: wethAddr, fee: 0x800000, tickSpacing: 60, hooks: hookAddr };
+  poolKey.hooks = hookAddr;
   await sendCall("initialize pool", POOL_MANAGER, PM_ABI, "initialize", [poolKey, SQRT_PRICE_1_1], 600_000n);
+  // Deploy and initialize are separate transactions. The hook rejects any other key, but
+  // confirm what it actually bound before the addresses are published.
+  const bound = await pub.readContract({ address: hookAddr, abi: HOOK_VIEW_ABI, functionName: "poolKey" });
+  for (const f of ["currency0", "currency1", "hooks"]) {
+    if (bound[f].toLowerCase() !== poolKey[f].toLowerCase()) throw new Error(`hook bound to wrong pool (${f})`);
+  }
+  if (bound.fee !== poolKey.fee || bound.tickSpacing !== poolKey.tickSpacing) throw new Error("hook bound to wrong pool");
 
   // Mint spare balances and seed hook-owned liquidity at 3000 USDC/WETH.
 

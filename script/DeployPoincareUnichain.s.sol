@@ -7,6 +7,7 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
@@ -95,6 +96,8 @@ contract DemoFaucet {
 ///           PRIVATE_KEY=0x... forge script script/DeployPoincareUnichain.s.sol:DeployPoincareUnichain \
 ///             --rpc-url unichain_sepolia --broadcast
 contract DeployPoincareUnichain is Script {
+    using PoolIdLibrary for PoolKey;
+
     // CREATE2_FACTORY (canonical deterministic deployer) is inherited from forge-std's Script.
 
     // Demo-pool config: engages quickly so the lean is visible on a testnet. Absolute
@@ -174,13 +177,21 @@ contract DeployPoincareUnichain is Script {
             ? (Currency.wrap(address(weth)), Currency.wrap(address(usdc)))
             : (Currency.wrap(address(usdc)), Currency.wrap(address(weth)));
 
-        PoincareHook hook = _deployHook(pm);
+        // The hook is pinned to this key at construction. `hooks` stays unset here: the hook
+        // address is mined from the constructor arguments, so it cannot be one of them.
+        PoolKey memory key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(address(0)));
+        PoincareHook hook = _deployHook(pm, key);
         PoincareLens lens = new PoincareLens(hook);
 
         // The custom curve prices off reserves, not slot0, so the starting sqrtPrice is
         // cosmetic; 1:1 is fine.
-        PoolKey memory key = PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(hook));
+        key.hooks = IHooks(hook);
         pm.initialize(key, Constants.SQRT_PRICE_1_1);
+        // Deploy and initialize are separate transactions. The hook rejects any other key, but
+        // confirm what it actually bound before the addresses are published.
+        require(
+            PoolId.unwrap(hook.poolKey().toId()) == PoolId.unwrap(hook.expectedPoolId()), "hook bound to wrong pool"
+        );
 
         // Seed hook-owned liquidity at the 3000 price (amounts follow the sorted order).
         weth.approve(address(hook), type(uint256).max);
@@ -227,15 +238,16 @@ contract DeployPoincareUnichain is Script {
         cfg.alphaWad = ALPHA;
     }
 
-    function _deployHook(IPoolManager pm) internal returns (PoincareHook hook) {
+    function _deployHook(IPoolManager pm, PoolKey memory key) internal returns (PoincareHook hook) {
         uint160 flags = uint160(
             Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
         PoincareConfig memory cfg = _config();
-        bytes memory args = abi.encode(pm, cfg);
+        // The broadcaster initializes the pool below, so it is the only address allowed to.
+        bytes memory args = abi.encode(pm, cfg, key, msg.sender);
         (address hookAddr, bytes32 salt) = HookMiner.find(CREATE2_FACTORY, flags, type(PoincareHook).creationCode, args);
-        hook = new PoincareHook{salt: salt}(pm, cfg);
+        hook = new PoincareHook{salt: salt}(pm, cfg, key, msg.sender);
         require(address(hook) == hookAddr, "hook address mismatch");
     }
 

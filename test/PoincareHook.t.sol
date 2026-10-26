@@ -52,7 +52,7 @@ contract PoincareHookTest is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, currency0, currency1);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
         // Approve the hook to pull tokens for hook-owned liquidity.
@@ -83,7 +83,7 @@ contract PoincareHookTest is PoincareTestBase {
         internal
         returns (PoincareHook h, PoolKey memory key)
     {
-        h = deployPoincare(cfg, ns);
+        h = deployPoincare(cfg, ns, currency0, currency1);
         key = initPoincarePool(h, currency0, currency1);
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(h), type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(h), type(uint256).max);
