@@ -79,9 +79,11 @@ struct PoincareConfig {
 /// @dev    Settlement is fully delegated to {BaseCustomCurve} (ERC-6909 claims,
 ///         take/settle, unlock); this contract only implements pricing and liquidity.
 ///
-///         Reserves are the hook's ERC-6909 claim balances, never a manually tracked
-///         variable, so they stay consistent through settlement. The detector watches
-///         the executable mid (r1+b)/(r0+a).
+///         Reserves are shadow-accounted (`_res0`/`_res1`): the hook books the exact
+///         amount it settles on every swap and liquidity change, rather than reading its
+///         ERC-6909 claim balances, so claims donated from outside cannot move pricing,
+///         the detector or redemption. See `_reserves`. The detector watches the
+///         executable mid (r1+b)/(r0+a).
 ///
 ///         All detector logic lives in the view `_projectDetector`; the swap path
 ///         persists its result and `previewSpread`/`previewDetector` expose the same
@@ -613,7 +615,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     ///      The shadow only ever moves in `_settleReserves` (swaps) and `_bookLiquidity`
     ///      (add/remove), each applying the exact amount `BaseCustomCurve` settles in the
     ///      same call. It can therefore never exceed the real claim balance, which is the
-    ///      safe direction: a payout is always backed. `invariant_reservesMatchGhostAccounting`
+    ///      safe direction: a payout is always backed. `invariant_shadowReservesBackedByClaims`
     ///      asserts the two agree across randomized op sequences, so any drift fails a test
     ///      rather than becoming a silent solvency gap.
     ///
