@@ -296,4 +296,80 @@ contract ShsLabsFindingsTest is PoincareTestBase {
         );
         assertEq(h.balanceOf(address(this)), sharesBefore - enough, "a payable burn still works");
     }
+
+    /// @dev Follow-up to L-2: `previewDetector()` returns `DetectorSnap`, which is public ABI.
+    ///      Its third word must still be the WAD price a pre-fix decoder expects there; the
+    ///      1e36 mid is appended at the end.
+    function test_L2_previewDetectorKeepsWadPriceInPlace() public {
+        (PoincareHook h, PoolKey memory key) = _seededPool(defaultConfig(), 0x7500, 1e30, 1e13);
+        _swap(key, 1e27, true);
+        vm.roll(block.number + 1);
+        (uint256 r0, uint256 r1) = h.reserves();
+
+        (bool ok, bytes memory raw) = address(h).staticcall(abi.encodeCall(PoincareHook.previewDetector, ()));
+        assertTrue(ok);
+        uint256 word2;
+        assembly {
+            word2 := mload(add(raw, 96)) // skip length, then words 0 and 1
+        }
+        assertEq(word2, AsymmetricCurve.marginalPriceWad(r0, r1, 0, 0), "positional priceWad is still WAD");
+
+        PoincareHook.DetectorSnap memory snap = h.previewDetector();
+        assertEq(snap.priceWad, word2);
+        assertEq(snap.mid, AsymmetricCurve.marginalPrice(r0, r1, 0, 0), "appended mid is the 1e36 value");
+    }
+
+    /// @dev Follow-up to L-2: a zero-mid interval AFTER a baseline is established. The skip
+    ///      keeps the stored state untouched, and the first representable sample afterwards
+    ///      reads one return spanning the whole gap against the last good sample, clipped like
+    ///      any other. That is intended: the detector sees one large move, not a missing one.
+    /// @dev Everything the detector persists, in one comparable value.
+    function _detectorState(PoincareHook h) internal view returns (bytes32) {
+        (int256 sPos, int256 sNeg) = h.cusumState();
+        (int256 ewmaNet, uint256 ewmaTV) = h.signalState();
+        return keccak256(
+            abi.encode(sPos, sNeg, ewmaNet, ewmaTV, h.kappa(), h.trend(), h.lastSampledBlock(), h.lastSampledPriceWad())
+        );
+    }
+
+    function test_L2_zeroMidAfterEstablishedBaseline_retainsStateThenRecovers() public {
+        PoincareConfig memory cfg = defaultConfig();
+        (PoincareHook h, PoolKey memory key) = _seededPool(cfg, 0x7600, 1e20, 1e20);
+
+        // Baseline, then one real return on an up-move, so the detector has live state.
+        _swap(key, 1e18, false);
+        vm.roll(block.number + 1);
+        (uint256 x0, uint256 y0) = h.reserves(); // what this block's sample is taken on
+        _swap(key, 1e18, false);
+        assertEq(h.lastSampledBlock(), block.number, "baseline established");
+        (int256 sPos,) = h.cusumState();
+        assertGt(sPos, 0, "live up-evidence");
+        bytes32 stateBefore = _detectorState(h);
+
+        // Same block: sell token0 hard enough that even the 1e36 mid floors to zero. Against
+        // the up-trend, so no directional spread holds back part of the output.
+        MockERC20(Currency.unwrap(currency0)).mint(address(this), 15e37);
+        _swap(key, 15e37, true);
+        (uint256 r0, uint256 r1) = h.reserves();
+        assertEq(AsymmetricCurve.marginalPrice(r0, r1, 0, 0), 0, "mid now floors to zero");
+
+        // Next block: the swap still prices, the sample is skipped, and state is untouched.
+        vm.roll(block.number + 1);
+        _swap(key, 1, false);
+        assertEq(_detectorState(h), stateBefore, "zero mid skipped: stored state untouched");
+
+        // Same block: bring the price back to a representable level.
+        _swap(key, 1e20, false);
+        (r0, r1) = h.reserves();
+        assertGt(AsymmetricCurve.marginalPrice(r0, r1, 0, 0), 0, "representable again");
+
+        // Next block: one return spanning the gap, measured against the last good sample.
+        vm.roll(block.number + 1);
+        PoincareHook.DetectorSnap memory snap = h.previewDetector();
+        assertTrue(snap.hasReturn, "sampling resumes");
+        int256 gap = _trueLogReturn(x0, y0, r0, r1);
+        int256 clip = int256(cfg.clipWad);
+        int256 expected = gap > clip ? clip : (gap < -clip ? -clip : gap);
+        assertApproxEqAbs(snap.r, expected, 1e6, "the gap-spanning return, clipped like any other");
+    }
 }

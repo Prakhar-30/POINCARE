@@ -199,11 +199,13 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     }
 
     /// @dev In-memory projection of one detector step; shared by the swap path and the
-    ///      read-only previews so the two can never drift.
+    ///      read-only previews so the two can never drift. Returned by `previewDetector`, so
+    ///      its layout is public ABI: new fields go at the end, existing ones keep their
+    ///      position and units.
     struct DetectorSnap {
         bool advanced; // a new-block sample happened (state to persist)
         bool hasReturn; // a log-return was processed (false for the first baseline sample)
-        uint256 mid; // sampled executable mid at MID_SCALE resolution (only when advanced)
+        uint256 priceWad; // sampled executable mid, WAD (only when advanced)
         int256 r; // clipped log-return (only when hasReturn)
         int256 sPos;
         int256 sNeg;
@@ -215,6 +217,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         Cusum.Trend trend;
         uint256 offsetA; // current base offsets, returned to save a re-read
         uint256 offsetB;
+        uint256 mid; // the same mid at MID_SCALE resolution, which the detector runs on
     }
 
     /// @param key The pool this hook will serve. `hooks` may be left unset: the hook address
@@ -411,6 +414,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         s.advanced = true;
         s.mid = mid;
+        s.priceWad = _midToWad(mid);
         uint256 prev = _lastSampledMid;
         if (prev == 0) return s; // first ever sample: establish the baseline, no return yet
 
@@ -480,7 +484,7 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
 
         emit DetectorSample(
             block.number,
-            _midToWad(s.mid),
+            s.priceWad,
             s.r,
             s.sPos,
             s.sNeg,
@@ -678,8 +682,8 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         return _midToWad(_lastSampledMid);
     }
 
-    /// @dev The detector keeps its mid at MID_SCALE; everything it reports is WAD, exactly
-    ///      `AsymmetricCurve.marginalPriceWad` of the same reserves.
+    /// @dev The detector keeps its mid at MID_SCALE; every price field it reports in WAD is
+    ///      this, exactly `AsymmetricCurve.marginalPriceWad` of the same reserves.
     function _midToWad(uint256 mid) private pure returns (uint256) {
         return mid / (AsymmetricCurve.MID_SCALE / WAD);
     }
