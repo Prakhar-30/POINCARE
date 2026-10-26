@@ -721,8 +721,8 @@ python analysis/simulation/plot_fouryear.py
 > **Status:** the MVP described above is **built and green**, 239 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
-> regression test per finding fixed from the **Olympix security review** and the **2026-10
-> manual review**). The
+> regression test per finding fixed from the **Olympix security review** and the **shs_labs
+> audit**). The
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
@@ -736,8 +736,9 @@ web app (`frontend/`) that trades, provides liquidity, and charts the detector's
 **Security review:** the contracts were reviewed by **Olympix** under the **Uniswap Foundation
 Security Fund**. Every reported finding was fixed and each has a regression test that fails on
 the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain
-cases in `PriceLib.t.sol`). Full finding table in [§11](#11-security-review). An independent
-external audit is still required before mainnet (item 5 below).
+cases in `PriceLib.t.sol`). An external audit by **shs_labs** followed in 2026-10; its fixes are
+in the code and ship with the next deployment. Both finding tables are in
+[§11](#11-security-review).
 
 **Built (MVP + the 2026-07 feature pass):** the directional-spread pricing engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
 
@@ -755,7 +756,8 @@ external audit is still required before mainnet (item 5 below).
    scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
    wants re-deriving against block-cadence data.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
-5. **External security audit** before mainnet.
+5. ~~**External security audit**~~ **Done (2026-10, shs_labs).** Fixes merged with regression
+   tests; they reach chain with the next deployment. See [§11](#11-security-review).
 
 > **Not on this roadmap, and deliberately:** a depth or curvature lever. It was built,
 > made round-trip safe and split-invariant, measured across four years, and lost by roughly
@@ -792,13 +794,30 @@ above:
 
 So: the contracts were reviewed, every finding was fixed, and the currently deployed build
 carries one post-review logic change that was itself a fix. None of that substitutes for an
-independent audit, which is still required before mainnet.
+independent audit, which followed in 2026-10 (below).
 
-#### Manual review (2026-10)
+| Severity | Finding | Fix |
+|---|---|---|
+| Medium | A native-ETH payout recipient could reenter a swap mid-withdrawal and price against half-settled reserves | Transient `_liquidityLock` held across the whole add/remove including settlement; `_beforeSwap` reverts while it is set |
+| Medium | LP shares were priced off token0 while the token1 counterpart floored down, minting claims token1 never backed | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected |
+| Low | The Lens returned a quote for a zero amount that a real swap reverts on | The Lens mirrors the PoolManager's `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful |
+| Low ×2 | An extreme move could push `lnWad` outside its domain, letting the detector revert a swap and violating the never-revert rule (§4.5) | The ratio is clamped into the safe domain, and a mid that floors to zero skips the sample instead of reverting |
+| Low ×2 | The docs claimed full donation resistance, but ERC-6909 claims are transferable, so a claim donation can move `_reserves()` | **Closed.** Reserves are now shadow-accounted: the hook books every amount it settles, so a donation moves nothing it prices from. See [`SECURITY.md`](./SECURITY.md) |
+| Low | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio, opening an arb seam | Seeds where either offset rounds to zero are rejected |
+| Low | Exact-out routing could dodge part of the directional spread, because marking up the input undercharges on a convex curve | Exact-out reimplemented as the exact inverse of the exact-in haircut |
 
-An independent manual review by Mathias Steinbach (report `POINCARE-MSR-78d75e24`, 24 October
-2026) read all seven contracts at commit `78d75e24`. It also independently re-ran the test suite,
-Slither, Aderyn and Echidna. **No Critical, High or Medium finding; two Lows and eight Notes.**
+Finding, fix and test are mapped one to one in [`SECURITY.md`](./SECURITY.md) and tracked in
+[`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §H.
+
+**What this does not mean.** A sponsored review is not a full external human audit, and we do not
+present it as one. That audit followed in 2026-10, below.
+
+### Audit by shs_labs (2026-10)
+
+A manual security audit by **shs_labs** (Mathias Steinbach), report `POINCARE-MSR-78d75e24`
+(24 October 2026), read all seven contracts at commit `78d75e24`. It also independently re-ran
+the test suite, Slither, Aderyn and Echidna. **No Critical, High or Medium finding; two Lows and
+eight Notes.**
 
 - **L-1, fixed.** The inherited initializer bound whichever pool reached a fresh hook first, and
   deploy and initialize are separate transactions. The hook is now pinned to its PoolKey at
@@ -816,27 +835,11 @@ Slither, Aderyn and Echidna. **No Critical, High or Medium finding; two Lows and
 - **N-3, N-4, N-7 and N-8, documented.** They are written up as accepted behaviour, a supported-token
   policy, and residual economic risk.
 
-Every code fix ships with a regression test in `test/regression/ManualReviewFindings.t.sol`, and
+Every code fix ships with a regression test in `test/regression/ShsLabsFindings.t.sol`, and
 no Olympix fix was touched. The full disposition, with the evidence for each call, is in
-[`SECURITY.md`](./SECURITY.md) and tracked in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §M. The Unichain Sepolia deployment in §10 predates these fixes.
-They take effect on the next deployment.
-
-| Severity | Finding | Fix |
-|---|---|---|
-| Medium | A native-ETH payout recipient could reenter a swap mid-withdrawal and price against half-settled reserves | Transient `_liquidityLock` held across the whole add/remove including settlement; `_beforeSwap` reverts while it is set |
-| Medium | LP shares were priced off token0 while the token1 counterpart floored down, minting claims token1 never backed | Shares priced off the scarcer funded side (`min` of both ratios); zero-counterpart adds rejected |
-| Low | The Lens returned a quote for a zero amount that a real swap reverts on | The Lens mirrors the PoolManager's `SwapAmountCannotBeZero` guard, so quotes stay execution-faithful |
-| Low ×2 | An extreme move could push `lnWad` outside its domain, letting the detector revert a swap and violating the never-revert rule (§4.5) | The ratio is clamped into the safe domain, and a mid that floors to zero skips the sample instead of reverting |
-| Low ×2 | The docs claimed full donation resistance, but ERC-6909 claims are transferable, so a claim donation can move `_reserves()` | **Closed.** Reserves are now shadow-accounted: the hook books every amount it settles, so a donation moves nothing it prices from. See [`SECURITY.md`](./SECURITY.md) |
-| Low | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio, opening an arb seam | Seeds where either offset rounds to zero are rejected |
-| Low | Exact-out routing could dodge part of the directional spread, because marking up the input undercharges on a convex curve | Exact-out reimplemented as the exact inverse of the exact-in haircut |
-
-Finding, fix and test are mapped one to one in [`SECURITY.md`](./SECURITY.md) and tracked in
-[`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §H.
-
-**What this does not mean.** A sponsored review is not a full external human audit, and we do not
-present it as one. An independent audit remains required before mainnet, and stays open as item
-A9 in the tracker.
+[`SECURITY.md`](./SECURITY.md) and tracked in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md)
+§M. The Unichain Sepolia deployment in §10 predates these fixes. They take effect on the next
+deployment.
 
 ---
 

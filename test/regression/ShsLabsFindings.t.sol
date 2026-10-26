@@ -21,10 +21,11 @@ import {AsymmetricCurve} from "../../src/libraries/AsymmetricCurve.sol";
 import {PriceLib} from "../../src/libraries/PriceLib.sol";
 import {PoincareTestBase} from "../utils/PoincareTestBase.sol";
 
-/// @title ManualReviewFindingsTest: regression tests for the 2026-10 manual security review
-/// @notice One test group per finding remediated in code (POINCARE-MSR-78d75e24), named after
-///         the report's IDs. Each fails on the reviewed commit and passes now.
-contract ManualReviewFindingsTest is PoincareTestBase {
+/// @title ShsLabsFindingsTest: regression tests for the shs_labs audit (2026-10)
+/// @notice One test group per finding remediated in code (report POINCARE-MSR-78d75e24, by
+///         Mathias Steinbach), named after the report's IDs. Each fails on the audited commit
+///         and passes now.
+contract ShsLabsFindingsTest is PoincareTestBase {
     using PoolIdLibrary for PoolKey;
 
     Currency currency0;

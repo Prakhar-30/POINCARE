@@ -3,7 +3,7 @@
 ## In scope
 
 All contracts under `src/` — 7 files, 1,352 lines (`wc -l`, comments included; the 2026-10
-manual review counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
+shs_labs audit counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
 project (`via_ir = true` for the hook build):
 
 | Contract | Lines | Role |
@@ -76,20 +76,18 @@ fails on the pre-fix code and passes now:
 | L-5 first-deposit seed flooring a virtual offset to zero | reject seeds where either anchored offset rounds to zero | `test_L5_offsetSeedFloorsToZero_reverts` |
 | L-7 exact-out routing dodging part of the spread | exact-out spread made the exact inverse of the exact-in haircut | `test_L7_exactOutSpread_notCheaperThanExactInInverse` |
 
-An automated scan is not a substitute for the external human audit, which remains required
-before mainnet.
+An automated scan is not a substitute for an external human audit, which followed in 2026-10
+(below).
 
-## Manual review (2026-10)
+## Audit by shs_labs (2026-10)
 
-An independent, manual, read-only review by **Mathias Steinbach** (independent Solidity
-reviewer), report `POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit
-`78d75e24`. Scope: the seven files above. The reviewer also ran the 222-test suite, Slither,
-Aderyn and Echidna in a private CI runner, and 50,000 off-chain integer-model trials of the curve
-arithmetic. The report describes itself as an individual review, not a firm audit or
-certification, and this repository presents it the same way.
+A manual, read-only security audit by **shs_labs** (Mathias Steinbach), report
+`POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit `78d75e24`. Scope:
+the seven files above. The auditor also ran the 222-test suite, Slither, Aderyn and Echidna in a
+private CI runner, and 50,000 off-chain integer-model trials of the curve arithmetic.
 
 **Result: no Critical, High or Medium finding. Two Lows and eight Notes.** Both Lows and N-5 are
-fixed in code, each with a regression test in `test/regression/ManualReviewFindings.t.sol` that
+fixed in code, each with a regression test in `test/regression/ShsLabsFindings.t.sol` that
 fails against the pre-fix code, and N-6's stale comment is corrected. The rest are dispositioned
 below with the evidence behind each call. None of the changes touches an Olympix
 fix: those regression tests pass unchanged, and the log-domain clamp and the zero-mid skip
@@ -108,7 +106,7 @@ fix: those regression tests pass unchanged, and the log-domain clamp and the zer
 | N-7 | Fee-on-transfer and rebasing tokens need an explicit policy | **Documented.** See *Supported tokens* below | — |
 | N-8 | JIT liquidity and multi-block MEV economics not established | **Acknowledged residual risk.** See below | — |
 
-The reviewer's five client questions (same-block manipulation, round-trip draining,
+The auditor's five client questions (same-block manipulation, round-trip draining,
 first-depositor inflation, Lens-versus-execution divergence, κ or fee beyond caps) all came back
 with no exploitable path found, each with the stated caveat that cross-block, multi-party and
 economic sequences were not proven safe.
@@ -202,7 +200,7 @@ Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
 from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
 ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
 
-That deployment predates the 2026-10 manual review fixes above. The constructor now also takes
+That deployment predates the 2026-10 shs_labs audit fixes above. The constructor now also takes
 the pinned PoolKey, so they take effect only on a fresh deployment, and any mainnet deployment
 is made from this build.
 

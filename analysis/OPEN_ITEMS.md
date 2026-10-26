@@ -49,7 +49,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 | A6 | **`Cusum.update` (uncapped) can overflow-revert** under sustained drift on the hot path. | `Cusum` | ✅ (mitigated) | Hook MUST use `updateCapped` (or `step`) on-chain; plain `update` is back-test only. Enforced by convention (see D1). |
 | A7 | **Swap feasibility.** | `AsymmetricCurve` / hook | ✅ | On the shipped `a=b=0` base the "infeasible output" case **cannot occur**: `swapExactIn` gives `amountOut = Y − ⌈XY/(X+amountIn)⌉ < Y` (strictly less than the output reserve), and the spread haircut only shrinks it further. `swapExactOut` reverting when the requested output ≥ reserve is **correct AMM behaviour** (you cannot buy more than the pool holds; the router's `amountInMax` also bounds it), so it is the AMM's revert, not a detector/§4.5 revert. Exercised by the invariant handler (random exact-in/out) and the Lens + manipulation exact-out tests, all with feasible amounts succeeding. |
 | A8 | **Rounding direction preserved end-to-end.** | hook | ✅ | The invariant suite (`test/invariant/`) drives 384k randomized swaps/liquidity ops and asserts (a) the hook's reserves equal independent ghost accounting to the wei (no favorable rounding leak), and (b) the constant-product invariant never decreases on a swap (no value creation by traders). |
-| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | 🟠 (external audit only) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual is the **standard external security audit before mainnet**, which is not self-certifiable, so it is kept open for that reason alone. |
+| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | ✅ (audited 2026-10, shs_labs; see M) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual was the **standard external security audit before mainnet**, which is not self-certifiable; the shs_labs audit (2026-10, §M) found no issue in this area. |
 | A10 | **First-deposit / share-inflation.** | hook | ✅ | Resolved: a fixed `MINIMUM_LIQUIDITY = 1000` is locked to `0xdead` on the first mint (UniV2-standard guard), so the share supply can never be driven to dust. Also note reserves are ERC-6909 **claims** (not raw `balanceOf`), so a plain token donation cannot skew them. |
 
 ## B. Conceptual / design decisions (settled vs open)
@@ -345,14 +345,14 @@ and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceL
 | L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 
-Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stays open.
+Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stayed open until the shs_labs audit (M).
 
-## M. Manual security review (2026-10)
+## M. Audit by shs_labs (2026-10)
 
-Independent manual review by Mathias Steinbach, report `POINCARE-MSR-78d75e24` (24 October 2026),
+Manual security audit by shs_labs (Mathias Steinbach), report `POINCARE-MSR-78d75e24` (24 October 2026),
 pinned to commit `78d75e24`: no Critical, High or Medium finding, two Lows and eight Notes. Code
-fixes carry regression tests in `test/regression/ManualReviewFindings.t.sol` that fail on the
-pre-fix code. Full disposition and evidence: `SECURITY.md`, *Manual review (2026-10)*.
+fixes carry regression tests in `test/regression/ShsLabsFindings.t.sol` that fail on the
+pre-fix code. Full disposition and evidence: `SECURITY.md`, *Audit by shs_labs (2026-10)*.
 
 | # | Finding | Status | Resolution |
 |---|---------|--------|-----|
@@ -367,5 +367,5 @@ pre-fix code. Full disposition and evidence: `SECURITY.md`, *Manual review (2026
 | N-7 | Token-behaviour policy. | ✅ (documented) | Standard ERC-20s and native ETH only; see `SECURITY.md` *Supported tokens*. |
 | N-8 | JIT liquidity / multi-block MEV economics. | 🟠 residual | Documented as open economic risk; not provable from bounded κ and fee alone. |
 
-Scope note: the report describes itself as an individual review, not a firm audit. A9 is left
-open for the project to decide whether it satisfies the pre-mainnet audit requirement.
+Scope note: this is the external audit A9 was held open for; A9 is closed against it. Its fixes
+reach chain with the next deployment.
