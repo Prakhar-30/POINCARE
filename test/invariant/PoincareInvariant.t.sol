@@ -150,7 +150,7 @@ abstract contract PoincareInvariantBase is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(_config(), 0x4444);
+        hook = deployPoincare(_config(), 0x4444, currency0, currency1);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
         // Seed the pool from the test contract (these shares stay locked here for the whole run,

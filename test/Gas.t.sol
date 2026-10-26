@@ -30,7 +30,7 @@ contract GasTest is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, currency0, currency1);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(hook), type(uint256).max);

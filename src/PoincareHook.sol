@@ -5,7 +5,9 @@ import {BaseCustomCurve} from "@openzeppelin/uniswap-hooks/src/base/BaseCustomCu
 import {BaseHook} from "@openzeppelin/uniswap-hooks/src/base/BaseHook.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
@@ -95,6 +97,7 @@ struct PoincareConfig {
 ///         be reintroduced.
 contract PoincareHook is BaseCustomCurve, ERC20 {
     using CurrencyLibrary for Currency;
+    using PoolIdLibrary for PoolKey;
     using Cusum for Cusum.State;
     using DirectionalSignal for DirectionalSignal.State;
 
@@ -134,6 +137,12 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
     uint256 public immutable feeGamma;
     uint256 public immutable feeCap;
     uint256 public immutable alphaWad;
+
+    /// @notice The one pool this hook will accept, fixed at construction. The inherited
+    ///         initializer binds whichever key reaches it first, and deployment and
+    ///         initialization are separate transactions, so without this anyone could bind
+    ///         the hook to a pool of their choosing in between.
+    PoolId public immutable expectedPoolId;
 
     // Detector state, packed to 4 slots. The downcasts are safe: sPos/sNeg live in
     // [0, sMax] with sMax <= int128.max (constructor-validated); |ewmaNet| <= ewmaTV <=
@@ -200,10 +209,17 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         uint256 offsetB;
     }
 
-    constructor(IPoolManager _poolManager, PoincareConfig memory cfg)
+    /// @param key The pool this hook will serve. `hooks` may be left unset: the hook address
+    ///        is not known before deployment when it is mined, and it can only be this hook.
+    constructor(IPoolManager _poolManager, PoincareConfig memory cfg, PoolKey memory key)
         BaseHook(_poolManager)
         ERC20("Poincare LP", "POIN-LP")
     {
+        require(address(key.hooks) == address(0) || address(key.hooks) == address(this), "pool key cfg");
+        require(key.currency0 < key.currency1, "pool key cfg");
+        key.hooks = IHooks(address(this));
+        expectedPoolId = key.toId();
+
         require(Cusum.isValidConfig(cfg.k, cfg.h), "cusum cfg");
         require(DirectionalSignal.isValidConfig(cfg.lambda), "ewma cfg");
         require(
@@ -231,6 +247,16 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         feeGamma = cfg.feeGamma;
         feeCap = cfg.feeCap;
         alphaWad = cfg.alphaWad;
+    }
+
+    /// @dev Bind only the pool fixed at construction; see `expectedPoolId`.
+    function _beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
+        internal
+        override
+        returns (bytes4)
+    {
+        require(PoolId.unwrap(key.toId()) == PoolId.unwrap(expectedPoolId), "unexpected pool key");
+        return super._beforeInitialize(sender, key, sqrtPriceX96);
     }
 
     // reentrancy guard

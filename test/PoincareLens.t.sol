@@ -36,7 +36,7 @@ contract PoincareLensTest is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, currency0, currency1);
         lens = new PoincareLens(hook);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
@@ -193,7 +193,7 @@ contract PoincareLensTest is PoincareTestBase {
         cfg.feeCap = 1e16;
         cfg.alphaWad = 5e17;
 
-        PoincareHook fullHook = deployPoincare(cfg, 0x5555);
+        PoincareHook fullHook = deployPoincare(cfg, 0x5555, currency0, currency1);
         PoincareLens fullLens = new PoincareLens(fullHook);
         PoolKey memory fullKey = initPoincarePool(fullHook, currency0, currency1);
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(fullHook), type(uint256).max);

@@ -171,7 +171,11 @@ contract ForkRealDataTest is Test {
         cfg.dMax = D_MAX;
         cfg.feeGamma = feeGamma;
         cfg.feeCap = feeGamma == 0 ? 0 : FEE_CAP;
-        deployCodeTo("PoincareHook.sol:PoincareHook", abi.encode(pm, cfg), flags);
+        deployCodeTo(
+            "PoincareHook.sol:PoincareHook",
+            abi.encode(pm, cfg, PoolKey(c0, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(flags))),
+            flags
+        );
         h = PoincareHook(payable(flags));
     }
 

@@ -41,7 +41,7 @@ contract ManipulationTest is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, currency0, currency1);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(hook), type(uint256).max);
@@ -176,7 +176,7 @@ contract ManipulationTest is PoincareTestBase {
     }
 
     function _deployAdaptivePool() internal returns (PoincareHook aHook, PoolKey memory aKey) {
-        aHook = deployPoincare(adaptiveConfig(), 0x5555);
+        aHook = deployPoincare(adaptiveConfig(), 0x5555, currency0, currency1);
         aKey = initPoincarePool(aHook, currency0, currency1);
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(aHook), type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(aHook), type(uint256).max);

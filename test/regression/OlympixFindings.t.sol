@@ -41,7 +41,7 @@ contract OlympixFindingsTest is PoincareTestBase {
         deployArtifactsAndLabel();
         (currency0, currency1) = deployCurrencyPair();
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, currency0, currency1);
         poolKey = initPoincarePool(hook, currency0, currency1);
 
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(hook), type(uint256).max);
@@ -97,7 +97,7 @@ contract OlympixFindingsTest is PoincareTestBase {
     function test_L5_offsetSeedFloorsToZero_reverts() public {
         PoincareConfig memory c = defaultConfig();
         c.alphaWad = 1e17; // 0.1 depth, so alpha*amount0/WAD floors to 0 for amount0 < 10
-        PoincareHook ah = deployPoincare(c, 0x7777);
+        PoincareHook ah = deployPoincare(c, 0x7777, currency0, currency1);
         initPoincarePool(ah, currency0, currency1);
         IERC20Minimal(Currency.unwrap(currency0)).approve(address(ah), type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(ah), type(uint256).max);
@@ -235,7 +235,7 @@ contract OlympixReentrancyTest is PoincareTestBase {
         MockERC20 token = deployToken();
         currency1 = Currency.wrap(address(token));
 
-        hook = deployPoincare(defaultConfig(), 0x4444);
+        hook = deployPoincare(defaultConfig(), 0x4444, NATIVE, currency1);
         poolKey = initPoincarePool(hook, NATIVE, currency1);
     }
 
