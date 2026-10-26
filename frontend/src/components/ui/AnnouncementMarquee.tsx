@@ -1,13 +1,15 @@
 import { Icon } from "@/components/ui/Icon";
 
-// The Olympix scan stays on the strip: the review happened, every finding was fixed, and each
-// fix carries a regression test. Keep the claims literally true as the suite grows — the count
-// below is the number `forge test` actually reports, not a round number.
+// Both security reviews stay on the strip: the Olympix pre-audit scan (every finding fixed) and
+// the shs_labs audit (no critical/high/medium; both Lows fixed, the Notes fixed or dispositioned
+// in SECURITY.md). Every fix carries a regression test. Keep the claims literally true as the
+// suite grows — the count below is the number `forge test` actually reports, not a round number.
 const ITEMS = [
+  "Audited by shs_labs (Mathias Steinbach)",
+  "0 critical, high or medium audit findings",
   "Pre-audit scanned by Olympix BugPoCer",
-  "0 high-severity findings",
-  "every reported finding fixed and regression-tested",
-  "228 passing Foundry tests",
+  "every Olympix finding and both audit Lows fixed and regression-tested",
+  "240 passing Foundry tests",
   "calibrated on 4 years of real ETH/USDC",
 ];
 
@@ -26,7 +28,7 @@ function Group({ hidden }: { hidden?: boolean }) {
   );
 }
 
-/** Scrolling announcement strip: the Olympix pre-audit scan result. Pauses on hover. */
+/** Scrolling announcement strip: the shs_labs audit and Olympix pre-audit scan results. Pauses on hover. */
 export function AnnouncementMarquee() {
   return (
     <div
