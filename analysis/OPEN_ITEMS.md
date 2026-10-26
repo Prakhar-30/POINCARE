@@ -49,7 +49,7 @@ plain MVP and full-feature: deep base + vol fee + adaptive detector — 128k cal
 | A6 | **`Cusum.update` (uncapped) can overflow-revert** under sustained drift on the hot path. | `Cusum` | ✅ (mitigated) | Hook MUST use `updateCapped` (or `step`) on-chain; plain `update` is back-test only. Enforced by convention (see D1). |
 | A7 | **Swap feasibility.** | `AsymmetricCurve` / hook | ✅ | On the shipped `a=b=0` base the "infeasible output" case **cannot occur**: `swapExactIn` gives `amountOut = Y − ⌈XY/(X+amountIn)⌉ < Y` (strictly less than the output reserve), and the spread haircut only shrinks it further. `swapExactOut` reverting when the requested output ≥ reserve is **correct AMM behaviour** (you cannot buy more than the pool holds; the router's `amountInMax` also bounds it), so it is the AMM's revert, not a detector/§4.5 revert. Exercised by the invariant handler (random exact-in/out) and the Lens + manipulation exact-out tests, all with feasible amounts succeeding. |
 | A8 | **Rounding direction preserved end-to-end.** | hook | ✅ | The invariant suite (`test/invariant/`) drives 384k randomized swaps/liquidity ops and asserts (a) the hook's reserves equal independent ghost accounting to the wei (no favorable rounding leak), and (b) the constant-product invariant never decreases on a swap (no value creation by traders). |
-| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | ✅ (audited 2026-10, shs_labs; see M) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual was the **standard external security audit before mainnet**, which is not self-certifiable; the shs_labs audit (2026-10, §M) found no issue in this area. |
+| A9 | **Reentrancy / settlement correctness** (ERC-6909 claims, `take`/`settle`/`sync`). | hook | ✅ (independent review 2026-10, SFS-Labs; see M) | **Accounting correctness: ✅ proven.** The invariant suite shows exact ghost-conservation across 384k ops with 0 reverts, and now also that the shadow reserves equal the claims backing them. **Reentrancy: no vector in our code.** The hook's mutating path makes NO external calls except the view `poolManager.balanceOf` in `claimReserves()`; settlement runs inside `PoolManager.unlock`'s own reentrancy lock via the audited OZ `BaseCustomCurve`. The only residual was the **standard external security audit before mainnet**, which is not self-certifiable; the SFS-Labs independent review (2026-10, §M) confirmed no issue in this area within its scope. |
 | A10 | **First-deposit / share-inflation.** | hook | ✅ | Resolved: a fixed `MINIMUM_LIQUIDITY = 1000` is locked to `0xdead` on the first mint (UniV2-standard guard), so the share supply can never be driven to dust. Also note reserves are ERC-6909 **claims** (not raw `balanceOf`), so a plain token donation cannot skew them. |
 
 ## B. Conceptual / design decisions (settled vs open)
@@ -345,19 +345,19 @@ and passes now (`test/regression/OlympixFindings.t.sol`; L-2/L-4 live in `PriceL
 | L-5 | A first deposit small enough to floor one anchored virtual offset to zero anchors the curve off the seeded ratio (arb seam). | ✅ | Seeds where either offset rounds to zero are rejected. |
 | L-7 | Exact-out routing could dodge part of the directional spread (input-side markup undercharges on a convex curve). | ✅ | Exact-out spread reimplemented as the exact inverse of the exact-in haircut (gross-out grossing). |
 
-Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stayed open until the shs_labs audit (M).
+Scope note: a sponsored review is not a full independent audit. A9 (human audit before mainnet) stayed open until the SFS-Labs review (M).
 
-## M. Audit by shs_labs (2026-10)
+## M. Independent security review by SFS-Labs (2026-10)
 
-Manual security audit by shs_labs (Mathias Steinbach), report `POINCARE-MSR-78d75e24` (24 October 2026),
+Independent scoped manual security review by SFS-Labs (Mathias Steinbach), report `POINCARE-MSR-78d75e24` (24 October 2026),
 pinned to commit `78d75e24`: no Critical, High or Medium finding, two Lows and eight Notes. Code
-fixes carry regression tests in `test/regression/ShsLabsFindings.t.sol` that fail on the
-pre-fix code. Full disposition and evidence: `SECURITY.md`, *Audit by shs_labs (2026-10)*.
+fixes carry regression tests in `test/regression/SfsLabsFindings.t.sol` that fail on the
+pre-fix code. Full disposition and evidence: `SECURITY.md`, *Independent security review by SFS-Labs (2026-10)*.
 
 | # | Finding | Status | Resolution |
 |---|---------|--------|-----|
-| L-1 | Inherited initializer binds the first PoolKey to arrive; deploy and initialize are separate txs. | ✅ | Constructor pins the key (`expectedPoolId`); `_beforeInitialize` rejects any other; both deploy paths verify `poolKey()`. |
-| L-2 | Detector's WAD mid quantizes small raw-unit price ratios. | ✅ | Detector samples `AsymmetricCurve.marginalPrice` at `MID_SCALE = 1e36`; reported WAD prices unchanged. |
+| L-1 | Inherited initializer binds the first PoolKey to arrive; deploy and initialize are separate txs. | ✅ | Constructor pins the key (`expectedPoolId`) and the only allowed `initializer` (added after the 2026-10-26 follow-up); `_beforeInitialize` rejects any other; both deploy paths verify `poolKey()`. |
+| L-2 | Detector's WAD mid quantizes small raw-unit price ratios. | ✅ | Detector samples `AsymmetricCurve.marginalPrice` at `MID_SCALE = 1e36`; every WAD price field unchanged, including `previewDetector().priceWad` in place (follow-up); 1e36 `mid` appended. |
 | N-1 | Trend relabel before evidence reaches `h` can leave residual κ when `dMax < kappaMax`. | ✅ (not reachable) | The deployed rate limit never binds, so κ has no memory; pinned by `DeployedConfig.t.sol::test_rateLimitNeverBinds`. Revisit if the limit is ever made to bind. |
 | N-2 | `dMax == kappaMax`: rate limit non-binding. | ✅ (intentional) | Four-year sweep at the deployed gate: every binding `dMax` (0.01–0.04) costs 7–58 bps of LP value (`test_compose_deployedDMaxSweep`). |
 | N-3 | `_liquidityLock` is a flag, not nesting-safe. | ✅ (accepted) | No reachable nesting: nested liquidity calls inside `unlock` revert, and the native refund runs after booking. Revisit on any reorder. |
@@ -367,5 +367,6 @@ pre-fix code. Full disposition and evidence: `SECURITY.md`, *Audit by shs_labs (
 | N-7 | Token-behaviour policy. | ✅ (documented) | Standard ERC-20s and native ETH only; see `SECURITY.md` *Supported tokens*. |
 | N-8 | JIT liquidity / multi-block MEV economics. | 🟠 residual | Documented as open economic risk; not provable from bounded κ and fee alone. |
 
-Scope note: this is the external audit A9 was held open for; A9 is closed against it. Its fixes
-reach chain with the next deployment.
+Scope note: this is the external human review A9 was held open for, and A9 is closed against it.
+It is a scoped independent review, not a certification. Its fixes reach chain with the next
+deployment.

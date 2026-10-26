@@ -96,7 +96,7 @@ contract DeployedConfigTest is Test {
 
     /// @dev The kappa rate limit deliberately never binds: dMax spans the whole
     ///      [kappaMin, kappaMax] band, so kappa always equals the ramp target of the current
-    ///      evidence. The 2026-10 shs_labs audit asked whether that is intentional (N-2). At
+    ///      evidence. The 2026-10 SFS-Labs review asked whether that is intentional (N-2). At
     ///      the deployed gate every binding dMax tried, 0.01 to 0.04, cost LP value, and more
     ///      the tighter it was (`GammaFourYear.t.sol::test_compose_deployedDMaxSweep`).
     ///      It is also what keeps review note N-1 unreachable: kappa carries no memory, so a

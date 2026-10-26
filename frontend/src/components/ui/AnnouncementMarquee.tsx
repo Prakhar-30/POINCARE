@@ -1,15 +1,16 @@
 import { Icon } from "@/components/ui/Icon";
 
-// Both security reviews stay on the strip: the Olympix pre-audit scan (every finding fixed) and
-// the shs_labs audit (no critical/high/medium; both Lows fixed, the Notes fixed or dispositioned
-// in SECURITY.md). Every fix carries a regression test. Keep the claims literally true as the
-// suite grows — the count below is the number `forge test` actually reports, not a round number.
+// Both security reviews stay on the strip, in the reviewers' own scope language: the Olympix
+// pre-audit scan (every finding fixed) and the SFS-Labs independent scoped review (its wording
+// below is the public statement the reviewer asked for; it is not an audit certification).
+// Every fix carries a regression test. Keep the claims literally true as the suite grows — the
+// count below is the number `forge test` actually reports, not a round number.
 const ITEMS = [
-  "Audited by shs_labs (Mathias Steinbach)",
-  "0 critical, high or medium audit findings",
+  "Independent scoped security review by SFS-Labs (Mathias Steinbach), pinned to commit 78d75e24",
+  "no Critical/High/Medium issues confirmed within the reviewed scope; two Low findings reported, both fixed",
   "Pre-audit scanned by Olympix BugPoCer",
-  "every Olympix finding and both audit Lows fixed and regression-tested",
-  "240 passing Foundry tests",
+  "every Olympix finding fixed and regression-tested",
+  "243 passing Foundry tests",
   "calibrated on 4 years of real ETH/USDC",
 ];
 
@@ -28,7 +29,7 @@ function Group({ hidden }: { hidden?: boolean }) {
   );
 }
 
-/** Scrolling announcement strip: the shs_labs audit and Olympix pre-audit scan results. Pauses on hover. */
+/** Scrolling announcement strip: the SFS-Labs review and Olympix pre-audit scan results. Pauses on hover. */
 export function AnnouncementMarquee() {
   return (
     <div

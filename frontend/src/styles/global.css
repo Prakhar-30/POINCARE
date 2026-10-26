@@ -188,7 +188,7 @@
 .marquee-track {
   display: inline-flex;
   width: max-content;
-  animation: marqueeSlide 41s linear infinite; /* scales with strip length: same px/s as before */
+  animation: marqueeSlide 54s linear infinite; /* scales with strip length: same px/s as before */
 }
 .marquee:hover .marquee-track {
   animation-play-state: paused;

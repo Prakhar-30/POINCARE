@@ -3,7 +3,7 @@
 ## In scope
 
 All contracts under `src/` — 7 files, 1,352 lines (`wc -l`, comments included; the 2026-10
-shs_labs audit counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
+SFS-Labs review counted 1,298 the same way at its pinned commit), Solidity 0.8.30, Foundry
 project (`via_ir = true` for the hook build):
 
 | Contract | Lines | Role |
@@ -76,29 +76,32 @@ fails on the pre-fix code and passes now:
 | L-5 first-deposit seed flooring a virtual offset to zero | reject seeds where either anchored offset rounds to zero | `test_L5_offsetSeedFloorsToZero_reverts` |
 | L-7 exact-out routing dodging part of the spread | exact-out spread made the exact inverse of the exact-in haircut | `test_L7_exactOutSpread_notCheaperThanExactInInverse` |
 
-An automated scan is not a substitute for an external human audit, which followed in 2026-10
+An automated scan is not a substitute for an external human review, which followed in 2026-10
 (below).
 
-## Audit by shs_labs (2026-10)
+## Independent security review by SFS-Labs (2026-10)
 
-A manual, read-only security audit by **shs_labs** (Mathias Steinbach), report
-`POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit `78d75e24`. Scope:
-the seven files above. The auditor also ran the 222-test suite, Slither, Aderyn and Echidna in a
-private CI runner, and 50,000 off-chain integer-model trials of the curve arithmetic.
+An independent, scoped, manual pre-launch security review by **SFS-Labs** (Mathias Steinbach;
+[github.com/SFS-Labs](https://github.com/SFS-Labs), [x.com/sfs_labs](https://x.com/sfs_labs)),
+report `POINCARE-MSR-78d75e24` revision 3.0, dated 24 October 2026, pinned to commit `78d75e24`.
+Scope: the seven files above. The reviewer also ran the 222-test suite, Slither, Aderyn and
+Echidna in a private CI runner, and 50,000 off-chain integer-model trials of the curve
+arithmetic. It is a limited independent review, not a firm audit, certification or guarantee,
+and is presented here as exactly that.
 
-**Result: no Critical, High or Medium finding. Two Lows and eight Notes.** Both Lows, N-4 and
-N-5 are fixed in code, each with a regression test in `test/regression/ShsLabsFindings.t.sol` that
-fails against the pre-fix code, and N-6's stale comment is corrected. The rest are dispositioned
+**Result: no Critical, High or Medium issue confirmed within the reviewed scope. Two Lows and
+eight Notes.** Both Lows, N-4 and N-5 are fixed in code, each with a regression test in
+`test/regression/SfsLabsFindings.t.sol` that fails against the pre-fix code, and N-6's stale comment is corrected. The rest are dispositioned
 below with the evidence behind each call. None of the changes touches an Olympix
 fix: those regression tests pass unchanged, and the log-domain clamp and the zero-mid skip
 (Olympix L-2 / L-4) are reused as they were.
 
 | ID | Finding | Disposition | Evidence |
 |---|---|---|---|
-| L-1 | The inherited initializer binds whichever PoolKey arrives first, and deploy and initialize are separate transactions | **Fixed.** The constructor takes the intended key and stores `expectedPoolId`; `_beforeInitialize` rejects any other key. Both deploy paths confirm `poolKey()` before publishing | `test_L1_unexpectedPoolKey_cannotBindHook`, `test_L1_constructorRejectsMalformedKey` |
-| L-2 | The detector's WAD mid quantizes small raw-unit ratios (near 10, one unit is a ~9.5% log-return) | **Fixed.** The detector samples the mid at `MID_SCALE = 1e36`. Reported prices (`lastSampledPriceWad`, `DetectorSample.priceWad`) stay WAD and unchanged to the wei | `test_L2_detectorReturnMatchesTrueMove_atSmallRawRatios`, `test_L2_wadMidWouldHaveAliasedTheSameMove`, `test_L2_zeroMid_skipsThenRecovers`, `testFuzz_L2_reportedPriceIsUnchanged` |
+| L-1 | The inherited initializer binds whichever PoolKey arrives first, and deploy and initialize are separate transactions | **Fixed.** The constructor fixes both the intended key (`expectedPoolId`) and the one address allowed to initialize it (`initializer`); `_beforeInitialize` rejects any other sender or key. Both deploy paths pass their broadcaster and confirm `poolKey()` before publishing | `test_L1_unexpectedPoolKey_cannotBindHook`, `test_L1_outsiderCannotInitializeEvenTheIntendedKey`, `test_L1_constructorRejectsMalformedKey` |
+| L-2 | The detector's WAD mid quantizes small raw-unit ratios (near 10, one unit is a ~9.5% log-return) | **Fixed.** The detector samples the mid at `MID_SCALE = 1e36`. Every WAD price field (`lastSampledPriceWad`, `DetectorSample.priceWad`, and `priceWad` in `previewDetector()`'s `DetectorSnap`, at its original position) stays WAD and unchanged to the wei; the 1e36 `mid` is appended as the struct's last field | `test_L2_detectorReturnMatchesTrueMove_atSmallRawRatios`, `test_L2_wadMidWouldHaveAliasedTheSameMove`, `test_L2_zeroMid_skipsThenRecovers`, `test_L2_zeroMidAfterEstablishedBaseline_retainsStateThenRecovers`, `test_L2_previewDetectorKeepsWadPriceInPlace`, `testFuzz_L2_reportedPriceIsUnchanged` |
 | N-1 | The trend label can flip before evidence reaches `h`, leaving residual κ on the new side when `dMax < kappaMax` | **Not reachable in the deployed configuration; no code change.** See below | `DeployedConfig.t.sol::test_rateLimitNeverBinds` |
-| N-2 | `dMax == kappaMax`, so the rate limit never binds | **Intentional, and re-verified.** See below | `GammaFourYear.t.sol::test_compose_deployedDMaxSweep` |
+| N-2 | `dMax == kappaMax`, so the rate limit never binds | **Intentional, and re-verified.** See below | `GammaFourYear.t.sol::test_compose_deployedDMaxSweep` (sweep-only: a no-op unless `POINCARE_SWEEP=1`) |
 | N-3 | `_liquidityLock` is a flag, not a nesting-safe counter | **Acknowledged; no reachable nesting today.** See below | — |
 | N-4 | A dust share burn can pay out zero of both tokens | **Fixed.** A burn that would pay nothing on either side reverts. Only reachable with deep virtual offsets (`alphaWad > 0`); at the deployed `alphaWad = 0` one share is always worth at least one unit (20,000 fuzzed sequences found no case) | `test_N4_dustBurnPayingNothing_reverts` |
 | N-5 | `rateLimit` could overflow on an extreme `dMax`; a `dFloor` above WAD makes the gate unreachable | **Fixed.** Overflow-free `rateLimit`; the constructor rejects `dFloor > WAD` | `testFuzz_N5_rateLimitNeverOverflows`, `test_N5_unboundedDMax_stillSwaps`, `test_N5_constructorRejectsUnreachableGate` |
@@ -106,10 +109,42 @@ fix: those regression tests pass unchanged, and the log-domain clamp and the zer
 | N-7 | Fee-on-transfer and rebasing tokens need an explicit policy | **Documented.** See *Supported tokens* below | — |
 | N-8 | JIT liquidity and multi-block MEV economics not established | **Acknowledged residual risk.** See below | — |
 
-The auditor's five client questions (same-block manipulation, round-trip draining,
+The reviewer's five client questions (same-block manipulation, round-trip draining,
 first-depositor inflation, Lens-versus-execution divergence, κ or fee beyond caps) all came back
 with no exploitable path found, each with the stated caveat that cross-block, multi-party and
 economic sequences were not proven safe.
+
+### Remediation follow-up (2026-10-26)
+
+SFS-Labs reviewed the remediation branch at `7699f626` against the original report: a read-only,
+source-level follow-up, not a new audit or deployment clearance. It confirmed the L-1, L-2, N-4
+and N-5 source changes and their regression cases, and ran 200,000 off-chain arithmetic-model
+cases each for the WAD-conversion identity and the overflow-safe rate limit, all passing. The
+reviewer could not run Foundry in their environment, so the test-suite and fix-removal results
+here are this project's own runs, not independently verified ones.
+
+It raised three points, all addressed:
+
+- **L-1 residual: anyone could still initialize the intended key first.** Pinning the key stopped
+  a wrong pool from binding, but the right key could be initialized by an outsider at a price of
+  their choosing, making the deployer's own call revert. The pool would still have worked (when
+  the hook absorbs the whole swap, v4's `Pool.swap` returns before any slot0 or price-limit
+  check), but deployment order was open to interference and integrators would see an arbitrary
+  slot0 price. The constructor now also fixes an `initializer`, the only address allowed to
+  initialize; it has no power after that. `test_L1_outsiderCannotInitializeEvenTheIntendedKey`.
+- **L-2: `previewDetector()` changed shape.** The fix had replaced the WAD `priceWad` field of the
+  public `DetectorSnap` with a 1e36 `mid`, so a positional decoder would have read the wrong
+  units. `priceWad` is restored in place; `mid` is appended. `test_L2_previewDetectorKeepsWadPriceInPlace`
+  checks the raw return word. The earlier claim that every reported price was unchanged was wrong
+  for this view until this fix.
+- **L-2: recovery after an established baseline.** Now tested: a zero-mid interval leaves every
+  persisted detector field untouched, and the first representable sample afterwards reads one
+  return spanning the gap against the last good sample, clipped like any other. That is intended
+  behaviour. `test_L2_zeroMidAfterEstablishedBaseline_retainsStateThenRecovers`.
+
+The reviewer's attribution and wording notes are applied: the reviewer is SFS-Labs, and public
+wording (README, the frontend strip) describes a scoped independent review, not an audit or
+certification.
 
 ### N-1 and N-2: the rate limit, and why it stays non-binding
 
@@ -191,7 +226,7 @@ sequencer ordering remain open economic questions. They are listed as residual r
 
 ## Existing coverage
 
-240 passing Foundry tests in the default suite: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and both regression suites above. The fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`) need a Sepolia RPC and run separately.
+243 passing Foundry tests in the default suite: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and both regression suites above. The fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`) need a Sepolia RPC and run separately.
 
 ## Deployment
 
@@ -200,7 +235,7 @@ Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
 from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
 ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
 
-That deployment predates the 2026-10 shs_labs audit fixes above. The constructor now also takes
+That deployment predates the 2026-10 SFS-Labs review fixes above. The constructor now also takes
 the pinned PoolKey, so they take effect only on a fresh deployment, and any mainnet deployment
 is made from this build.
 

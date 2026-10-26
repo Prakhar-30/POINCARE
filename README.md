@@ -718,11 +718,11 @@ python analysis/simulation/plot_fouryear.py
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 240 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 243 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
-> regression test per finding fixed from the **Olympix security review** and the **shs_labs
-> audit**). The
+> regression test per finding fixed from the **Olympix security review** and the **SFS-Labs
+> security review**). The
 > items below are what remains to go from MVP to production.
 
 **Live on Unichain Sepolia** (chain id 1301, testnet only, no real funds at risk): hook
@@ -736,8 +736,8 @@ web app (`frontend/`) that trades, provides liquidity, and charts the detector's
 **Security review:** the contracts were reviewed by **Olympix** under the **Uniswap Foundation
 Security Fund**. Every reported finding was fixed and each has a regression test that fails on
 the pre-fix code and passes now (`test/regression/OlympixFindings.t.sol`, plus the log-domain
-cases in `PriceLib.t.sol`). An external audit by **shs_labs** followed in 2026-10; its fixes are
-in the code and ship with the next deployment. Both finding tables are in
+cases in `PriceLib.t.sol`). An independent scoped security review by **SFS-Labs** followed in
+2026-10; its fixes are in the code and ship with the next deployment. Both finding tables are in
 [§11](#11-security-review).
 
 **Built (MVP + the 2026-07 feature pass):** the directional-spread pricing engine + `beforeSwapReturnDelta` accounting; the directional-efficiency signal and two-sided CUSUM detector (`h` from a target false-alarm rate, not a block count); the bounded, rate-limited control law + safety layer; the back-test (LVR vs constant-product **and** vs a vol-fee baseline, plus the manipulation-cost study); the Quoter/Lens (quotes match execution to the wei, **including in a fresh block**, via the hook's own detector projection); the **v2 adaptive (σ-normalized) detector mode** with the Huber-clipped robust increment (§9.2); the **vol-scaled base fee** `min(γ·σ̂, cap)` — calm-market LP revenue generated from realized volatility, never a constant; the **deep symmetric calm base** (supply-scaled virtual offsets, the arb-safe E0 parameterisation); the **`DetectorSample` per-block trace event** (S⁺/S⁻, D, σ̂, κ, fee — the frontend charts the real statistics from it); packed detector storage (~96k gas per sampled block, event included); **native-ETH pair support**; the Olympix review fixes with their regression suite; a **plain-English narration of the live detector state** on the Analytics screen, generated server-side with a deterministic local fallback; and the full Foundry suite.
@@ -756,8 +756,9 @@ in the code and ship with the next deployment. Both finding tables are in
    scale-free and carry over, but `κ_max = 0.05` specifically is a this-regime number and
    wants re-deriving against block-cadence data.
 4. **Router / aggregator integration** through the Lens, plus multi-pool coverage.
-5. ~~**External security audit**~~ **Done (2026-10, shs_labs).** Fixes merged with regression
-   tests; they reach chain with the next deployment. See [§11](#11-security-review).
+5. ~~**External security review**~~ **Done (2026-10, SFS-Labs), with a remediation follow-up.**
+   A scoped independent review, not a certification. Fixes merged with regression tests; they
+   reach chain with the next deployment. See [§11](#11-security-review).
 
 > **Not on this roadmap, and deliberately:** a depth or curvature lever. It was built,
 > made round-trip safe and split-invariant, measured across four years, and lost by roughly
@@ -794,7 +795,7 @@ above:
 
 So: the contracts were reviewed, every finding was fixed, and the currently deployed build
 carries one post-review logic change that was itself a fix. None of that substitutes for an
-independent audit, which followed in 2026-10 (below).
+independent human review, which followed in 2026-10 (below).
 
 | Severity | Finding | Fix |
 |---|---|---|
@@ -810,21 +811,24 @@ Finding, fix and test are mapped one to one in [`SECURITY.md`](./SECURITY.md) an
 [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md) §H.
 
 **What this does not mean.** A sponsored review is not a full external human audit, and we do not
-present it as one. That audit followed in 2026-10, below.
+present it as one. An independent human review followed in 2026-10, below.
 
-### Audit by shs_labs (2026-10)
+### Independent security review by SFS-Labs (2026-10)
 
-A manual security audit by **shs_labs** (Mathias Steinbach), report `POINCARE-MSR-78d75e24`
-(24 October 2026), read all seven contracts at commit `78d75e24`. It also independently re-ran
-the test suite, Slither, Aderyn and Echidna. **No Critical, High or Medium finding; two Lows and
-eight Notes.**
+An independent scoped security review by **SFS-Labs** (Mathias Steinbach;
+[github.com/SFS-Labs](https://github.com/SFS-Labs)), report `POINCARE-MSR-78d75e24`
+(24 October 2026), pinned to commit `78d75e24`. It read all seven contracts and independently
+re-ran the test suite, Slither, Aderyn and Echidna. **No Critical, High or Medium issue confirmed
+within the reviewed scope; two Low findings and eight Notes reported.** It is a limited manual
+pre-launch review, not an audit certification.
 
 - **L-1, fixed.** The inherited initializer bound whichever pool reached a fresh hook first, and
-  deploy and initialize are separate transactions. The hook is now pinned to its PoolKey at
-  construction and rejects every other.
+  deploy and initialize are separate transactions. The hook is now pinned at construction to its
+  PoolKey and to the one address allowed to initialize it, and rejects anything else.
 - **L-2, fixed.** The detector sampled its price in WAD, which quantizes pairs with a small
   raw-unit ratio, such as a cheap 18-decimals token against a 6-decimals stable. It now samples
-  at 1e36. Every price the hook reports is unchanged.
+  at 1e36. Every WAD price the hook reports, including `previewDetector()`'s, is unchanged; the
+  1e36 value is appended.
 - **N-4, fixed.** A dust burn that would pay out nothing on either side now reverts instead of
   destroying the shares.
 - **N-5, fixed.** An extreme `dMax` could overflow the rate limit and revert swaps, and a gate
@@ -837,7 +841,12 @@ eight Notes.**
 - **N-3, N-7 and N-8, documented.** They are written up as accepted behaviour, a
   supported-token policy, and residual economic risk.
 
-Every code fix ships with a regression test in `test/regression/ShsLabsFindings.t.sol`, and
+A remediation follow-up by the same reviewer (2026-10-26) confirmed these changes at source level
+and raised three points: the intended key could still be initialized by an outsider,
+`previewDetector()`'s field order, and a recovery case. All three are now addressed (see
+`SECURITY.md`).
+
+Every code fix ships with a regression test in `test/regression/SfsLabsFindings.t.sol`, and
 no Olympix fix was touched. The full disposition, with the evidence for each call, is in
 [`SECURITY.md`](./SECURITY.md) and tracked in [`analysis/OPEN_ITEMS.md`](./analysis/OPEN_ITEMS.md)
 §M. The Unichain Sepolia deployment in §10 predates these fixes. They take effect on the next
