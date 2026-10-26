@@ -242,4 +242,34 @@ contract ShsLabsFindingsTest is PoincareTestBase {
         cfg.dFloor = WAD; // a perfectly one-way path reaches D == WAD, so this stays legal
         deployPoincare(cfg, 0x7301, currency0, currency1);
     }
+
+    // N-4: a share burn that would pay out nothing on either side is refused.
+
+    function test_N4_dustBurnPayingNothing_reverts() public {
+        // Deep virtual offsets keep the real reserves free to fall well below the share supply.
+        // Seed 1e24 : 1e18 at 100x depth (1e21 shares), then buy nearly all token0.
+        PoincareConfig memory cfg = defaultConfig();
+        cfg.alphaWad = 100e18;
+        (PoincareHook h, PoolKey memory key) = _seededPool(cfg, 0x7400, 1e24, 1e18);
+        swapRouter.swapTokensForExactTokens(
+            1e24 - 1e20, type(uint256).max, false, key, Constants.ZERO_BYTES, address(this), block.timestamp + 1
+        );
+        (uint256 r0, uint256 r1) = h.reserves();
+        uint256 supply = h.totalSupply();
+        assertTrue(r0 < supply && r1 < supply, "one share is now worth under one unit of each token");
+
+        uint256 sharesBefore = h.balanceOf(address(this));
+        vm.expectRevert(bytes("insufficient"));
+        h.removeLiquidity(
+            BaseCustomAccounting.RemoveLiquidityParams(1, 0, 0, type(uint256).max, -887220, 887220, bytes32(0))
+        );
+        assertEq(h.balanceOf(address(this)), sharesBefore, "no shares lost");
+
+        // A burn large enough to be owed something still goes through.
+        uint256 enough = supply / r0 + 1;
+        h.removeLiquidity(
+            BaseCustomAccounting.RemoveLiquidityParams(enough, 0, 0, type(uint256).max, -887220, 887220, bytes32(0))
+        );
+        assertEq(h.balanceOf(address(this)), sharesBefore - enough, "a payable burn still works");
+    }
 }

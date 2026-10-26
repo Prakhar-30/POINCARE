@@ -561,6 +561,8 @@ contract PoincareHook is BaseCustomCurve, ERC20 {
         shares = params.liquidity;
         amount0 = FullMath.mulDiv(shares, r0, supply);
         amount1 = FullMath.mulDiv(shares, r1, supply);
+        // Both sides floor, so a dust burn could destroy shares for nothing; refuse it.
+        require(amount0 > 0 || amount1 > 0, "insufficient");
     }
 
     /// @dev Called after `_modifyLiquidity` has already settled, so `callerDelta` is the

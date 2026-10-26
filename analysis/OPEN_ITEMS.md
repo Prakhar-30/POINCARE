@@ -361,7 +361,7 @@ pre-fix code. Full disposition and evidence: `SECURITY.md`, *Audit by shs_labs (
 | N-1 | Trend relabel before evidence reaches `h` can leave residual κ when `dMax < kappaMax`. | ✅ (not reachable) | The deployed rate limit never binds, so κ has no memory; pinned by `DeployedConfig.t.sol::test_rateLimitNeverBinds`. Revisit if the limit is ever made to bind. |
 | N-2 | `dMax == kappaMax`: rate limit non-binding. | ✅ (intentional) | Four-year sweep at the deployed gate: every binding `dMax` (0.01–0.04) costs 7–58 bps of LP value (`test_compose_deployedDMaxSweep`). |
 | N-3 | `_liquidityLock` is a flag, not nesting-safe. | ✅ (accepted) | No reachable nesting: nested liquidity calls inside `unlock` revert, and the native refund runs after booking. Revisit on any reorder. |
-| N-4 | Dust burn can pay out zero. | ✅ (accepted) | Rounding against the redeemer; the loss is bounded by the burner's own dust. |
+| N-4 | Dust burn can pay out zero. | ✅ | `_getAmountOut` rejects a burn paying nothing on either side. Reachable only with `alphaWad > 0`. |
 | N-5 | `rateLimit` overflow on extreme `dMax`; `dFloor > WAD` unreachable gate. | ✅ | Overflow-free `rateLimit`; constructor rejects `dFloor > WAD`. |
 | N-6 | Arithmetic edges; stale reserve NatSpec. | ✅ | NatSpec corrected; arithmetic edges unreachable for holdable amounts (documented). |
 | N-7 | Token-behaviour policy. | ✅ (documented) | Standard ERC-20s and native ETH only; see `SECURITY.md` *Supported tokens*. |

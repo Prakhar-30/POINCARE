@@ -718,7 +718,7 @@ python analysis/simulation/plot_fouryear.py
 
 ## 10. Roadmap
 
-> **Status:** the MVP described above is **built and green**, 239 passing Foundry tests (unit,
+> **Status:** the MVP described above is **built and green**, 240 passing Foundry tests (unit,
 > fuzz, TWO invariant flavors — plain and full-feature — at 128k randomized calls each,
 > end-to-end manipulation sims including σ-inflation, native-ETH coverage, gas, and a
 > regression test per finding fixed from the **Olympix security review** and the **shs_labs
@@ -825,6 +825,8 @@ eight Notes.**
 - **L-2, fixed.** The detector sampled its price in WAD, which quantizes pairs with a small
   raw-unit ratio, such as a cheap 18-decimals token against a 6-decimals stable. It now samples
   at 1e36. Every price the hook reports is unchanged.
+- **N-4, fixed.** A dust burn that would pay out nothing on either side now reverts instead of
+  destroying the shares.
 - **N-5, fixed.** An extreme `dMax` could overflow the rate limit and revert swaps, and a gate
   above 1.0 could never open. The rate limit is now overflow-free, and the impossible gate is
   rejected.
@@ -832,8 +834,8 @@ eight Notes.**
 - **N-1 and N-2, kept, with evidence.** The deployed rate limit is deliberately non-binding. A
   four-year sweep shows every binding value costs LP value, and non-binding is exactly what makes
   N-1 unreachable. Both are now pinned by test.
-- **N-3, N-4, N-7 and N-8, documented.** They are written up as accepted behaviour, a supported-token
-  policy, and residual economic risk.
+- **N-3, N-7 and N-8, documented.** They are written up as accepted behaviour, a
+  supported-token policy, and residual economic risk.
 
 Every code fix ships with a regression test in `test/regression/ShsLabsFindings.t.sol`, and
 no Olympix fix was touched. The full disposition, with the evidence for each call, is in

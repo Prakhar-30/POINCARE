@@ -21,7 +21,7 @@ on the with-trend (toxic) side while the stabilising side keeps trading at the b
 ## Run it
 
 ```bash
-forge test                      # 239 tests: unit, fuzz, invariant, manipulation, calibration, regression
+forge test                      # 240 tests: unit, fuzz, invariant, manipulation, calibration, regression
 FOUNDRY_PROFILE=fork forge test --match-path "test/sim/Fork*.t.sol"
                                 # 6 more, against a live Sepolia fork: quote-vs-execution
                                 # through the CANONICAL router. Needs SEPOLIA_RPC.

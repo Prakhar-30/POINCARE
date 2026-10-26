@@ -86,8 +86,8 @@ A manual, read-only security audit by **shs_labs** (Mathias Steinbach), report
 the seven files above. The auditor also ran the 222-test suite, Slither, Aderyn and Echidna in a
 private CI runner, and 50,000 off-chain integer-model trials of the curve arithmetic.
 
-**Result: no Critical, High or Medium finding. Two Lows and eight Notes.** Both Lows and N-5 are
-fixed in code, each with a regression test in `test/regression/ShsLabsFindings.t.sol` that
+**Result: no Critical, High or Medium finding. Two Lows and eight Notes.** Both Lows, N-4 and
+N-5 are fixed in code, each with a regression test in `test/regression/ShsLabsFindings.t.sol` that
 fails against the pre-fix code, and N-6's stale comment is corrected. The rest are dispositioned
 below with the evidence behind each call. None of the changes touches an Olympix
 fix: those regression tests pass unchanged, and the log-domain clamp and the zero-mid skip
@@ -100,7 +100,7 @@ fix: those regression tests pass unchanged, and the log-domain clamp and the zer
 | N-1 | The trend label can flip before evidence reaches `h`, leaving residual κ on the new side when `dMax < kappaMax` | **Not reachable in the deployed configuration; no code change.** See below | `DeployedConfig.t.sol::test_rateLimitNeverBinds` |
 | N-2 | `dMax == kappaMax`, so the rate limit never binds | **Intentional, and re-verified.** See below | `GammaFourYear.t.sol::test_compose_deployedDMaxSweep` |
 | N-3 | `_liquidityLock` is a flag, not a nesting-safe counter | **Acknowledged; no reachable nesting today.** See below | — |
-| N-4 | A dust share burn can pay out zero of both tokens | **Acknowledged.** Rounding against the redeemer protects the pool; the loss is at most the burner's own dust | — |
+| N-4 | A dust share burn can pay out zero of both tokens | **Fixed.** A burn that would pay nothing on either side reverts. Only reachable with deep virtual offsets (`alphaWad > 0`); at the deployed `alphaWad = 0` one share is always worth at least one unit (20,000 fuzzed sequences found no case) | `test_N4_dustBurnPayingNothing_reverts` |
 | N-5 | `rateLimit` could overflow on an extreme `dMax`; a `dFloor` above WAD makes the gate unreachable | **Fixed.** Overflow-free `rateLimit`; the constructor rejects `dFloor > WAD` | `testFuzz_N5_rateLimitNeverOverflows`, `test_N5_unboundedDMax_stillSwaps`, `test_N5_constructorRejectsUnreachableGate` |
 | N-6 | Arithmetic edge cases, and a stale NatSpec on reserves | **Comment fixed; arithmetic acknowledged.** See below | — |
 | N-7 | Fee-on-transfer and rebasing tokens need an explicit policy | **Documented.** See *Supported tokens* below | — |
@@ -191,7 +191,7 @@ sequencer ordering remain open economic questions. They are listed as residual r
 
 ## Existing coverage
 
-239 passing Foundry tests in the default suite: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and both regression suites above. The fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`) need a Sepolia RPC and run separately.
+240 passing Foundry tests in the default suite: unit, fuzz, invariant (solvency, no value creation; 4 invariants x 128k randomized calls, 0 reverts), adversarial manipulation simulations (fake-trend attacks must cost more than the spread advantage returns), and both regression suites above. The fork simulations (including quote-versus-execution through the canonical router, `FOUNDRY_PROFILE=fork`) need a Sepolia RPC and run separately.
 
 ## Deployment
 
