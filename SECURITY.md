@@ -231,13 +231,13 @@ sequencer ordering remain open economic questions. They are listed as residual r
 ## Deployment
 
 Testnet only. Current deployment: Unichain Sepolia (chain id 1301), hook
-`0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88`, Lens `0x5d360309c7564270c5604067d7fa85e7d2508e02`,
-from block 62883477 (18 September 2026, the recalibrated build of README §9.3). Earlier builds
-ran there from 3 July and 19 July 2026. Not on mainnet; no live funds at risk.
-
-That deployment predates the fixes from the 2026-10 independent scoped review above. The constructor now also takes
-the pinned PoolKey, so they take effect only on a fresh deployment, and any mainnet deployment
-is made from this build.
+`0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88`, Lens `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2`,
+from block 66190311 (26 October 2026). This is the build carrying every fix from the 2026-10
+independent scoped review above, merged to `main` in PR #1. On chain: the hook is bound to the
+USDC/WETH dynamic-fee pool (tick spacing 60) it was pinned to, its `initializer` is the deployer,
+and it is seeded at 3,000,000 USDC : 1,000 WETH. Earlier builds ran there from 3 July,
+19 July and 18 September 2026 (block 62883477, hook `0xa5ABa524…AAa88`, which predates these
+fixes). Not on mainnet; no live funds at risk.
 
 ## Contact
 

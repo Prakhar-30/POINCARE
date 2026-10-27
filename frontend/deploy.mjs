@@ -191,10 +191,20 @@ async function main() {
 
   // Initialise the pool; the custom curve prices off reserves, so sqrtPrice is cosmetic.
   poolKey.hooks = hookAddr;
-  await sendCall("initialize pool", POOL_MANAGER, PM_ABI, "initialize", [poolKey, SQRT_PRICE_1_1], 600_000n);
+  const initRcpt = await sendCall("initialize pool", POOL_MANAGER, PM_ABI, "initialize", [poolKey, SQRT_PRICE_1_1], 600_000n);
   // Deploy and initialize are separate transactions. The hook rejects any other key, but
-  // confirm what it actually bound before the addresses are published.
-  const bound = await pub.readContract({ address: hookAddr, abi: HOOK_VIEW_ABI, functionName: "poolKey" });
+  // confirm what it actually bound before the addresses are published. Read at the
+  // initialize block and retry: a lagging replica (as with the code check above) can still
+  // report the hook unbound, which reads as an all-zero key and would fail the comparison.
+  let bound;
+  for (let tries = 0; ; tries++) {
+    bound = await pub
+      .readContract({ address: hookAddr, abi: HOOK_VIEW_ABI, functionName: "poolKey", blockNumber: initRcpt.blockNumber })
+      .catch(() => undefined);
+    if (bound && bound.hooks.toLowerCase() !== ZERO) break;
+    if (tries >= 10) throw new Error("hook still reads unbound after initialize");
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   for (const f of ["currency0", "currency1", "hooks"]) {
     if (bound[f].toLowerCase() !== poolKey[f].toLowerCase()) throw new Error(`hook bound to wrong pool (${f})`);
   }
