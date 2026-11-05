@@ -11,12 +11,13 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
       href={`${EXPLORER}/address/${address}`}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1.5 transition-colors"
-      style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}
+      className="link-quiet inline-flex items-center gap-1.5 rounded-md py-1"
+      style={{ fontSize: 13, fontWeight: 600 }}
+      aria-label={`${label} contract ${address} on the block explorer (opens in a new tab)`}
     >
-      <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
-      <Icon name="external" size={12} />
+      <span>{label}</span>
+      <span translate="no" style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
+      <Icon name="external" size={12} aria-hidden="true" />
     </a>
   );
 }
@@ -27,27 +28,20 @@ function FaucetButton() {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <button
+        type="button"
         onClick={() => faucet.mint()}
         disabled={faucet.minting}
-        className="inline-flex items-center gap-2 font-bold"
-        style={{
-          background: "var(--lav-soft)",
-          color: "var(--lav-deep)",
-          border: "1px solid var(--lav-border, var(--border))",
-          borderRadius: 12,
-          padding: "9px 14px",
-          fontSize: 12.5,
-          cursor: faucet.minting ? "default" : "pointer",
-        }}
+        aria-busy={faucet.minting}
+        className="btn btn-soft btn-sm"
       >
-        <span className="flex items-center" style={{ marginRight: 1 }}>
+        <span className="flex items-center" style={{ marginRight: 1 }} aria-hidden="true">
           <TokenIcon sym="USDC" size={16} />
           <span style={{ marginLeft: -5 }}><TokenIcon sym="WETH" size={16} /></span>
         </span>
         {faucet.minting ? "Sending…" : "Get test tokens · 50k USDC + 20 WETH"}
       </button>
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".3px", color: "var(--faint)", textTransform: "uppercase" }}>
-        Testnet only · test tokens, no value
+      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+        Testnet only · test tokens have no value
       </span>
     </div>
   );
@@ -56,42 +50,43 @@ function FaucetButton() {
 /** Footer for the wallet-gated app. Links contract addresses out to the explorer. */
 export function AppFooter() {
   return (
-    <footer className="px-6 py-7 mt-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}>
-      <div className="mx-auto flex flex-wrap items-center justify-between gap-5" style={{ maxWidth: 1180 }}>
-        <div className="flex items-center gap-4 flex-wrap">
-          <Wordmark size={26} />
-          <span className="flex items-center gap-1.5" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-3)" }}>
-            <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
-            {CHAIN_NAME} · testnet · research preview
-          </span>
+    <footer className="mt-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}>
+      <div className="mx-auto px-4 sm:px-6 py-8" style={{ maxWidth: 1600 }}>
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Wordmark size={26} />
+            <span className="flex items-center gap-1.5" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-3)" }}>
+              <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
+              {CHAIN_NAME} · testnet · research preview
+            </span>
+          </div>
+
+          <nav aria-label="Contracts and links" className="flex items-center gap-x-5 gap-y-1 flex-wrap">
+            <ExplorerLink label="Hook" address={CONTRACTS.hook} />
+            <ExplorerLink label="Pool manager" address={CONTRACTS.poolManager} />
+            <ExplorerLink label="Router" address={CONTRACTS.router} />
+            <a
+              href="https://x.com/Poincare_AMM"
+              target="_blank"
+              rel="noreferrer"
+              className="link-quiet inline-flex items-center gap-1.5 rounded-md py-1"
+              style={{ fontSize: 13, fontWeight: 700 }}
+              aria-label="Poincaré on X (opens in a new tab)"
+            >
+              <Icon name="xSocial" size={13} aria-hidden="true" />
+              @Poincare_AMM
+            </a>
+          </nav>
         </div>
 
-        <div className="flex items-center gap-5 flex-wrap">
-          <ExplorerLink label="Hook" address={CONTRACTS.hook} />
-          <ExplorerLink label="Pool manager" address={CONTRACTS.poolManager} />
-          <ExplorerLink label="Router" address={CONTRACTS.router} />
-          <a
-            href="https://x.com/Poincare_AMM"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-lav"
-            style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}
-          >
-            <Icon name="xSocial" size={13} />
-            @Poincare_AMM
-          </a>
+        <div className="mt-5">
+          <FaucetButton />
         </div>
-      </div>
 
-      <div className="mx-auto mt-5" style={{ maxWidth: 1180 }}>
-        <FaucetButton />
-      </div>
-
-      <div className="mx-auto mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1180, borderTop: "1px solid var(--divider)" }}>
-        <span style={{ fontSize: 11, color: "var(--faint)" }}>
-          Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.
-        </span>
-        <span style={{ fontSize: 11, color: "var(--faint)" }}>Prices off the pool's own reserves · no oracle, no keeper.</span>
+        <div className="mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ borderTop: "1px solid var(--divider)", fontSize: 12, color: "var(--muted)" }}>
+          <span>Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.</span>
+          <span>Prices off the pool's own reserves · no oracle, no keeper.</span>
+        </div>
       </div>
     </footer>
   );
