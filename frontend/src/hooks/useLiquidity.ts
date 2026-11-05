@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { zeroHash } from "viem";
-import { CONTRACTS, ERC20_ABI, EXPLORER, HOOK_LP_ABI } from "@/config/contracts";
+import { CONTRACTS, ERC20_ABI, EXPLORER, HOOK_ABI, HOOK_LP_ABI } from "@/config/contracts";
 import { fromWei, toWei } from "@/lib/units";
 import { recordLpEvent } from "@/lib/db";
 import { resolveGas, GAS, nextNonce, waitForSuccess } from "@/lib/gas";
@@ -26,6 +26,15 @@ export function useLiquidity(onDone?: () => void) {
   const toast = useToast();
   const [status, setStatus] = useState<LiquidityStatus>("idle");
 
+  // One transaction flow at a time. Status only turns "busy" after the allowance read, so a fast
+  // double click (or Enter pressed twice) could otherwise start a second approve-and-send.
+  const inFlight = useRef(false);
+  const once = <A extends unknown[]>(fn: (...a: A) => Promise<unknown>) => async (...a: A) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try { await fn(...a); } finally { inFlight.current = false; }
+  };
+
   const hook = CONTRACTS.hook as `0x${string}`;
 
   /** Approve exactly what the hook needs for this token, never infinite. */
@@ -43,7 +52,9 @@ export function useLiquidity(onDone?: () => void) {
     stepper.complete(stepKey);
   }
 
-  async function add(params: { usdc: string; weth: string; valueUsdc: number }) {
+  const add = once(runAdd);
+  const remove = once(runRemove);
+  async function runAdd(params: { usdc: string; weth: string; valueUsdc: number }) {
     if (!address || !walletClient || !publicClient) return;
     const a0 = toWei(params.usdc || "0", "USDC"); // currency0
     const a1 = toWei(params.weth || "0", "WETH"); // currency1
@@ -67,6 +78,11 @@ export function useLiquidity(onDone?: () => void) {
 
       current = "add";
       stepper.activate("add");
+      // The deposit's minted LP shares are not in the call's return path here, so read the
+      // share balance either side of it; the history then records what was actually minted.
+      const sharesOf = async () =>
+        (await publicClient.readContract({ address: hook, abi: HOOK_ABI, functionName: "balanceOf", args: [address] })) as bigint;
+      const before = await sharesOf().catch(() => null);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
       const lpArgs = [{ amount0Desired: a0, amount1Desired: a1, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, account: address }, GAS.addLiquidity);
@@ -75,7 +91,9 @@ export function useLiquidity(onDone?: () => void) {
       stepper.complete("add");
       stepper.finish(`${EXPLORER}/tx/${hash}`);
 
-      await recordLpEvent({ tx_hash: hash, wallet: address, kind: "add", shares: 0, amount0: fromWei(a0, "USDC"), amount1: fromWei(a1, "WETH"), value_usdc: params.valueUsdc });
+      const after = before === null ? null : await sharesOf().catch(() => null);
+      const minted = before !== null && after !== null && after > before ? Number(after - before) / 1e18 : 0;
+      await recordLpEvent({ tx_hash: hash, wallet: address, kind: "add", shares: minted, amount0: fromWei(a0, "USDC"), amount1: fromWei(a1, "WETH"), value_usdc: params.valueUsdc });
       setStatus("success");
       toast.success("Liquidity added", `${fmtNum(fromWei(a0, "USDC"), 2)} USDC and ${fmtNum(fromWei(a1, "WETH"), 4)} WETH`, `${EXPLORER}/tx/${hash}`);
       onDone?.();
@@ -85,7 +103,7 @@ export function useLiquidity(onDone?: () => void) {
     }
   }
 
-  async function remove(params: { shares: bigint; valueUsdc: number; amount0: number; amount1: number }) {
+  async function runRemove(params: { shares: bigint; valueUsdc: number; amount0: number; amount1: number }) {
     if (!address || !walletClient || !publicClient) return;
     let current = "remove";
     try {
