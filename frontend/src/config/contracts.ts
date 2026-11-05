@@ -32,21 +32,25 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
     nativeSymbol: "ETH",
     explorer: "https://sepolia.uniscan.xyz",
     poolManager: "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
-    hook: "0xa5ABa524A96695Dc4E36BacfF3048aD2F24AAa88",
-    lens: "0x5d360309c7564270c5604067d7fa85e7d2508e02",
-    faucet: "0x77cbfe7bfb06ee6ccb3fec0bb3768fa2a573e922",
+    hook: "0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88",
+    lens: "0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2",
+    faucet: "0x389ef3443ee0b86172853238b318cb62ec43f2af",
     router: "0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba",
-    usdc: "0x25d590083B462CA24dE0D601964DA1c8a3D6CAEe",
-    weth: "0xee26321652D215103D8f08B891457918B9a77BD8",
-    deployBlock: 62883477n,
+    usdc: "0x1b4034D6C443Eff3D2e9051A08147eF9eD8EBc70",
+    weth: "0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449",
+    deployBlock: 66190311n,
   },
   // Additional chains slot in here once a deployment exists (entry shape above);
   // Monad testnet was evaluated and dropped for now: no canonical Uniswap v4 there.
 };
 
-/** Wallet that seeded the pool and ran the historical market replay; its tape rows
- *  carry the original market date of the candle they reproduce, not execution time. */
-export const REPLAY_TRADER = "0x49abe186a9b24f73e34ccae3d179299440c352ac";
+/** Wallets that ran the historical market replay (the first also seeded the pool); their tape
+ *  rows carry the original market date of the candle they reproduce, not execution time. */
+const REPLAY_TRADERS = new Set([
+  "0x49abe186a9b24f73e34ccae3d179299440c352ac",
+  "0x8717f01291eb1be00a2371314eb02d5424cc8dc2",
+]);
+export const isReplayTrader = (addr?: string | null) => !!addr && REPLAY_TRADERS.has(addr.toLowerCase());
 
 const isLive = (d: Deployment) => d.hook.length === 42;
 export const LIVE_CHAIN_IDS = Object.values(DEPLOYMENTS).filter(isLive).map((d) => d.chainId);

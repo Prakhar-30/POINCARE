@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { priceOf, type SwapRow } from "@/lib/db";
 import { fmtNum, fmtUsd } from "@/lib/format";
-import { REPLAY_TRADER } from "@/config/contracts";
+import { isReplayTrader } from "@/config/contracts";
 
 /** Fresh trades get a relative age; anything older (e.g. replayed history, which
  *  carries its historical market date) shows that date instead of "9mo". */
@@ -29,6 +30,11 @@ export function Tape({
   scroll = true,
   maxHeight = 250,
   badge = "live",
+  title = "Trade tape",
+  actions,
+  empty = "No trades yet. Be the first to swap.",
+  bare = false,
+  fill = false,
 }: {
   rows: SwapRow[];
   onLoadMore?: () => void;
@@ -37,81 +43,102 @@ export function Tape({
   scroll?: boolean;
   maxHeight?: number;
   badge?: string;
+  title?: string;
+  /** Optional controls rendered in the header, e.g. a filter. */
+  actions?: ReactNode;
+  empty?: string;
+  /** Render without the card and header, for use inside a panel that already has them. */
+  bare?: boolean;
+  /** Fill the parent's height: only the rows scroll, the footnote and "load more" always show. */
+  fill?: boolean;
 }) {
   return (
-    <div className="card-quiet overflow-hidden">
-      <div className="flex justify-between items-center px-5 py-3.5" style={{ borderBottom: "1px solid var(--divider)" }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text-3)" }}>Trade tape</span>
-        <span className="flex items-center gap-1.5" style={{ fontSize: 11, fontWeight: 700, color: "var(--green-label)" }}>
-          <span className="anim-pulse-dot" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
+    <section className={[bare ? "" : "card-quiet overflow-hidden", fill ? "flex flex-col h-full min-h-0" : ""].join(" ").trim() || undefined} aria-labelledby={bare ? undefined : "tape-title"} aria-label={bare ? title : undefined}>
+      {!bare && <div className="flex justify-between items-center px-5 py-3.5" style={{ borderBottom: "1px solid var(--divider)" }}>
+        <div className="flex items-center gap-3">
+          <h2 id="tape-title" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>{title}</h2>
+          {actions}
+        </div>
+        <span className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--green-label)" }}>
+          <span className="anim-pulse-dot" aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
           {badge}
         </span>
+      </div>}
+      <div role="table" className={fill ? "flex flex-col flex-1 min-h-0" : undefined} aria-labelledby={bare ? undefined : "tape-title"} aria-label={bare ? title : undefined}>
+      <div role="row" className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider-2)" }}>
+        <span role="columnheader">Side</span>
+        <span role="columnheader" className="text-right">Price</span>
+        <span role="columnheader" className="text-right">Size · WETH</span>
+        <span role="columnheader" className="text-right">Time</span>
       </div>
-      <div className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 10, fontWeight: 700, color: "var(--faint)", borderBottom: "1px solid var(--divider-2)" }}>
-        <span>side</span>
-        <span className="text-right">price</span>
-        <span className="text-right">size · WETH</span>
-        <span className="text-right">when</span>
-      </div>
-      <div className={scroll ? "no-scrollbar" : undefined} style={scroll ? { maxHeight, overflowY: "auto" } : undefined}>
+      <div
+        role="rowgroup"
+        className={fill ? "flex-1 min-h-0" : undefined}
+        style={fill ? { overflowY: "auto", overscrollBehavior: "contain" } : scroll ? { maxHeight, overflowY: "auto", overscrollBehavior: "contain" } : undefined}
+        tabIndex={scroll ? 0 : undefined}
+        aria-label={scroll ? "Trade history, scrollable" : undefined}
+      >
         {rows.length === 0 && (
-          <div className="px-5 py-6 text-center" style={{ fontSize: 12, color: "var(--faint)" }}>
-            No trades yet. Be the first to swap.
+          <div role="row" className="px-5 py-6 text-center" style={{ fontSize: 13, color: "var(--muted)" }}>
+            <span role="cell">{empty}</span>
           </div>
         )}
         <AnimatePresence initial={false}>
           {rows.map((t) => {
             const buy = t.side === "buy_weth";
-            const replay = t.trader?.toLowerCase() === REPLAY_TRADER;
+            const replay = isReplayTrader(t.trader);
             return (
               <motion.div
                 key={t.tx_hash}
+                role="row"
                 initial={{ opacity: 0, backgroundColor: buy ? "rgba(107,184,154,.16)" : "rgba(229,140,160,.16)" }}
                 animate={{ opacity: 1, backgroundColor: "rgba(0,0,0,0)" }}
                 transition={{ duration: 0.9 }}
                 className="grid items-center px-5 py-2"
                 style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, borderBottom: "1px solid var(--divider-2)" }}
               >
-                <span style={{ color: buy ? "var(--up)" : "var(--down)", fontWeight: 800 }}>{buy ? "buy" : "sell"}</span>
-                <span className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
-                <span className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
+                <span role="cell" style={{ color: buy ? "var(--up-ink)" : "var(--down-ink)", fontWeight: 800 }}>{buy ? "Buy" : "Sell"}</span>
+                <span role="cell" className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
+                <span role="cell" className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
                 <span
+                  role="cell"
                   className="text-right"
-                  title={replay ? "Historical replay of real ETH/USDC market data; this is the original market date." : undefined}
-                  style={{ color: replay ? "var(--lav)" : "var(--faint)", fontSize: 11, fontWeight: replay ? 700 : undefined }}
+                  title={replay ? "Original trade time" : undefined}
+                  style={{ color: replay ? "var(--lav-ink)" : "var(--muted)", fontSize: 12, fontWeight: replay ? 700 : undefined }}
                 >
-                  {replay ? "◦ " : ""}{when(t.ts)}
+                  {replay ? <span aria-hidden="true">◦ </span> : ""}{when(t.ts)}{replay && <span className="sr-only"> (original trade time)</span>}
                 </span>
               </motion.div>
             );
           })}
         </AnimatePresence>
       </div>
+      </div>
 
-      {rows.some((t) => t.trader?.toLowerCase() === REPLAY_TRADER) && (
-        <div className="px-5 py-2" style={{ fontSize: 10, lineHeight: 1.5, color: "var(--faint)", borderTop: "1px solid var(--divider-2)" }}>
-          <span style={{ color: "var(--lav)", fontWeight: 700 }}>◦</span> replay of real ETH/USDC market
-          history; the date shown is the original market date. Your own swaps show their actual time.
+      {rows.some((t) => isReplayTrader(t.trader)) && (
+        <div className="px-5 py-2 shrink-0" style={{ fontSize: 12, lineHeight: 1.5, color: "var(--muted)", borderTop: "1px solid var(--divider-2)" }}>
+          <span style={{ color: "var(--lav-ink)", fontWeight: 700 }} aria-hidden="true">◦</span> Earlier market activity, shown at its original trade time.
         </div>
       )}
 
       {onLoadMore && rows.length > 0 && (hasMore || loadingMore) && (
         <button
+          type="button"
           onClick={onLoadMore}
           disabled={loadingMore}
-          className="w-full text-center font-bold"
+          aria-busy={loadingMore}
+          className="tape-more w-full text-center font-bold shrink-0"
           style={{
-            padding: "11px",
-            fontSize: 12,
-            color: "var(--lav-deep)",
+            minHeight: 44,
+            fontSize: 13,
+            color: "var(--lav-ink)",
             background: "var(--surface-2)",
             borderTop: "1px solid var(--divider)",
-            cursor: loadingMore ? "default" : "pointer",
           }}
         >
           {loadingMore ? "Loading…" : "Load more history"}
         </button>
       )}
-    </div>
+    </section>
   );
 }
