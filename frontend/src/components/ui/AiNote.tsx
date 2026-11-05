@@ -44,6 +44,8 @@ export function AiNote({
   return (
     <div
       className="rounded-2xl p-4"
+      aria-live="polite"
+      aria-busy={waiting || loading}
       style={{
         background: "var(--lav-soft)",
         border: "1px solid var(--lav-dim)",
@@ -51,10 +53,10 @@ export function AiNote({
     >
       <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-2">
-          <span style={{ color: "var(--lav-deep)" }}>
-            <Icon name={loading ? "spinner" : "spark"} size={15} />
+          <span style={{ color: "var(--lav-ink)" }}>
+            <Icon name={loading ? "spinner" : "spark"} size={15} aria-hidden="true" />
           </span>
-          <span className="font-display" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>
+          <span className="font-display" style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
             {title}
           </span>
         </div>
@@ -63,10 +65,10 @@ export function AiNote({
           <span
             className="rounded-full px-2 py-0.5"
             style={{
-              fontSize: 9.5,
+              fontSize: 12,
               fontWeight: 700,
               letterSpacing: ".3px",
-              color: source === "model" ? "var(--lav-deep)" : "var(--text-3)",
+              color: source === "model" ? "var(--lav-ink)" : "var(--text-3)",
               background: "var(--surface)",
               border: "1px solid var(--lav-dim)",
             }}
@@ -105,7 +107,7 @@ export function AiNote({
             ))}
           </div>
           {reason && (
-            <p style={{ fontSize: 10.5, lineHeight: 1.6, color: "var(--faint)", marginTop: 12 }}>
+            <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginTop: 12 }}>
               Waiting on the model — {reason}. Retrying automatically.
             </p>
           )}
@@ -118,7 +120,7 @@ export function AiNote({
           <p style={{ fontSize: 12, lineHeight: 1.65, color: "var(--text-2)", margin: 0 }}>
             The report could not be generated: <b>{reason}</b>.
           </p>
-          <p style={{ fontSize: 11, lineHeight: 1.6, color: "var(--faint)", margin: "6px 0 0" }}>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", margin: "6px 0 0" }}>
             This will not resolve on its own — the deployed <code>explain</code> function does not
             have the task this page is asking for. Redeploy it with{" "}
             <code>supabase functions deploy explain --no-verify-jwt</code>. Every figure on the
@@ -126,7 +128,7 @@ export function AiNote({
           </p>
         </div>
       ) : (
-        <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>{text}</p>
+        <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-2)", whiteSpace: "pre-wrap", maxWidth: "75ch", textWrap: "pretty" }}>{text}</p>
       )}
     </div>
   );

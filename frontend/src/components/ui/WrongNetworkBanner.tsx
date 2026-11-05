@@ -32,21 +32,17 @@ export function WrongNetworkBanner() {
       }}
     >
       <span className="inline-flex items-center gap-2">
-        <Icon name="shield" size={15} />
+        <Icon name="shield" size={15} aria-hidden="true" />
         Your wallet is on <strong style={{ color: "var(--text)" }}>{chain.name}</strong>. Trading and
         liquidity need <strong style={{ color: "var(--text)" }}>{CHAIN_NAME}</strong>.
       </span>
       <button
+        type="button"
         onClick={() => switchChain({ chainId: ACTIVE_CHAIN_ID })}
         disabled={isPending}
-        className="rounded-full px-3.5 py-1 font-bold transition-opacity"
-        style={{
-          background: "var(--lav)",
-          color: "#fff",
-          fontSize: 12.5,
-          cursor: isPending ? "default" : "pointer",
-          opacity: isPending ? 0.6 : 1,
-        }}
+        aria-busy={isPending}
+        className="btn btn-primary btn-sm"
+        style={{ borderRadius: 999 }}
       >
         {isPending ? "Switching…" : `Switch to ${CHAIN_NAME}`}
       </button>

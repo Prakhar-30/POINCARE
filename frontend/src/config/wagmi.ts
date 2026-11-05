@@ -1,27 +1,20 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { unichainSepolia } from "wagmi/chains";
-import { http, type Config } from "wagmi";
+import type { Config } from "wagmi";
 import type { Chain } from "viem";
-import { ACTIVE_CHAIN_ID, LIVE_CHAIN_IDS } from "./contracts";
+import { LIVE_CHAINS, TRANSPORTS } from "./chains";
+
+// The full wallet config (RainbowKit's connectors: MetaMask SDK, WalletConnect, Coinbase, ...).
+// Only the app's lazily loaded provider imports it, so none of the connector code ships with
+// the landing page, which reads the chain through `readConfig` (chains.ts) instead.
 
 // Injected wallets work without a WalletConnect project id; set one in .env to
 // enable WalletConnect / mobile wallets (https://cloud.reown.com).
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "POINCARE_DEV_PLACEHOLDER";
 
-// Only chains with a live Poincaré deployment are offered; the active chain leads so
-// RainbowKit connects to it by default (see contracts.ts for the reload-on-switch model).
-const ALL_CHAINS: Chain[] = [unichainSepolia];
-const live = ALL_CHAINS.filter((c) => LIVE_CHAIN_IDS.includes(c.id));
-live.sort((a, b) => (a.id === ACTIVE_CHAIN_ID ? -1 : 0) - (b.id === ACTIVE_CHAIN_ID ? -1 : 0));
-
 export const wagmiConfig: Config = getDefaultConfig({
   appName: "Poincaré",
   projectId,
-  chains: live as [Chain, ...Chain[]],
-  transports: {
-    [unichainSepolia.id]: http("https://sepolia.unichain.org"),
-  },
+  chains: LIVE_CHAINS as [Chain, ...Chain[]],
+  transports: TRANSPORTS,
   ssr: false,
 });
-
-export const ACTIVE_CHAIN = live[0];

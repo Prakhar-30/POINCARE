@@ -95,13 +95,13 @@ export function EvidenceChart({
     <div ref={wrapRef} style={{ minWidth: 0 }}>
       {/* legend in normal flow so it can never collide with the plot on narrow screens */}
       <div className="flex items-center justify-between gap-x-3 gap-y-1 flex-wrap mb-1.5">
-        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
           CUSUM evidence · per sampled block
         </span>
-        <span className="flex items-center gap-3 flex-wrap" style={{ fontSize: 10, fontWeight: 700 }}>
-          <span style={{ color: "var(--up)" }}>▬ up</span>
-          <span style={{ color: "var(--down)" }}>▬ down</span>
-          <span style={{ color: "var(--honey)" }}>┅ threshold h</span>
+        <span className="flex items-center gap-3 flex-wrap" style={{ fontSize: 12, fontWeight: 700 }}>
+          <span style={{ color: "var(--up-ink)" }}>▬ up</span>
+          <span style={{ color: "var(--down-ink)" }}>▬ down</span>
+          <span style={{ color: "var(--honey-ink)" }}>┅ threshold h</span>
         </span>
       </div>
 
@@ -111,13 +111,13 @@ export function EvidenceChart({
       >
         {!model ? (
           <div className="flex items-center justify-center gap-2 px-4 text-center" style={{ height: "100%" }}>
-            {loading && <span className="anim-pulse-dot" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)", flexShrink: 0 }} />}
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--faint)" }}>
+            {loading && <span className="anim-pulse-dot" aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)", flexShrink: 0 }} />}
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
               {loading ? "Loading detector history…" : "Waiting for detector samples (one is recorded per traded block)."}
             </span>
           </div>
         ) : (
-          <svg width={W} height={H} style={{ display: "block" }}>
+          <svg width={W} height={H} style={{ display: "block" }} role="img" aria-label="CUSUM evidence for an up-trend and a down-trend against the detection threshold h, per sampled block. Shaded bands mark blocks where the pool was charging a spread.">
             {/* blocks where the curve was actually leaning */}
             {model.leanBands.map((b, i) => (
               <rect key={i} x={b.x0} y={PAD.top} width={Math.max(b.x1 - b.x0, 2)} height={H - PAD.top - PAD.bottom} fill="var(--honey)" opacity={0.1} />
@@ -145,7 +145,7 @@ export function EvidenceChart({
       </div>
 
       {model && (
-        <div className="flex items-center justify-between gap-x-3 gap-y-0.5 flex-wrap mt-1.5" style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>
+        <div className="flex items-center justify-between gap-x-3 gap-y-0.5 flex-wrap mt-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
           <span>
             blocks {points[0].block_number} → {points[points.length - 1].block_number}
           </span>

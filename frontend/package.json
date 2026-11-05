@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "^2.48.1",
     "@tanstack/react-query": "^5.66.0",
     "@vercel/analytics": "^2.0.1",
+    "boring-avatars": "2.0.4",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
     "react": "^18.3.1",
@@ -31,5 +32,6 @@
     "tailwindcss": "^4.0.6",
     "typescript": "^5.7.3",
     "vite": "^6.0.7"
-  }
+  },
+  "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937"
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, EXPLORER, FAUCET_ABI, POOL_KEY, ROUTER_ABI, hasFaucet } from "@/config/contracts";
 import { recordSwap } from "@/lib/db";
@@ -22,7 +22,17 @@ export function useSwap() {
   const toast = useToast();
   const [status, setStatus] = useState<SwapStatus>("idle");
 
-  async function swap(params: { amountIn: string; zeroForOne: boolean; minOutWei: bigint; quote: TradeQuote }) {
+  // One transaction flow at a time. Status only turns "busy" after the allowance read, so a fast
+  // double click (or Enter pressed twice) could otherwise start a second approve-and-send.
+  const inFlight = useRef(false);
+  const once = <A extends unknown[]>(fn: (...a: A) => Promise<unknown>) => async (...a: A) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try { await fn(...a); } finally { inFlight.current = false; }
+  };
+
+  const swap = once(runSwap);
+  async function runSwap(params: { amountIn: string; zeroForOne: boolean; minOutWei: bigint; quote: TradeQuote }) {
     if (!address || !walletClient || !publicClient) return;
     const { amountIn, zeroForOne, minOutWei, quote } = params;
     const { inSym, outSym } = legsOf(zeroForOne);
@@ -128,11 +138,17 @@ export function useFaucet() {
   const USDC_AMT = "50000";
   const WETH_AMT = "20";
 
+  // Same guard as swaps: `minting` only disables the button after a re-render, so a fast double
+  // click could otherwise send two drips.
+  const inFlight = useRef(false);
+
   async function mint() {
     if (!address || !walletClient || !publicClient) {
       toast.error("Connect a wallet", "Connect your wallet to get test tokens.");
       return;
     }
+    if (inFlight.current) return;
+    inFlight.current = true;
     setMinting(true);
     try {
       if (hasFaucet) {
@@ -162,6 +178,7 @@ export function useFaucet() {
     } catch (e) {
       toast.error("Faucet failed", humanizeError(e));
     } finally {
+      inFlight.current = false;
       setMinting(false);
     }
   }

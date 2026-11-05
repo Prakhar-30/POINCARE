@@ -10,8 +10,8 @@ export type DetectorConfig = {
   h: number; // CUSUM threshold
   sMax: number; // statistic cap / κ saturation level
   kappaMin: number;
-  kappaMax: number; // security cap on asymmetry
-  dMax: number; // max spread (κ -> spread ceiling)
+  kappaMax: number; // security cap on asymmetry; kappa is charged as the spread, so this is the spread cap
+  dMax: number; // max change in kappa per block (ramp rate), not a spread level
   lambda: number; // EWMA decay
   dFloor: number; // directional-efficiency floor to engage
   effWindow: number; // implied effective window N = 1/(1-λ)

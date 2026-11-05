@@ -21,8 +21,8 @@ export function useToast(): ToastApi {
 
 const META: Record<ToastKind, { icon: IconName; color: string; bg: string; border: string }> = {
   success: { icon: "check", color: "var(--green-label)", bg: "var(--green-bg)", border: "var(--green-border)" },
-  error: { icon: "shield", color: "var(--down-deep)", bg: "var(--warn-bg)", border: "var(--warn-border)" },
-  info: { icon: "spark", color: "var(--lav-deep)", bg: "var(--lav-soft)", border: "var(--nav-border)" },
+  error: { icon: "shield", color: "var(--down-ink)", bg: "var(--warn-bg)", border: "var(--warn-border)" },
+  info: { icon: "spark", color: "var(--lav-ink)", bg: "var(--lav-soft)", border: "var(--nav-border)" },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -54,7 +54,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         className="fixed z-[100] flex flex-col gap-2.5"
-        style={{ right: 20, bottom: 20, width: 340, maxWidth: "calc(100vw - 40px)", pointerEvents: "none" }}
+        role="region"
+        aria-label="Notifications"
+        style={{ right: 20, bottom: "max(20px, env(safe-area-inset-bottom))", width: 360, maxWidth: "calc(100vw - 40px)", pointerEvents: "none" }}
       >
         <AnimatePresence initial={false}>
           {toasts.map((t) => {
@@ -63,6 +65,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <motion.div
                 key={t.id}
                 layout
+                role={t.kind === "error" ? "alert" : "status"}
+                aria-live={t.kind === "error" ? "assertive" : "polite"}
                 initial={{ opacity: 0, x: 24, scale: 0.96 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 24, scale: 0.96, transition: { duration: 0.18 } }}
@@ -73,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   border: `1px solid ${m.border}`,
                   borderRadius: 16,
                   boxShadow: "var(--shadow-lg)",
-                  padding: "13px 14px",
+                  padding: "14px 14px",
                   display: "flex",
                   gap: 11,
                   alignItems: "flex-start",
@@ -82,11 +86,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <span
                   className="flex items-center justify-center shrink-0"
                   style={{ width: 28, height: 28, borderRadius: 9, background: m.bg, color: m.color }}
+                  aria-hidden="true"
                 >
                   <Icon name={m.icon} size={16} />
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--text)" }}>{t.title}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{t.title}</div>
                   {t.message && (
                     <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5, marginTop: 2 }}>{t.message}</div>
                   )}
@@ -98,17 +103,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                       className="inline-flex items-center gap-1 mt-2"
                       style={{ fontSize: 12, fontWeight: 700, color: m.color }}
                     >
-                      View on explorer <Icon name="external" size={12} />
+                      View on explorer <Icon name="external" size={12} aria-hidden="true" />
                     </a>
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => dismiss(t.id)}
-                  className="shrink-0"
-                  style={{ color: "var(--faint)", background: "transparent", lineHeight: 0, padding: 2 }}
-                  aria-label="Dismiss"
+                  className="icon-btn icon-btn-plain shrink-0"
+                  style={{ marginTop: -4, marginRight: -4 }}
+                  aria-label="Dismiss notification"
                 >
-                  <Icon name="close" size={15} />
+                  <Icon name="close" size={15} aria-hidden="true" />
                 </button>
               </motion.div>
             );

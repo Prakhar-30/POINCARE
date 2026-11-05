@@ -30,6 +30,10 @@
   --color-lav-deep: var(--lav-deep);
   --color-lav-soft: var(--lav-soft);
   --color-honey: var(--honey);
+  --color-up-ink: var(--up-ink);
+  --color-down-ink: var(--down-ink);
+  --color-honey-ink: var(--honey-ink);
+  --color-lav-ink: var(--lav-ink);
   --color-eth: var(--eth);
   --color-usdc: var(--usdc);
   --color-green-label: var(--green-label);
@@ -54,6 +58,16 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
+    color-scheme: light;
+    -webkit-tap-highlight-color: rgba(142, 136, 216, 0.18);
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  @media (pointer: fine) {
+    html {
+      overscroll-behavior: none;
+    }
   }
   /* Safety net: clip stray horizontal overflow on small screens without
      breaking position: sticky (overflow-x: clip is exempt from that, unlike hidden). */
@@ -67,25 +81,290 @@
     color: var(--text);
     background: var(--app-bg);
     background-attachment: fixed;
-    transition: background 0.35s ease, color 0.35s ease;
+    transition: background-color 0.35s ease, color 0.35s ease;
+    /* figures line up in every price, amount and percentage, and stop jittering as they update */
+    font-variant-numeric: tabular-nums;
+    /* viewport-fit=cover hands the notch and home-indicator areas to the page: keep content out of them */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* headings break into even lines instead of leaving one word on the last */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  button,
+  a,
+  input,
+  [role="tab"] {
+    touch-action: manipulation;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* One focus ring for the whole app: keyboard users always see where they are; mouse users never do. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  /* section headings land below the sticky nav when jumped to */
+  [id] {
+    scroll-margin-top: 88px;
   }
   ::selection {
     background: rgba(142, 136, 216, 0.22);
   }
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: var(--track);
-    border-radius: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
   input {
     font-family: inherit;
   }
+  input[type="range"] {
+    accent-color: var(--lav);
+  }
+}
+
+/* Skip link: first stop for keyboard users, invisible until focused. */
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -64px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: var(--shadow-lg);
+  transition: top 0.15s ease-out;
+}
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+/* Controls ---------------------------------------------------------------- */
+/* Buttons: one shape, four intents. Every state (hover, pressed, focus, disabled) is defined
+   here once, so a button looks and behaves the same on every screen, landing page included.
+   Shape encodes role: anything you press is a pill; anything that holds content (cards, panels,
+   inputs, segmented selectors) keeps a rounded rectangle. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out,
+    box-shadow 0.15s ease-out, transform 0.1s ease-out;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-lg {
+  min-height: 52px;
+  padding: 0 26px;
+  font-size: 15px;
+}
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-primary {
+  background: var(--action);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(111, 104, 200, 0.24);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+.btn-positive {
+  background: var(--positive);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(64, 129, 104, 0.22);
+}
+.btn-positive:hover:not(:disabled) {
+  background: var(--positive-hover);
+}
+.btn-negative {
+  background: var(--negative);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(191, 78, 106, 0.2);
+}
+.btn-negative:hover:not(:disabled) {
+  background: var(--negative-hover);
+}
+.btn-soft {
+  background: var(--lav-soft);
+  color: var(--lav-ink);
+  border: 1px solid var(--lav-dim);
+}
+.btn-soft:hover:not(:disabled) {
+  border-color: var(--lav);
+}
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--lav-dim);
+}
+/* Disabled reads as unavailable without dropping its label below legibility. */
+.btn:disabled {
+  background: var(--surface-3);
+  color: var(--muted);
+  border-color: var(--border);
+  box-shadow: none;
+}
+.btn[aria-busy="true"]:disabled {
+  background: var(--action);
+  color: #fff;
+  opacity: 0.85;
+}
+.btn-positive[aria-busy="true"]:disabled {
+  background: var(--positive);
+}
+.btn-negative[aria-busy="true"]:disabled {
+  background: var(--negative);
+}
+
+/* Icon-only button: 40px target, quiet until hovered. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--text-3);
+  background: var(--surface);
+  border: 1px solid var(--nav-border);
+  cursor: pointer;
+  transition: color 0.15s ease-out, border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+.icon-btn:hover {
+  color: var(--lav-ink);
+  border-color: var(--lav-dim);
+}
+.icon-btn-plain {
+  border-color: transparent;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+}
+/* Hit slop: small icon controls keep their size but take a 44px touch target on touch screens,
+   via an invisible box around them. Fine pointers keep the visual size so neighbours never overlap. */
+.icon-btn-plain,
+.hit-slop {
+  position: relative;
+}
+@media (pointer: coarse) {
+  .icon-btn-plain::after,
+  .hit-slop::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+  .hit-slop::after {
+    inset: -13px;
+  }
+}
+
+/* Segmented control: a group of mutually exclusive options (aria-pressed marks the choice). */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.seg-item {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.seg-item:hover {
+  color: var(--text);
+}
+.seg-item[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.seg-sm .seg-item {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* Amount field: the whole box is the hit target and takes the focus ring. */
+.field {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-2);
+  padding: 14px 16px;
+  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.field:hover {
+  border-color: var(--border-strong);
+}
+.field:focus-within {
+  border-color: var(--lav);
+  box-shadow: 0 0 0 3px rgba(142, 136, 216, 0.18);
+}
+.field input {
+  outline: none;
+}
+.field-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* App nav tabs: inactive tabs brighten on hover; the active pill is drawn by framer-motion. */
+.nav-tab {
+  transition: color 0.15s ease-out;
+}
+.nav-tab:not([aria-current="page"]):hover {
+  color: var(--text) !important;
+}
+
+/* Quiet text link: muted at rest, ink on hover. */
+.link-quiet {
+  color: var(--text-3);
+  transition: color 0.15s ease-out;
+}
+.link-quiet:hover {
+  color: var(--lav-ink);
 }
 
 /* Crafted helpers --------------------------------------------------------- */
@@ -93,15 +372,39 @@
   font-family: var(--font-display);
 }
 
-/* hide scrollbar but keep scroll (used by the trade tape) */
-.no-scrollbar {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+/* Scrollbars: thin, soft and theme-tinted, and only shown while the pointer is over the area
+   that scrolls. WebKit/Blink get a 6px pill; Firefox (no ::-webkit-scrollbar) gets "thin" and
+   repaints on :hover by itself.
+   The track is always reserved, so revealing the thumb never shifts layout. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-.no-scrollbar::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 99px;
+}
+/* .sb-on is set by lib/softScrollbars on the area under the pointer: Blink does not repaint
+   a scrollbar on :hover alone, but it does on a class change */
+.sb-on::-webkit-scrollbar-thumb {
+  background-color: var(--scroll-thumb);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  :hover,
+  :focus-visible {
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 
 /* card: the single recurring surface primitive */
@@ -162,6 +465,17 @@
   .shimmer { animation: none; background: var(--lav-dim); }
 }
 
+/* Collapsed preview of long generated prose: the first lines, then a "read more" control. */
+.prose-clamp p {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.prose-clamp-tall p {
+  -webkit-line-clamp: 10;
+}
+
 /* bonding-curve motion: drifting dash current + one-shot trade ripple */
 @keyframes curveFlow {
   to { stroke-dashoffset: -64; }
@@ -188,10 +502,16 @@
 .marquee-track {
   display: inline-flex;
   width: max-content;
-  animation: marqueeSlide 54s linear infinite; /* scales with strip length: same px/s as before */
+  animation: marqueeSlide 48s linear infinite; /* scales with strip length: same px/s as before */
 }
 .marquee:hover .marquee-track {
   animation-play-state: paused;
+}
+.tape-more {
+  transition: background-color 0.15s ease-out;
+}
+.tape-more:hover:not(:disabled) {
+  background: var(--surface-3) !important;
 }
 .marquee-group {
   display: inline-flex;
@@ -210,4 +530,244 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Curve-depth book rows: a whole row is the hit target, like an exchange order book. */
+.depth-row {
+  cursor: pointer;
+  background-repeat: no-repeat;
+  transition: background-color 0.12s ease-out;
+}
+.depth-row:hover {
+  background-color: var(--surface-2);
+}
+
+/* Dashboard account strip: exchange-style stat cells split by hairlines.
+   Phones: balance on its own row, the three trade stats side by side beneath it. */
+.acct-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--divider);
+}
+.acct-cell {
+  padding: 12px 14px 14px;
+}
+.acct-cell:first-child {
+  grid-column: 1 / -1;
+  padding: 14px 20px 16px;
+}
+.acct-cell + .acct-cell {
+  border-top: 1px solid var(--divider);
+}
+.acct-cell + .acct-cell + .acct-cell {
+  border-left: 1px solid var(--divider);
+}
+@media (max-width: 639px) {
+  .acct-sub { display: none; }
+}
+@media (min-width: 1024px) {
+  .acct-strip {
+    grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  }
+  .acct-cell,
+  .acct-cell:first-child {
+    grid-column: auto;
+    padding: 14px 20px 16px;
+  }
+  .acct-cell + .acct-cell {
+    border-top: 0;
+    border-left: 1px solid var(--divider);
+  }
+}
+.row-hover {
+  transition: background-color 0.12s ease-out;
+}
+.row-hover:hover {
+  background-color: var(--surface-2);
+}
+
+/* Dashboard columns end on the same line: the last panel in each column absorbs the difference */
+.dash-col > :last-child {
+  flex: 1 1 auto;
+}
+
+/* Shared stat strip: hairlines come from the 1px grid gap over the divider colour */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--divider);
+  border-top: 1px solid var(--divider);
+}
+.stat-strip > * {
+  background: var(--surface);
+  padding: 12px 18px 14px;
+}
+.stat-strip > [data-tone="good"] {
+  background: var(--green-bg);
+}
+.stat-strip > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+@media (min-width: 1024px) {
+  .stat-strip {
+    grid-template-columns: var(--cols);
+  }
+  .stat-strip > :last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+
+/* Landing FAQ: native <details>, custom marker that turns into a close mark when open */
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq .faq-icon {
+  transition: transform 0.2s ease-out;
+}
+.faq[open] .faq-icon {
+  transform: rotate(45deg);
+}
+.faq summary:hover {
+  color: var(--lav-ink);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Landing page. Black is the second voice next to the soft palette: the primary action, the
+   evidence band and the headline weight. In dark mode the roles invert (light action, a band
+   deeper than the page) so the contrast survives. */
+:root {
+  --lp-ink: #17151f;
+  --lp-ink-hover: #2c2938;
+  --lp-on-ink: #ffffff;
+  --lp-band: #15131c;
+  --lp-band-2: #1f1c29;
+  --lp-band-line: rgba(255, 255, 255, 0.1);
+  --lp-band-text: #f6f3fb;
+  --lp-band-muted: #aaa4bf;
+  --lp-head: #17151f;
+  --lp-card: #f8f6fc;
+  --lp-stage: radial-gradient(80% 90% at 50% 100%, #d9d5f7 0%, #ebe8fb 45%, #f7f5fd 80%);
+}
+[data-theme="dark"] {
+  --lp-ink: #f6f3fb;
+  --lp-ink-hover: #ffffff;
+  --lp-on-ink: #15131c;
+  --lp-band: #0c0b11;
+  --lp-band-2: #17151f;
+  --lp-band-line: rgba(255, 255, 255, 0.09);
+  --lp-band-text: #f6f3fb;
+  --lp-band-muted: #a39db7;
+  --lp-head: #f6f3fb;
+  --lp-card: #1e1b2a;
+  --lp-stage: radial-gradient(80% 90% at 50% 100%, #3a3460 0%, #26223a 45%, #1a1726 80%);
+}
+.lp-btn-ink {
+  background: var(--lp-ink);
+  color: var(--lp-on-ink);
+  border-radius: 999px;
+  box-shadow: none;
+}
+.lp-btn-ink:hover {
+  background: var(--lp-ink-hover);
+}
+/* the launch action on a dark card: light pill, dark label, the same in both themes */
+.lp-btn-light {
+  background: #f6f3fb;
+  color: #15131c;
+}
+.lp-btn-light:hover {
+  background: #ffffff;
+}
+.lp-btn-ghost {
+  background: transparent;
+  color: var(--lp-head);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+.lp-btn-ghost:hover {
+  background: var(--surface);
+}
+.lp-band .lp-btn-ghost {
+  color: var(--lp-band-text);
+  border-color: var(--lp-band-line);
+}
+.lp-band .lp-btn-ghost:hover {
+  background: var(--lp-band-2);
+}
+.lp-band {
+  background: var(--lp-band);
+  color: var(--lp-band-text);
+}
+.lp-band a.link-quiet {
+  color: var(--lp-band-muted);
+}
+.lp-band a.link-quiet:hover {
+  color: var(--lp-band-text);
+}
+.lp-head {
+  font-family: var(--font-display);
+  color: var(--lp-head);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.lp-card {
+  background: var(--lp-card);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+}
+.lp-stage {
+  background: var(--lp-stage);
+  border-radius: 36px;
+}
+.lp-card-link {
+  transition: border-color 0.2s ease-out, background-color 0.2s ease-out;
+}
+.lp-card-link:hover {
+  border-color: var(--lav-dim);
+  background: var(--surface);
+}
+.lp-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.lp-reviewer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease-out;
+}
+.lp-reviewer:hover {
+  border-color: var(--lav-dim);
+}
+/* the phone render ships on its own near-black backdrop, so its card keeps that colour in both themes */
+.lp-showcase {
+  background: #0d0c11;
+  border-radius: 36px;
+  border: 1px solid var(--border);
+}
+/* fade every edge of the render into the card, so its own grey backdrop leaves no seam */
+.lp-showcase-img {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 10%, #000 88%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0, #000 24%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 10%, #000 88%, transparent 100%);
+  mask-composite: intersect;
+}
+
+/* Keyboard hint: a small key cap for shortcuts (command menu, tab hints). */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font: 700 11px/1 var(--font-sans);
+  white-space: nowrap;
 }

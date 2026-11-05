@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
+import { CONTRACTS } from "@/config/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   dedupeByTx,
@@ -7,10 +8,20 @@ import {
   fetchTape,
   fetchTapePage,
   fetchWalletTotals,
+  fetchWalletProfile,
+  fetchWalletSwaps,
+  fetchLpEvents,
   subscribeSwaps,
   touchWallet,
+  type LpEvent,
   type SwapRow,
 } from "@/lib/db";
+
+/** ERC20 Transfer(address,address,uint256). The LP share token is the hook's own OpenZeppelin
+ *  ERC20, so every deposit's mint is a Transfer from the zero address in its receipt. */
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const ZERO_TOPIC = `0x${"0".repeat(64)}`;
+const addrTopic = (a: string) => `0x${"0".repeat(24)}${a.toLowerCase().slice(2)}`;
 
 /** Register the connected wallet once per browser session; first sight counts it as
  *  a new user, every later session as a returning one (see v_wallet_totals). */
@@ -33,6 +44,55 @@ export function usePoolTotals() {
 /** User counts: total / new this week / returning / active 24h. */
 export function useWalletTotals() {
   return useQuery({ queryKey: ["walletTotals"], queryFn: fetchWalletTotals, refetchInterval: 30000 });
+}
+
+/** Everything the app has recorded for the connected wallet: profile, swaps, liquidity events. */
+export function useWalletActivity() {
+  const { address } = useAccount();
+  const enabled = Boolean(address);
+  const addr = address ?? "";
+  const profile = useQuery({ queryKey: ["walletProfile", addr], queryFn: () => fetchWalletProfile(addr), enabled, refetchInterval: 60000 });
+  const swaps = useQuery({ queryKey: ["walletSwaps", addr], queryFn: () => fetchWalletSwaps(addr), enabled, refetchInterval: 15000 });
+  const lp = useQuery({ queryKey: ["walletLp", addr], queryFn: () => fetchLpEvents(addr), enabled, refetchInterval: 15000 });
+
+  // Deposits recorded before the app captured minted shares were stored with shares = 0. The
+  // real figure is on chain: read it back from each deposit's receipt. Receipts never change,
+  // so each is fetched once.
+  const publicClient = usePublicClient();
+  const missing = (lp.data ?? []).filter((e) => e.kind === "add" && !(e.shares > 0)).map((e) => e.tx_hash);
+  const minted = useQuery({
+    queryKey: ["lpMinted", addr, missing],
+    enabled: enabled && missing.length > 0 && Boolean(publicClient),
+    staleTime: Infinity,
+    queryFn: async () => {
+      const hook = CONTRACTS.hook.toLowerCase();
+      const to = addrTopic(addr);
+      const out: Record<string, number> = {};
+      await Promise.all(missing.map(async (hash) => {
+        try {
+          const r = await publicClient!.getTransactionReceipt({ hash: hash as `0x${string}` });
+          let sum = 0n;
+          for (const log of r.logs) {
+            const t = log.topics;
+            if (log.address.toLowerCase() === hook && t[0] === TRANSFER_TOPIC && t[1] === ZERO_TOPIC && t[2]?.toLowerCase() === to) sum += BigInt(log.data);
+          }
+          if (sum > 0n) out[hash] = Number(sum) / 1e18;
+        } catch { /* unreachable receipt: the row keeps showing "not recorded" */ }
+      }));
+      return out;
+    },
+  });
+  const lpEvents: LpEvent[] = (lp.data ?? []).map((e) =>
+    e.kind === "add" && !(e.shares > 0) && minted.data?.[e.tx_hash] ? { ...e, shares: minted.data[e.tx_hash] } : e,
+  );
+
+  return {
+    address,
+    profile: profile.data ?? null,
+    swaps: swaps.data ?? [],
+    lpEvents,
+    loading: profile.isLoading || swaps.isLoading || lp.isLoading,
+  };
 }
 
 /** The live trade tape: seeded by a query, kept fresh by realtime inserts. */

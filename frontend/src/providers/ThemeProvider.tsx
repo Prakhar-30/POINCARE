@@ -17,6 +17,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("poincare-theme", theme);
+    // Browser chrome (mobile address bar, PWA title bar) follows the page background.
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#16131f" : "#f4f1f9");
   }, [theme]);
 
   return (

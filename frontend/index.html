@@ -2,22 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/Logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f1f9" />
+    <title>Poincaré: Uniswap v4 hook that cuts LVR for LPs</title>
     <meta
       name="description"
-      content="Poincaré — an adaptive Uniswap v4 AMM that detects real price trends and leans its curve against them, protecting liquidity providers from LVR. On Unichain Sepolia."
+      content="A Uniswap v4 hook that detects real price trends and charges only with-trend swaps a spread, so liquidity providers keep value arbitrage used to take."
     />
+    <link rel="canonical" href="https://www.poincaretrade.in/" />
+
+    <!-- link previews (X, Telegram, Discord, Slack, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Poincaré" />
+    <meta property="og:url" content="https://www.poincaretrade.in/" />
+    <meta property="og:title" content="Poincaré: liquidity that charges the trend, not the trader" />
+    <meta property="og:description" content="A Uniswap v4 hook that detects real price trends and charges only with-trend swaps a spread. Liquidity providers keep it." />
+    <meta property="og:image" content="https://www.poincaretrade.in/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Poincaré: liquidity that charges the trend, not the trader." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Poincare_AMM" />
+    <meta name="twitter:title" content="Poincaré: liquidity that charges the trend, not the trader" />
+    <meta name="twitter:description" content="A Uniswap v4 hook that detects real price trends and charges only with-trend swaps a spread. Liquidity providers keep it." />
+    <meta name="twitter:image" content="https://www.poincaretrade.in/og.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Poincaré",
+        "url": "https://www.poincaretrade.in/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "description": "A Uniswap v4 hook that detects real price trends on its own price and charges only with-trend swaps a spread, which stays with liquidity providers.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "sameAs": ["https://github.com/Prakhar-30/POINCARE", "https://x.com/Poincare_AMM"]
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500&family=Quicksand:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>Poincaré · adaptive liquidity</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- what crawlers and no-JS visitors read before the app renders -->
+    <noscript>
+      <h1>Poincaré: liquidity that charges the trend, not the trader</h1>
+      <p>Poincaré is a Uniswap v4 hook. When the pool's own price confirms a trend, swaps pushing with it pay a spread
+        of up to 5% that stays with liquidity providers; every other swap pays the plain pool price. No oracle, no keeper.
+        Live on Unichain Sepolia, reviewed by SFS-Labs (independent scoped review) and Olympix (pre-audit scan).</p>
+      <p><a href="https://github.com/Prakhar-30/POINCARE">Source code and research</a></p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
