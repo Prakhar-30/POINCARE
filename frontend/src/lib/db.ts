@@ -26,6 +26,7 @@ export type SwapRow = {
 
 export type LpEvent = {
   tx_hash: string;
+  ts?: string;
   wallet: string;
   kind: "add" | "remove";
   shares: number;
@@ -244,16 +245,82 @@ export async function fetchPriceSeries(sinceIso: string | null, limit = 2000): P
   return ((data as PricePoint[]) ?? []).reverse();
 }
 
+/** The last trade strictly before `sinceIso`: the price a chart window opens at. */
+export async function fetchPriceBefore(sinceIso: string): Promise<PricePoint | null> {
+  if (!supabaseReady) return null;
+  const { data } = await supabase
+    .from("swaps")
+    .select("ts,side,amount_in,amount_out,price,notional_usdc")
+    .eq("hook", HOOK)
+    .lt("ts", sinceIso)
+    .order("ts", { ascending: false })
+    .limit(1);
+  return ((data as PricePoint[]) ?? [])[0] ?? null;
+}
+
+/** Totals for this hook only. `v_pool_totals` sums every hook that ever wrote to `swaps`, and
+ *  the API has aggregates switched off, so page this hook's rows and add them up here. */
 export async function fetchPoolTotals(): Promise<PoolTotals> {
   const empty: PoolTotals = { lvr_avoided: 0, volume_usdc: 0, swap_count: 0, volume_24h: 0 };
   if (!supabaseReady) return empty;
-  const { data } = await supabase.from("v_pool_totals").select("*").single();
-  return (data as PoolTotals) ?? empty;
+  // One row from the per-hook view (migration_006) when it exists; this runs every few seconds
+  // per visitor, so summing server-side matters. Until the view is created, page and sum here.
+  const view = await supabase.from("v_pool_totals_by_hook").select("lvr_avoided,volume_usdc,swap_count,volume_24h").eq("hook", HOOK).maybeSingle();
+  if (!view.error) {
+    const v = view.data as Record<keyof PoolTotals, number | string> | null;
+    return v
+      ? { lvr_avoided: Number(v.lvr_avoided) || 0, volume_usdc: Number(v.volume_usdc) || 0, swap_count: Number(v.swap_count) || 0, volume_24h: Number(v.volume_24h) || 0 }
+      : empty;
+  }
+  const PAGE = 1000;
+  const since = Date.now() - 24 * 3600 * 1000;
+  const out = { ...empty };
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("swaps")
+      .select("notional_usdc, lvr_captured_usdc, ts")
+      .eq("hook", HOOK)
+      .order("ts", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) return from ? out : empty;
+    const rows = (data ?? []) as { notional_usdc: number | null; lvr_captured_usdc: number | null; ts: string }[];
+    for (const r of rows) {
+      out.swap_count++;
+      out.volume_usdc += Number(r.notional_usdc) || 0;
+      out.lvr_avoided += Number(r.lvr_captured_usdc) || 0;
+      if (Date.parse(r.ts) > since) out.volume_24h += Number(r.notional_usdc) || 0;
+    }
+    if (rows.length < PAGE) return out;
+  }
+}
+
+export type WalletProfile = { address: string; first_seen: string; last_seen: string; visit_count: number };
+
+/** The connected wallet's own row: when it first used the app and how often it returns. */
+export async function fetchWalletProfile(address: string): Promise<WalletProfile | null> {
+  if (!supabaseReady) return null;
+  const { data } = await supabase.from("wallets").select("address,first_seen,last_seen,visit_count").eq("address", lc(address)).maybeSingle();
+  return (data as WalletProfile) ?? null;
+}
+
+/** One wallet's swaps on this hook, newest first. */
+export async function fetchWalletSwaps(address: string, limit = 500): Promise<SwapRow[]> {
+  if (!supabaseReady) return [];
+  const { data } = await supabase
+    .from("swaps")
+    .select("*")
+    .eq("hook", HOOK)
+    .eq("trader", lc(address))
+    .order("ts", { ascending: false })
+    .limit(limit);
+  return (data as SwapRow[]) ?? [];
 }
 
 export async function fetchLpEvents(address: string): Promise<LpEvent[]> {
   if (!supabaseReady) return [];
-  const { data } = await supabase.from("lp_events").select("*").eq("wallet", lc(address)).order("ts", { ascending: false });
+  // Hook-scoped like every other query: without it, deposits into an earlier deployment show up
+  // as history (and as "deposited") for the current pool.
+  const { data } = await supabase.from("lp_events").select("*").eq("hook", HOOK).eq("wallet", lc(address)).order("ts", { ascending: false });
   return (data as LpEvent[]) ?? [];
 }
 
