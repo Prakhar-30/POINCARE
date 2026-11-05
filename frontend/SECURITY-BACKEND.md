@@ -12,22 +12,33 @@ the public roles. It adds shape constraints for new rows, validates the address 
 `v_pool_totals_by_hook`, which `fetchPoolTotals` already reads when it exists (until then it
 falls back to paging).
 
-## 2. Supabase, next: verified writes
+## 2. Supabase: verified writes, `record` + `migration_007_verified_writes.sql` (applied)
 
-Today anyone holding the public anon key, which ships in the bundle, can INSERT a well-formed
-fake row into `swaps`, `lp_events` or `detector_samples`. That moves the "Kept for LPs" figure
-and every other aggregate the site shows. The fix takes the write path server-side:
+Applied on 2026-11-06. Before it, anyone holding the public anon key, which ships in the bundle,
+could INSERT a well-formed fake row into `swaps`, `lp_events` or `detector_samples` and move the
+"Kept for LPs" figure and every other aggregate the site shows. Now the write path is
+server-side and every new row is checked against the chain first.
 
-The client side is done: `recordSwap`, `recordLpEvent` and `recordDetectorSamples` in
+Checks run when it was applied:
+
+- `record` smoke test: an already-recorded swap's hash returned `{"stored":false,"duplicate":true}`;
+  a malformed hash and an unknown kind returned 400; a sample sync for a foreign hook returned 422;
+  CORS answered only `https://www.poincaretrade.in`.
+- A live test swap before 007 and another after it were both stored by the function, with
+  amounts, sender, block and block time matching the receipt.
+- After 007, an anon INSERT into `swaps`, `lp_events` and `detector_samples` is refused with
+  401 / `42501` (permission denied); reads and the `touch_wallet` RPC still work.
+
+How it works: `recordSwap`, `recordLpEvent` and `recordDetectorSamples` in
 `src/lib/db.ts` call the function with the transaction hash only (samples: a block range, split
 into 1000-block chunks). The function re-reads amounts, sender, block time and spread from the
 receipt. A write that fails on our side (RPC outage, network, function down) is queued in
 `localStorage` and retried the next time the app opens; one the function rejects (bad or
 foreign transaction, HTTP 400/422) is dropped.
 
-Remaining, in this order:
+To redeploy the function (or set it up on a new project), from `frontend/`:
 
-1. Deploy the function and set its secrets, from `frontend/`:
+1. Deploy the function and set its secrets:
 
    ```sh
    npx supabase login
@@ -51,8 +62,9 @@ Remaining, in this order:
 Scripts: `trend.mjs` records through the function like the app. `replay.mjs` and
 `probe-replay-cex.mjs` stamp each row with the historical candle's date, which the function
 cannot do (it uses block time), so they write directly with the admin key from
-`frontend/.env.local` (`SUPABASE_SERVICE_ROLE_KEY=...`, gitignored). Never put that key in a
-`VITE_` variable.
+`frontend/.env.local` (`SUPABASE_SERVICE_ROLE_KEY=...`, gitignored). The key is in the Supabase
+dashboard under Project Settings → API Keys: a secret key (`sb_secret_...`) or, on the legacy tab,
+the `service_role` key; the scripts accept either. Never put it in a `VITE_` variable.
 
 To undo migration 007:
 
