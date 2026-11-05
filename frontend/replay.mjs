@@ -9,7 +9,11 @@
 // FROM/TO window the series, e.g. the last four months:  FROM=2026-05-19 node replay.mjs
 //
 // Addresses come from ../deployments/<chain>.json (the deploy scripts' output);
-// Supabase creds are read from ./.env (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
+// Supabase: the URL comes from ./.env; the admin key from ./.env.local (gitignored), as
+// SUPABASE_SERVICE_ROLE_KEY=... Replay rows carry the historical candle's date, which the
+// `record` function cannot write (it stamps block time), so this script writes directly with
+// the admin key. After migration_007 the public key is refused. Never put the admin key in a
+// VITE_ variable: those ship in the browser bundle.
 import fs from "node:fs";
 import { createPublicClient, createWalletClient, http, parseUnits, formatEther, defineChain, decodeEventLog, parseAbiItem } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -26,12 +30,18 @@ const PK = process.env.PK?.startsWith("0x") ? process.env.PK : `0x${process.env.
 
 // config from repo files, never stale vs the deployment
 const dep = JSON.parse(fs.readFileSync(new URL(`../deployments/${CH.depFile}`, import.meta.url), "utf8"));
-const env = Object.fromEntries(
-  fs.readFileSync(new URL("./.env", import.meta.url), "utf8")
-    .split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
-);
+const readEnv = (f) => {
+  const u = new URL(f, import.meta.url);
+  if (!fs.existsSync(u)) return [];
+  return fs.readFileSync(u, "utf8").split("\n").filter((l) => l.includes("=") && !l.trimStart().startsWith("#"))
+    .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]);
+};
+const env = Object.fromEntries([...readEnv("./.env"), ...readEnv("./.env.local")]);
 const SB_URL = env.VITE_SUPABASE_URL;
-const SB_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SB_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+if (!env.SUPABASE_SERVICE_ROLE_KEY) console.warn("No SUPABASE_SERVICE_ROLE_KEY in .env.local: rows are refused once migration_007 is applied.");
+// a legacy JWT key goes in both headers; the newer sb_* keys belong in `apikey` only
+const SB_AUTH = SB_KEY?.startsWith("eyJ") ? { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } : { apikey: SB_KEY };
 
 const C = {
   hook: dep.poincareHook,
@@ -118,7 +128,7 @@ async function sb(table, row) {
   const post = (body) =>
     fetch(`${SB_URL}/rest/v1/${table}`, {
       method: "POST",
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" },
+      headers: { ...SB_AUTH, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" },
       body: JSON.stringify(body),
     });
   try {

@@ -78,29 +78,96 @@ export async function fetchWalletTotals(): Promise<WalletTotals> {
   return (data as WalletTotals) ?? empty;
 }
 
-/** Record a confirmed swap into the shared order tape. */
-export async function recordSwap(row: SwapRow) {
-  if (!supabaseReady) return;
-  const { error } = await supabase.from("swaps").insert({ ...row, trader: lc(row.trader), hook: HOOK });
-  if (error && error.code !== "23505") console.warn("recordSwap", error.message); // ignore dup tx_hash
+// ---- writes ---------------------------------------------------------------------------------
+// The browser never inserts rows itself. It hands a transaction hash to the `record` edge
+// function, which checks the transaction on chain and stores what the chain says (see
+// supabase/functions/record). After migration_007 the public key cannot insert at all.
+
+type RecordRequest =
+  | { kind: "swap"; tx_hash: string }
+  | { kind: "lp"; tx_hash: string; lp_kind: "add" | "remove"; shares: number };
+
+/** "rejected": the function looked and refused (a bad or foreign tx), so retrying cannot help.
+ *  "retry": we never got an answer about the tx itself (RPC outage, network, function down). */
+async function invokeRecord(body: object): Promise<"ok" | "rejected" | "retry"> {
+  try {
+    const { error } = await supabase.functions.invoke("record", { body });
+    if (!error) return "ok";
+    const status = (error as { context?: { status?: number } }).context?.status;
+    console.warn("record", status ?? "", error.message);
+    return status === 400 || status === 422 ? "rejected" : "retry";
+  } catch (e) {
+    console.warn("record", e);
+    return "retry";
+  }
 }
 
-export async function recordLpEvent(evt: LpEvent) {
+// Writes that failed for a reason on our side wait here and are retried on later visits, so an
+// RPC outage delays a row instead of losing it. Per-browser, capped, and best effort: storage
+// can be unavailable (private mode), in which case the write is simply not retried.
+const PENDING_KEY = "poincare-pending-records";
+const PENDING_MAX = 50;
+
+function readPending(): RecordRequest[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "[]");
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function writePending(list: RecordRequest[]) {
+  try {
+    if (list.length) localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-PENDING_MAX)));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch { /* storage unavailable */ }
+}
+
+async function record(req: RecordRequest) {
   if (!supabaseReady) return;
-  const { error } = await supabase.from("lp_events").insert({ ...evt, wallet: lc(evt.wallet), hook: HOOK });
-  if (error && error.code !== "23505") console.warn("recordLpEvent", error.message);
+  if ((await invokeRecord(req)) === "retry") {
+    writePending([...readPending().filter((p) => !(p.kind === req.kind && p.tx_hash === req.tx_hash)), req]);
+  }
+}
+
+/** Retry writes an earlier outage left behind. Called once when the app opens. */
+export async function flushPendingRecords() {
+  if (!supabaseReady) return;
+  const list = readPending();
+  if (!list.length) return;
+  const still: RecordRequest[] = [];
+  for (const req of list) if ((await invokeRecord(req)) === "retry") still.push(req);
+  writePending(still);
+}
+
+/** Record a confirmed swap. Only the hash is sent: amounts, trader and spread come from the receipt. */
+export async function recordSwap(row: SwapRow) {
+  await record({ kind: "swap", tx_hash: row.tx_hash });
+}
+
+/** Record a deposit or withdrawal. `shares` is the minted/burned LP figure the receipt does not decode. */
+export async function recordLpEvent(evt: LpEvent) {
+  await record({ kind: "lp", tx_hash: evt.tx_hash, lp_kind: evt.kind, shares: evt.shares });
 }
 
 // detector_samples: the on-chain DetectorSample trace, mirrored for history
 
-/** Mirror freshly-read on-chain samples. Idempotent: unique(hook, block_number). */
+/** Largest block span one `samples` call may cover (the function's MAX_RANGE is 1000). */
+const SAMPLE_SPAN = 999;
+
+/**
+ * Ask the function to mirror the DetectorSample logs for the blocks these points came from. The
+ * function reads the logs itself, so a caller can request a sync but never supply a sample.
+ * Idempotent (unique hook, block_number), and not queued: any later visitor syncs the same range.
+ */
 export async function recordDetectorSamples(points: DetectorPoint[]) {
   if (!supabaseReady || points.length === 0) return;
-  const rows = points.map((p) => ({ ...p, hook: HOOK }));
-  const { error } = await supabase
-    .from("detector_samples")
-    .upsert(rows, { onConflict: "hook,block_number", ignoreDuplicates: true });
-  if (error) console.warn("recordDetectorSamples", error.message);
+  const blocks = points.map((p) => p.block_number).filter((b) => Number.isFinite(b) && b > 0);
+  if (!blocks.length) return;
+  const lo = Math.min(...blocks), hi = Math.max(...blocks);
+  for (let from = lo; from <= hi; from += SAMPLE_SPAN + 1) {
+    await invokeRecord({ kind: "samples", hook: HOOK, from_block: from, to_block: Math.min(hi, from + SAMPLE_SPAN) });
+  }
 }
 
 /** Detector history for this hook, ascending by block (newest `limit` samples). */

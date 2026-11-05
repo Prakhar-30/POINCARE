@@ -11,6 +11,7 @@ import {
   fetchWalletProfile,
   fetchWalletSwaps,
   fetchLpEvents,
+  flushPendingRecords,
   subscribeSwaps,
   touchWallet,
   type LpEvent,
@@ -34,6 +35,13 @@ export function useWalletIdentity() {
     sessionStorage.setItem(key, "1");
     void touchWallet(address);
   }, [isConnected, address]);
+}
+
+/** Once per app open: retry any swap/deposit record an earlier RPC or network outage left queued. */
+export function useFlushPendingRecords() {
+  useEffect(() => {
+    void flushPendingRecords();
+  }, []);
 }
 
 /** Pool-wide totals (LVR avoided, volume), polled. */

@@ -100,17 +100,17 @@ async function detector() {
   ]);
   return { kappa: Number(k) / 1e18, trend: TREND[Number(t)], D: Number(d) / 1e18, spreadBuy: Number(sZ) / 1e18, spreadSell: Number(sO) / 1e18 };
 }
+// Live trades go through the `record` edge function like the app's: it checks the tx on chain
+// and stores the receipt's own amounts, so only the hash is sent. (After migration_007 the
+// public key cannot insert rows directly.)
 async function record(row) {
   if (!SB_URL || !SB_KEY) return;
-  const post = (body) =>
-    fetch(`${SB_URL}/rest/v1/swaps`, { method: "POST",
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" },
-      body: JSON.stringify(body) });
   try {
-    let res = await post({ ...row, hook: HOOK_LC });
-    if (!res.ok && res.status !== 409) res = await post(row); // pre-migration_002 schema
-    if (!res.ok && res.status !== 409) console.warn("supabase swaps:", res.status);
-  } catch (e) { console.warn("supabase", e.message); }
+    const res = await fetch(`${SB_URL}/functions/v1/record`, { method: "POST",
+      headers: { apikey: SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "swap", tx_hash: row.tx_hash }) });
+    if (!res.ok) console.warn("record swap:", res.status, (await res.text()).slice(0, 160));
+  } catch (e) { console.warn("record", e.message); }
 }
 
 let totalGasWei = 0n, swaps = 0, firstFire = null, lastBlock = 0n;
