@@ -18,7 +18,7 @@ import { TokenIcon } from "@/components/ui/TokenIcon";
 import { PoolChart } from "@/components/ui/PoolChart";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { CurveDepth, depthOf } from "@/components/ui/CurveDepth";
-import { useIsNarrow, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useIsNarrow, useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
  * The Trade screen as an exchange terminal: ticker bar, chart, book, ticket - the layout every
@@ -119,6 +119,7 @@ export function Trade() {
   const faucet = useFaucet();
   const tape = useOnchainTape();
   const narrow = useIsNarrow();
+  const tablet = useIsTablet();
   const wide = useMediaQuery("(min-width: 1280px)");
 
   const last = series.points[series.points.length - 1];
@@ -251,6 +252,7 @@ export function Trade() {
   };
 
   // ---------------------------------------------------------------- pieces
+  const hookCheck = <HookCheck s={s} side={side} spread={spread} q={q} risk={risk} />;
   const ticket = (
     <section className="card min-w-0 flex flex-col" aria-labelledby="ticket-title" style={narrow ? undefined : { height: "100%" }}>
       <h2 id="ticket-title" className="sr-only">Order form</h2>
@@ -292,7 +294,7 @@ export function Trade() {
 
         <InlineField label="Amount" unit={paySym} htmlFor="ticket-amount"
           footer={
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>{amtNum > 0 ? `≈ ${bigUsd(amtNum * (paySym === "USDC" ? 1 : mid))}` : "\u00a0"}</span>
               <span className="flex gap-1.5 shrink-0" role="group" aria-label="Share of available balance">
                 {([25, 50, 75, 100] as const).map((p) => {
@@ -349,6 +351,8 @@ export function Trade() {
             </div>
           </div>
         </dl>
+        {/* stacked layouts: the hook check scrolls with the form, so only the button rides the screen's edge */}
+        {narrow && hookCheck}
         </div>
 
         <div
@@ -360,10 +364,11 @@ export function Trade() {
             background: "var(--surface)",
             borderRadius: "0 0 var(--r-card) var(--r-card)",
             // on stacked layouts the ticket is taller than the screen, so the footer rides the viewport's bottom edge
-            ...(narrow ? { position: "sticky" as const, bottom: 0, zIndex: 5, boxShadow: "0 -8px 18px rgba(20,18,45,.07)" } : {}),
+            // (above the phone tab bar, which --bottom-nav measures)
+            ...(narrow ? { position: "sticky" as const, bottom: "var(--bottom-nav)", zIndex: 5, boxShadow: "0 -8px 18px rgba(20,18,45,.07)" } : {}),
           }}
         >
-        <HookCheck s={s} side={side} spread={spread} q={q} risk={risk} />
+        {!narrow && hookCheck}
 
         {highImpact && !insufficient && (
           <label className="flex items-start gap-2 rounded-lg" style={{ padding: "7px 10px", background: "var(--warn-bg)", border: "1px solid var(--warn-border)", cursor: "pointer", fontSize: 12, lineHeight: 1.4, color: "var(--text-2)" }}>
@@ -457,7 +462,16 @@ export function Trade() {
       <div className="px-3 sm:px-4 pt-4 pb-5 flex flex-col" style={{ gap: 12 }}>
         <TickerBar s={s} risk={risk} ready={series.points.length > 0} spreadCap={cfg.kappaMax} />
 
-        {narrow ? (
+        {tablet ? (
+          // tablets: ticket and book side by side (the book is the ticket's price ladder), chart below
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12 }}>
+              {ticket}
+              {panelCard}
+            </div>
+            {chartCard}
+          </div>
+        ) : narrow ? (
           <div className="flex flex-col" style={{ gap: 12 }}>
             {ticket}
             {panelCard}
@@ -498,21 +512,23 @@ function TickerBar({ s, risk, ready, spreadCap }: { s: PoolState; risk: RiskStat
   const sell = sideCost(s.spreadOneForZero);
 
   return (
-    <section className="card overflow-x-auto" aria-label="Market and detector" style={{ padding: "8px 16px" }}>
-      <div className="flex items-center justify-between" style={{ gap: 22, minWidth: "max-content" }}>
-        <div className="flex items-center gap-2.5">
-          <span className="flex" aria-hidden="true">
-            <TokenIcon sym="WETH" size={26} />
-            <span style={{ marginLeft: -8 }}><TokenIcon sym="USDC" size={26} /></span>
-          </span>
-          <div>
-            <div className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.1 }}>WETH / USDC</div>
-            <div style={{ fontSize: 12, color: "var(--text-3)" }}>Poincaré pool</div>
+    <section className="card" aria-label="Market and detector" style={{ padding: "10px 16px" }}>
+      <div className="ticker ticker-lg">
+        <div className="ticker-lead">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex shrink-0" aria-hidden="true">
+              <TokenIcon sym="WETH" size={26} />
+              <span style={{ marginLeft: -8 }}><TokenIcon sym="USDC" size={26} /></span>
+            </span>
+            <div className="min-w-0">
+              <div className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.1, whiteSpace: "nowrap" }}>WETH / USDC</div>
+              <div style={{ fontSize: 12, color: "var(--text-3)", whiteSpace: "nowrap" }}>Poincaré pool</div>
+            </div>
           </div>
-        </div>
-        <div className="font-display" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} aria-label={`Mid price ${fmtUsd(s.price, { dp: 2 })}`}>
-          {s.loading ? <Skel w="7ch" /> : s.price > 0 ? fmtNum(s.price, 2) : "—"}
-          <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", fontFamily: "inherit" }}>Mid price</span>
+          <div className="font-display text-right lg:text-left" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} aria-label={`Mid price ${fmtUsd(s.price, { dp: 2 })}`}>
+            {s.loading ? <Skel w="7ch" /> : s.price > 0 ? fmtNum(s.price, 2) : "—"}
+            <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", fontFamily: "inherit" }}>Mid price</span>
+          </div>
         </div>
         <Divider />
         <Cell label="Detector">
@@ -524,7 +540,7 @@ function TickerBar({ s, risk, ready, spreadCap }: { s: PoolState; risk: RiskStat
         <Cell label={risk.gated ? "Evidence · gated" : "Evidence"}>
           <span className="flex items-center gap-2">
             <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{ready ? `${Math.round(risk.progress * 100)}%` : "—"}</span>
-            <span style={{ width: 54, height: 5, borderRadius: 3, background: "var(--track)", overflow: "hidden", display: "inline-block" }} aria-hidden="true">
+            <span style={{ width: 40, height: 5, borderRadius: 3, background: "var(--track)", overflow: "hidden", display: "inline-block" }} aria-hidden="true">
               <span style={{ display: "block", height: "100%", background: tone.bar, transform: `scaleX(${Math.max(0.03, risk.progress)})`, transformOrigin: "left" }} />
             </span>
           </span>
@@ -549,7 +565,7 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const Divider = () => <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--divider)" }} />;
+const Divider = () => <span aria-hidden="true" className="ticker-div" />;
 
 /** A compact exchange-style field: label on the left, value right-aligned, unit suffix. */
 function InlineField({ label, unit, htmlFor, muted, error, footer, children }: { label: string; unit: string; htmlFor?: string; muted?: boolean; error?: string | null; footer?: ReactNode; children: ReactNode }) {

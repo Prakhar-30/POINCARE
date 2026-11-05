@@ -300,24 +300,27 @@ export function Analytics() {
           <thead>
             <tr>
               {["Parameter", "Controls", "Value"].map((h, i) => (
-                <th key={h} scope="col" style={{ textAlign: i === 2 ? "right" : "left", padding: "8px 20px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h}</th>
+                <th key={h} scope="col" className={i === 1 ? "hidden sm:table-cell" : undefined} style={{ textAlign: i === 2 ? "right" : "left", padding: "8px 20px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {params.map((r) => (
               <tr key={r.sym} className="row-hover" style={{ borderBottom: "1px solid var(--divider-2)" }}>
-                <th scope="row" style={{ textAlign: "left", fontWeight: 400, padding: "10px 20px", verticalAlign: "top", whiteSpace: "nowrap" }}>
-                  <span className="inline-flex items-center gap-2.5">
+                <th scope="row" className="pl-4 pr-2 sm:px-5" style={{ textAlign: "left", fontWeight: 400, paddingTop: 10, paddingBottom: 10, verticalAlign: "top" }}>
+                  <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
                     <span className="font-display" style={{ fontSize: 12, fontWeight: 800, color: "var(--lav-ink)", background: "var(--lav-soft)", borderRadius: 7, padding: "2px 8px", minWidth: 52, textAlign: "center" }}>{r.sym}</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)" }}>{r.name}</span>
                   </span>
+                  {/* phones: the "Controls" column folds in under the name instead of scrolling sideways */}
+                  <div className="sm:hidden" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5, marginTop: 4 }}>{r.desc}</div>
+                  {paramsOpen === "open" && <div className="sm:hidden" style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginTop: 3 }}>{r.why}</div>}
                 </th>
-                <td style={{ padding: "10px 20px 10px 0", verticalAlign: "top", minWidth: 220 }}>
+                <td className="hidden sm:table-cell" style={{ padding: "10px 20px 10px 0", verticalAlign: "top", minWidth: 220 }}>
                   <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5 }}>{r.desc}</div>
                   {paramsOpen === "open" && <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginTop: 3, maxWidth: "80ch" }}>{r.why}</div>}
                 </td>
-                <td className="font-display" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap", textAlign: "right", verticalAlign: "top", padding: "10px 20px" }}>{r.value}</td>
+                <td className="font-display pl-2 pr-4 sm:px-5" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap", textAlign: "right", verticalAlign: "top", paddingTop: 10, paddingBottom: 10 }}>{r.value}</td>
               </tr>
             ))}
           </tbody>

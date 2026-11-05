@@ -38,7 +38,9 @@ function FaucetButton() {
           <TokenIcon sym="USDC" size={16} />
           <span style={{ marginLeft: -5 }}><TokenIcon sym="WETH" size={16} /></span>
         </span>
-        {faucet.minting ? "Sending…" : "Get test tokens · 50k USDC + 20 WETH"}
+        {faucet.minting ? "Sending…" : (
+          <span>Get test tokens<span className="hidden sm:inline"> · 50k USDC + 20 WETH</span></span>
+        )}
       </button>
       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
         Testnet only · test tokens have no value

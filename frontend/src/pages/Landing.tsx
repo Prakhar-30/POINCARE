@@ -103,10 +103,11 @@ export function Landing() {
 function Nav() {
   return (
     <nav aria-label="Main" className="sticky top-0 z-50" style={{ background: "var(--nav-bg)", backdropFilter: "blur(14px)", borderBottom: "1px solid var(--nav-border)" }}>
-      <div className="mx-auto flex items-center gap-6 px-4 sm:px-6" style={{ maxWidth: WIDTH + 48, height: 68 }}>
+      <div className="mx-auto flex items-center gap-3 sm:gap-6 px-4 sm:px-6" style={{ maxWidth: WIDTH + 48, height: 68 }}>
         <button type="button" onClick={scrollTop} aria-label="Poincaré, back to top" className="flex items-center gap-2.5 shrink-0 rounded-xl" style={{ cursor: "pointer", minHeight: 44 }}>
           <Mark size={30} decorative />
-          <span className="font-display" style={{ fontWeight: 700, fontSize: 18, color: "var(--lp-head)", letterSpacing: "-0.01em" }}>Poincaré</span>
+          {/* the narrowest phones keep the mark alone, so the launch button never runs off the edge */}
+          <span className="font-display hidden min-[380px]:inline" style={{ fontWeight: 700, fontSize: 18, color: "var(--lp-head)", letterSpacing: "-0.01em" }}>Poincaré</span>
         </button>
         <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
           {NAV.map((n) => (

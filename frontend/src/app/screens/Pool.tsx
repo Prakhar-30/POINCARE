@@ -18,7 +18,7 @@ import { LiquidityDepth, DepthLegend } from "@/components/ui/LiquidityDepth";
 import { PanelHead, SourceTag, Seg } from "@/components/ui/Panel";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
-import { useIsNarrow } from "@/hooks/useMediaQuery";
+import { useIsMobile, useIsNarrow } from "@/hooks/useMediaQuery";
 
 /**
  * The Pool screen as an exchange "earn" terminal, built the way the Trade screen is: one row of
@@ -64,6 +64,7 @@ export function Pool() {
   const me = useWalletActivity();
   const lp = useLiquidity(() => { pos.refetch(); bal.refetch(); });
   const narrow = useIsNarrow();
+  const mobile = useIsMobile();
 
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [chart, setChart] = useParam("chart", ["depth", "curve"] as const, "depth");
@@ -88,16 +89,22 @@ export function Pool() {
   const side = (sp: number) => (sp > 0 ? { v: `+${fmtPct(sp)}`, c: "var(--honey-ink)" } : { v: "Free", c: "var(--up-ink)" });
 
   // ------------------------------------------------------------------ ticker
+  const tradeLink = (
+    <Link to={{ search: "?tab=trade" }} onClick={() => window.scrollTo({ top: 0 })} className="btn btn-secondary btn-sm">
+      <Icon name="swap" size={14} aria-hidden="true" /> Trade
+    </Link>
+  );
   const ticker = (
-    <section className="card overflow-x-auto" aria-labelledby="pool-head" style={{ padding: "8px 16px" }}>
-      <div className="flex items-center justify-between" style={{ gap: 22, minWidth: "max-content" }}>
-        <div className="flex items-center gap-2.5">
-          <span className="flex" aria-hidden="true">
+    <section className="card" aria-labelledby="pool-head" style={{ padding: "10px 16px" }}>
+      <div className="ticker">
+        <div className="ticker-lead">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex shrink-0" aria-hidden="true">
             <TokenIcon sym="WETH" size={26} />
             <span style={{ marginLeft: -8 }}><TokenIcon sym="USDC" size={26} /></span>
           </span>
           <div>
-            <h2 id="pool-head" className="font-display flex items-center gap-2" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.15 }}>
+            <h2 id="pool-head" className="font-display flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.15, whiteSpace: "nowrap" }}>
               WETH / USDC
               <span className="rounded-full px-2 py-0.5" role="status" style={{ fontSize: 12, fontWeight: 800, color: regime.ink, background: regime.bg, fontFamily: "var(--font-sans)" }}>{regime.label}</span>
             </h2>
@@ -106,6 +113,9 @@ export function Pool() {
               Hook {shorten(CONTRACTS.hook)} <Icon name="external" size={11} aria-hidden="true" />
             </a>
           </div>
+        </div>
+        {/* below 1280 the Trade link leads the stats row's right edge instead of trailing it */}
+        <div className="xl:hidden shrink-0">{tradeLink}</div>
         </div>
         <Divider />
         <Cell label="Total value locked"><b className="font-display" style={{ fontSize: 16, color: "var(--text)" }}>{s.loading ? <Skel /> : tvl > 0 ? fmtUsd(tvl, { compact: true }) : "—"}</b></Cell>
@@ -120,9 +130,7 @@ export function Pool() {
           <b style={{ fontSize: 13, color: "var(--text)" }}>{pos.shares > 0 ? fmtUsd(pos.valueUsdc, { dp: 2, compact: pos.valueUsdc >= 1e6 }) : "—"}</b>
           <span style={{ fontSize: 12, color: "var(--text-3)" }}>{pos.shares > 0 ? ` · ${fmtPct(pos.sharePct, pos.sharePct < 0.01 ? 3 : 2)}` : ""}</span>
         </Cell>
-        <Link to={{ search: "?tab=trade" }} onClick={() => window.scrollTo({ top: 0 })} className="btn btn-secondary btn-sm">
-          <Icon name="swap" size={14} aria-hidden="true" /> Trade
-        </Link>
+        <div className="hidden xl:block">{tradeLink}</div>
       </div>
     </section>
   );
@@ -142,7 +150,7 @@ export function Pool() {
           {chart === "depth" && (
             <>
               <Seg label="Scenario" value={scenario} onChange={setScenario}
-                options={[{ id: "live", label: "Live" }, { id: "up", label: "Up-trend at cap" }, { id: "down", label: "Down-trend at cap" }]} />
+                options={[{ id: "live", label: "Live" }, { id: "up", label: mobile ? "Up-trend" : "Up-trend at cap" }, { id: "down", label: mobile ? "Down-trend" : "Down-trend at cap" }]} />
               <Seg label="Price window" value={rangeId} onChange={setRangeId} options={RANGES.map((r) => ({ id: r.id, label: r.label }))} />
             </>
           )}
@@ -340,8 +348,8 @@ export function Pool() {
   ];
   const details = (
     <section className="card min-w-0" aria-label="Position and pool details" style={{ padding: 0 }}>
-      <div className="flex items-center gap-3 px-4 overflow-x-auto" style={{ minHeight: 54, borderBottom: "1px solid var(--divider)" }}>
-        <Seg label="Details" value={tab} onChange={setTab} options={tabs} />
+      <div className="flex items-center gap-3 px-4 py-2.5" style={{ minHeight: 54, borderBottom: "1px solid var(--divider)" }}>
+        <Seg label="Details" value={tab} onChange={setTab} options={tabs} className="seg-grid" />
       </div>
       {tab === "position" ? positionTab : tab === "composition" ? compositionTab : tab === "history" ? historyTab : howTab}
     </section>
@@ -378,7 +386,7 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const Divider = () => <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--divider)" }} />;
+const Divider = () => <span aria-hidden="true" className="ticker-div" />;
 
 /** Ticket body that scrolls if it must, with the action pinned beneath it on wide layouts. */
 function TicketBody({ pinned, children, footer }: { pinned: boolean; children: ReactNode; footer: ReactNode }) {

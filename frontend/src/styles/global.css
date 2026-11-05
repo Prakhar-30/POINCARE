@@ -756,6 +756,119 @@
   mask-composite: intersect;
 }
 
+/* ---------------------------------------------------------------------------------------------
+   Responsive app chrome. */
+
+/* Height of the phone tab bar, so anything pinned to the bottom (toasts, the trade ticket's
+   button, the page end) clears it. Zero wherever the bar is not shown. */
+:root {
+  --bottom-nav: 0px;
+}
+@media (max-width: 639px) {
+  :root:has(.app-shell) {
+    --bottom-nav: 64px;
+  }
+  .app-shell {
+    padding-bottom: calc(var(--bottom-nav) + env(safe-area-inset-bottom));
+  }
+}
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: var(--nav-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--nav-border);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: var(--bottom-nav, 64px);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.bottom-nav-item[aria-current="page"] {
+  color: var(--lav-ink);
+}
+.bottom-nav-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 28px;
+}
+
+/* Ticker bar (Trade, Pool): one row of hairline-split stats where it fits; below the breakpoint
+   the pair and price keep their own row and the stats flow into a grid, so nothing scrolls
+   sideways or hides behind the card's edge. `.ticker-lg` collapses below 1024, `.ticker` below 1280. */
+.ticker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+}
+.ticker-lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+}
+.ticker-div {
+  width: 1px;
+  align-self: stretch;
+  background: var(--divider);
+}
+@media (max-width: 1279px) {
+  .ticker:not(.ticker-lg) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+  }
+  .ticker:not(.ticker-lg) > .ticker-lead {
+    grid-column: 1 / -1;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .ticker:not(.ticker-lg) > .ticker-div {
+    display: none;
+  }
+}
+@media (max-width: 1023px) {
+  .ticker.ticker-lg {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+  }
+  .ticker.ticker-lg > .ticker-lead {
+    grid-column: 1 / -1;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .ticker.ticker-lg > .ticker-div {
+    display: none;
+  }
+}
+
+/* A segmented control that becomes a 2x2 grid on phones instead of scrolling sideways. */
+@media (max-width: 639px) {
+  .seg-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+
 /* Keyboard hint: a small key cap for shortcuts (command menu, tab hints). */
 .kbd {
   display: inline-flex;

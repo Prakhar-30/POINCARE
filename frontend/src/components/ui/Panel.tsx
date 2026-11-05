@@ -40,7 +40,8 @@ export function StatCell({
       <dt style={{ fontSize: 12, fontWeight: 700, color: tone ? "var(--green-label)" : "var(--muted)" }}>{label}</dt>
       <dd>
         <div className="font-display truncate" style={{ fontSize: "clamp(17px, 4.6vw, 21px)", fontWeight: 800, color: ink ?? "var(--text)", lineHeight: 1.3 }}>{value}</div>
-        {sub && <div className="truncate" style={{ fontSize: 12, color: tone ? "var(--green-sub)" : "var(--text-3)", marginTop: 2 }}>{sub}</div>}
+        {/* captions wrap rather than truncate: they carry the figure's basis ("over the latest 200 swaps") */}
+        {sub && <div style={{ fontSize: 12, lineHeight: 1.4, color: tone ? "var(--green-sub)" : "var(--text-3)", marginTop: 2, textWrap: "pretty" }}>{sub}</div>}
       </dd>
     </div>
   );
@@ -66,9 +67,9 @@ export function SourceTag({ kind }: { kind: SourceKind }) {
 }
 
 /** Compact segmented control for panel headers. */
-export function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: readonly { id: T; label: ReactNode }[]; onChange: (v: T) => void; label: string }) {
+export function Seg<T extends string>({ value, options, onChange, label, className }: { value: T; options: readonly { id: T; label: ReactNode }[]; onChange: (v: T) => void; label: string; className?: string }) {
   return (
-    <div className="seg seg-sm" role="group" aria-label={label} style={{ padding: 2 }}>
+    <div className={`seg seg-sm${className ? ` ${className}` : ""}`} role="group" aria-label={label} style={{ padding: 2 }}>
       {options.map((o) => (
         <button key={o.id} type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={value === o.id} onClick={() => onChange(o.id)}>
           {o.label}

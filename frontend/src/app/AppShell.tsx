@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { ACTIVE_CHAIN_ID, LIVE_CHAIN_IDS, setActiveChain } from "@/config/contracts";
-import { TopNav, TABS, type Tab } from "./TopNav";
+import { TopNav, BottomNav, TABS, type Tab } from "./TopNav";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { WalletGate } from "./WalletGate";
 import { Dashboard } from "./screens/Dashboard";
 import { Trade } from "./screens/Trade";
@@ -44,13 +45,14 @@ export function AppShell() {
   const { isConnected } = useAccount();
   const [tab, setTab] = useTabParam();
   const [menu, setMenu] = useState(false);
+  const mobile = useIsMobile();
   useWalletIdentity();
   useChainSync();
 
   if (!isConnected) return <WalletGate />;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
+    <div className="app-shell min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>
       <a href="#main" className="skip-link" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>
         Skip to content
       </a>
@@ -66,6 +68,7 @@ export function AppShell() {
         {tab === "analytics" && <Analytics />}
       </main>
       <AppFooter />
+      {mobile && <BottomNav tab={tab} setTab={setTab} />}
     </div>
   );
 }

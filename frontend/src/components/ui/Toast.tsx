@@ -56,7 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="fixed z-[100] flex flex-col gap-2.5"
         role="region"
         aria-label="Notifications"
-        style={{ right: 20, bottom: "max(20px, env(safe-area-inset-bottom))", width: 360, maxWidth: "calc(100vw - 40px)", pointerEvents: "none" }}
+        style={{ right: 20, bottom: "calc(max(20px, env(safe-area-inset-bottom)) + var(--bottom-nav, 0px))", width: 360, maxWidth: "calc(100vw - 40px)", pointerEvents: "none" }}
       >
         <AnimatePresence initial={false}>
           {toasts.map((t) => {
