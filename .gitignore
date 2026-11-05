@@ -11,8 +11,14 @@ out/
 # Docs
 docs/
 
-# Dotenv file
+# Dotenv files: every variant, at any depth. Only the documented example is tracked.
 .env
+.env.*
+!.env.example
+# key material never belongs in the repo
+*.pem
+*.key
+keystore/
 
 # Node modules
 node_modules/
