@@ -259,20 +259,18 @@ export function Trade() {
       <form onSubmit={onSubmit} noValidate className="flex flex-col flex-1 min-h-0">
         {/* Everything above the button scrolls if it must; the button never moves. */}
         <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ gap: 9, padding: "16px 16px 10px" }}>
-        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }} role="group" aria-label="Order side">
+        {/* the same selector as the Pool ticket's Deposit / Withdraw: one recipe for both tickets */}
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl p-1" role="group" aria-label="Order side" style={{ background: "var(--surface-2)" }}>
           {(["buy", "sell"] as const).map((id) => {
             const on = side === id;
             const sp = id === "buy" ? s.spreadZeroForOne : s.spreadOneForZero;
             return (
               <button key={id} type="button" aria-pressed={on} onClick={() => switchSide(id)}
-                className="flex items-center justify-center gap-1.5 rounded-lg"
-                style={{
-                  minHeight: 40, fontSize: 14, fontWeight: 800, cursor: "pointer",
-                  color: on ? "#fff" : "var(--text-3)",
-                  background: on ? (id === "buy" ? "var(--positive)" : "var(--negative)") : "transparent",
-                  transition: "background-color .15s ease-out, color .15s ease-out",
-                }}>
-                {id === "buy" ? "Buy" : "Sell"} WETH
+                className={on ? (id === "buy" ? "btn btn-positive btn-sm" : "btn btn-negative btn-sm") : "btn btn-sm"}
+                style={on ? { minHeight: 36, borderRadius: 8 } : { minHeight: 36, borderRadius: 8, background: "transparent", color: "var(--text-3)", boxShadow: "none", border: "1px solid transparent" }}>
+                <Icon name="arrowRight" size={14} aria-hidden="true" style={{ transform: `rotate(${id === "buy" ? -90 : 90}deg)` }} />
+                {/* one word like Deposit / Withdraw, so the spread badge fits; the CTA and screen readers keep "WETH" */}
+                <span>{id === "buy" ? "Buy" : "Sell"}<span className="sr-only"> WETH</span></span>
                 {sp > 0 && (
                   <span className="rounded-full px-1.5" style={{ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.22)" : "var(--warn-bg)", color: on ? "#fff" : "var(--honey-ink)" }}>
                     +{fmtPct(sp, 1)}
@@ -302,7 +300,8 @@ export function Trade() {
                   return (
                     <button key={p} type="button" className="btn btn-secondary btn-sm" disabled={payBal <= 0} aria-pressed={on}
                       onClick={() => setAmt(round((payBal * p) / 100, paySym))}
-                      style={{ minHeight: 26, padding: "0 9px", fontSize: 12, ...(on ? { borderColor: "var(--action)", color: "var(--lav-ink)" } : {}) }}>
+                      // a chip inside the 12px field, so a 6px corner like the slippage and book-step chips, not a pill
+                      style={{ minHeight: 26, padding: "0 9px", fontSize: 12, borderRadius: 6, ...(on ? { borderColor: "var(--action)", color: "var(--lav-ink)" } : {}) }}>
                       {p === 100 ? "Max" : `${p}%`}
                     </button>
                   );

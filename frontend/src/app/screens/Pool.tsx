@@ -109,7 +109,7 @@ export function Pool() {
               <span className="rounded-full px-2 py-0.5" role="status" style={{ fontSize: 12, fontWeight: 800, color: regime.ink, background: regime.bg, fontFamily: "var(--font-sans)" }}>{regime.label}</span>
             </h2>
             <a href={`${EXPLORER}/address/${CONTRACTS.hook}`} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" translate="no"
-              aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "ui-monospace, monospace" }}>
+              aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
               Hook {shorten(CONTRACTS.hook)} <Icon name="external" size={11} aria-hidden="true" />
             </a>
           </div>

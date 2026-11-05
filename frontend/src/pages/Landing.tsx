@@ -623,7 +623,7 @@ function Footer() {
             {l.to ? (
               <Link to={l.to} {...warmApp} className="link-quiet" style={{ fontSize: 14 }}>{l.label}</Link>
             ) : (
-              <a href={l.href} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" style={{ fontSize: 14, fontFamily: l.mono ? "ui-monospace, monospace" : undefined }} translate={l.mono ? "no" : undefined}>
+              <a href={l.href} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" style={{ fontSize: 14, fontFamily: l.mono ? "var(--font-mono)" : undefined }} translate={l.mono ? "no" : undefined}>
                 {l.label} <Icon name="external" size={12} aria-hidden="true" />
               </a>
             )}

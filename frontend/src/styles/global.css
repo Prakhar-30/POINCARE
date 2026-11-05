@@ -4,8 +4,11 @@
 /* Map design tokens to Tailwind v4 theme so utilities (bg-surface, text-text-2,
    rounded-card, font-display …) stay theme-reactive: each maps to a runtime var. */
 @theme {
-  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Quicksand", "Nunito", ui-sans-serif, sans-serif;
+  /* Inter for reading text; Space Grotesk for headings and the big figures (prices, balances);
+     JetBrains Mono for addresses and hashes. All three carry tabular figures. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-page: var(--page);
   --color-surface: var(--surface);
@@ -40,10 +43,10 @@
   --color-green-sub: var(--green-sub);
   --color-warn-label: var(--warn-label);
 
-  --radius-sm: var(--r-sm);
-  --radius-md: var(--r-md);
+  /* Only the card radius is mapped. Overriding Tailwind's own sm/md/xl here once made
+     rounded-md (16px) larger than rounded-lg (8px) and rounded-xl a 28px near-pill, so nested
+     controls lost their concentric corners. rounded-* now keeps Tailwind's ordered scale. */
   --radius-card: var(--r-card);
-  --radius-xl: var(--r-xl);
 
   --shadow-soft-sm: var(--shadow-sm);
   --shadow-soft: var(--shadow-card);
@@ -283,12 +286,16 @@
   }
 }
 
-/* Segmented control: a group of mutually exclusive options (aria-pressed marks the choice). */
+/* Segmented control: a group of mutually exclusive options (aria-pressed marks the choice).
+   Corners are concentric: an item's radius is the track's radius minus the track's border and
+   padding, so the selected pill sits evenly inside the track at every size. */
 .seg {
+  --seg-r: 14px;
+  --seg-pad: 4px;
   display: flex;
   gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
+  padding: var(--seg-pad);
+  border-radius: var(--seg-r);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
@@ -300,7 +307,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: calc(var(--seg-r) - var(--seg-pad) - 1px);
   font-size: 13px;
   font-weight: 800;
   color: var(--text-3);
@@ -315,11 +322,14 @@
   color: var(--text);
   box-shadow: var(--shadow-sm);
 }
+.seg-sm {
+  --seg-r: 10px;
+  --seg-pad: 2px;
+}
 .seg-sm .seg-item {
   min-height: 30px;
   padding: 0 10px;
   font-size: 12px;
-  border-radius: 8px;
 }
 
 /* Amount field: the whole box is the hit target and takes the focus ring. */

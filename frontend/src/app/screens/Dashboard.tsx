@@ -600,7 +600,7 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
     <section className="card flex flex-col" aria-labelledby="pool-title" style={{ padding: 0 }}>
       <PanelHead id="pool-title" title="Pool overview">
         <a href={`${EXPLORER}/address/${CONTRACTS.hook}`} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" translate="no"
-          aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "ui-monospace, monospace" }}>
+          aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
           {shorten(CONTRACTS.hook)} <Icon name="external" size={12} aria-hidden="true" />
         </a>
       </PanelHead>

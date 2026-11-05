@@ -16,7 +16,7 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
       aria-label={`${label} contract ${address} on the block explorer (opens in a new tab)`}
     >
       <span>{label}</span>
-      <span translate="no" style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
+      <span translate="no" style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
       <Icon name="external" size={12} aria-hidden="true" />
     </a>
   );
