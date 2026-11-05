@@ -21,12 +21,19 @@
   --nav-border: #ebe6f3;
   --nav-pill: #eeebf6;
   --track: #f1edf7;
+  --scroll-thumb: rgba(111, 104, 200, 0.32);
+  --scroll-thumb-hover: rgba(111, 104, 200, 0.55);
+  --depth-ask: rgba(214, 104, 130, 0.13);
+  --depth-bid: rgba(91, 170, 138, 0.14);
+  --book-sel: rgba(60, 52, 110, 0.12);
+  --book-hover: rgba(60, 52, 110, 0.05);
 
-  /* text */
+  /* text: every text token clears WCAG AA (4.5:1) on every light surface */
   --text: #3f3a56;
   --text-2: #5c5775;
-  --text-3: #8a85a0;
-  --muted: #a39db8;
+  --text-3: #66617e;
+  --muted: #6d6885;
+  /* faint is decoration only (dots, rules, disabled fills): never body text */
   --faint: #b6b1c8;
 
   /* brand + semantic */
@@ -45,27 +52,43 @@
   --usdc: #7ca8e0;
   --eth: #9d96e0;
 
+  /* ink: the same hues, deep enough to carry text at AA. The palette above stays the
+     colour of fills, charts and borders; ink is what text in that colour uses. */
+  --up-ink: #39775f;
+  --down-ink: #a8475f;
+  --honey-ink: #906117;
+  --lav-ink: #625ac6;
+
+  /* action fills that carry white text at AA */
+  --action: #6f68c8;
+  --action-hover: #5f58b8;
+  --positive: #408168;
+  --positive-hover: #376f5a;
+  --negative: #bf4e6a;
+  --negative-hover: #a9425c;
+  --focus-ring: #6f68c8;
+
   /* tinted cards */
   --green-bg: linear-gradient(150deg, #eaf6f0, #f4fbf7);
   --green-border: #d6ebe0;
-  --green-label: #4e9c7e;
-  --green-sub: #7c9c8e;
-  --green-rate: #6bae92;
+  --green-label: #39775f;
+  --green-sub: #4d6f61;
+  --green-rate: #39775f;
   --green-stat-bg: linear-gradient(135deg, #eaf6f0, #f2faf6);
   --change-up-bg: #eaf6f0;
   --change-down-bg: #fbecf0;
   --warn-bg: linear-gradient(150deg, #fbf4e5, #fdf9f0);
   --warn-border: #f0e2c8;
-  --warn-label: #c99a3e;
+  --warn-label: #886726;
   --warn-text: #6e6884;
   --warn-inner-bg: #ffffff;
   --warn-inner-border: #f1ead8;
 
   /* elevation */
-  --shadow-sm: 0 2px 14px rgba(123, 113, 158, 0.07);
-  --shadow-card: 0 4px 20px rgba(123, 113, 158, 0.08);
+  --shadow-sm: 0 1px 2px rgba(123, 113, 158, 0.06), 0 2px 10px rgba(123, 113, 158, 0.05);
+  --shadow-card: 0 1px 3px rgba(123, 113, 158, 0.06), 0 4px 16px rgba(123, 113, 158, 0.06);
   --shadow-lg: 0 18px 50px rgba(123, 113, 158, 0.16);
-  --shadow-glow-up: 0 10px 30px rgba(107, 184, 154, 0.22);
+  --shadow-glow-up: 0 6px 20px rgba(107, 184, 154, 0.14);
   --scrim: rgba(60, 54, 88, 0.32);
 
   /* radii */
@@ -94,11 +117,17 @@
   --nav-border: #2e2940;
   --nav-pill: #221e30;
   --track: #2a2539;
+  --scroll-thumb: rgba(194, 188, 245, 0.28);
+  --scroll-thumb-hover: rgba(194, 188, 245, 0.5);
+  --depth-ask: rgba(243, 182, 196, 0.12);
+  --depth-bid: rgba(143, 216, 186, 0.12);
+  --book-sel: rgba(255, 255, 255, 0.15);
+  --book-hover: rgba(255, 255, 255, 0.07);
 
   --text: #efeaf7;
   --text-2: #cbc4dc;
   --text-3: #9e97b2;
-  --muted: #837c97;
+  --muted: #928ca3;
   --faint: #655f79;
 
   --up: #74c6a4;
@@ -115,6 +144,19 @@
   --honey-deep: #f2d191;
   --usdc: #7ca8e0;
   --eth: #9d96e0;
+
+  --up-ink: #8fd8ba;
+  --down-ink: #f3b6c4;
+  --honey-ink: #f2d191;
+  --lav-ink: #c2bcf5;
+
+  --action: #6f68c8;
+  --action-hover: #7f78d6;
+  --positive: #408168;
+  --positive-hover: #4b9178;
+  --negative: #bf4e6a;
+  --negative-hover: #cc5c78;
+  --focus-ring: #a79fec;
 
   --green-bg: linear-gradient(150deg, #1e392f, #1a2e27);
   --green-border: #2c4a3c;
