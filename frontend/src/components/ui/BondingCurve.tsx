@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useWidth } from "@/hooks/useWidth";
 
 type Regime = "none" | "up" | "down";
 
@@ -42,7 +43,9 @@ export function BondingCurve({
 }: {
   r0: number; r1: number; spreadZeroForOne: number; spreadOneForZero: number; trend: Regime; height?: number;
 }) {
-  const W = 520;
+  // Drawn at the measured width: a fixed viewBox letterboxes the plot inside a wide panel.
+  const [wrapRef, measured] = useWidth<HTMLDivElement>();
+  const W = Math.max(320, measured || 520);
   const H = height;
   const pad = 28;
 
@@ -51,8 +54,9 @@ export function BondingCurve({
   const y0 = useTweened(r0 || 1, 900); // USDC on y
   const ax = useTweened(r1 || 1, 9000);
   const ay = useTweened(r0 || 1, 9000);
-  const sBid = useTweened(spreadZeroForOne, 700);
-  const sAsk = useTweened(spreadOneForZero, 700);
+  // token0 is USDC, so zeroForOne (USDC in) is a buy of WETH: the ask side.
+  const sAsk = useTweened(spreadZeroForOne, 700);
+  const sBid = useTweened(spreadOneForZero, 700);
 
   // ripple every time the underlying reserves actually change
   const [rippleKey, setRippleKey] = useState(0);
@@ -64,7 +68,7 @@ export function BondingCurve({
     }
   }, [r0, r1]);
 
-  const { path, px, py, bid, ask, qx, qMid } = useMemo(() => {
+  const { path, px, py, bid, ask, qx, qMid, plotR } = useMemo(() => {
     const k = x0 * y0;
     const xMin = (ax || 1) * 0.4;
     const xMax = (ax || 1) * 1.85;
@@ -73,7 +77,9 @@ export function BondingCurve({
     const yMax = yRef(xMin);
     const yMin = yRef(xMax);
 
-    const sx = (x: number) => pad + ((x - xMin) / (xMax - xMin)) * (W - 2 * pad);
+    // the curve gets the panel minus a lane on the right for the quote strip
+    const plotR = W - pad - 64;
+    const sx = (x: number) => pad + ((x - xMin) / (xMax - xMin)) * (plotR - pad);
     const sy = (y: number) => H - pad - ((y - yMin) / (yMax - yMin)) * (H - 2 * pad);
 
     let d = "";
@@ -92,25 +98,26 @@ export function BondingCurve({
     // rejected (OPEN_ITEMS E1). The hook never changes the curve's shape; it charges a spread
     // on one side. So the spread is drawn on a price scale, where it actually lives.
     const QH = H - 2 * pad; // usable height of the quote strip
-    const qx = W - pad - 16;
+    const qx = W - pad - 20;
     const qMid = pad + QH / 2;
     const span = 0.06; // full strip height = +/- 6% around the pool price
     const qy = (frac: number) => qMid - (frac / span) * (QH / 2);
     const ask = { x: qx, yMid: qMid, y: qy(sAsk) }; // buying WETH pays sAsk
     const bid = { x: qx, yMid: qMid, y: qy(-sBid) }; // selling WETH pays sBid
-    return { path: d.trim(), px, py, bid, ask, qx, qMid };
-  }, [x0, y0, ax, ay, sBid, sAsk, H]);
+    return { path: d.trim(), px, py, bid, ask, qx, qMid, plotR };
+  }, [x0, y0, ax, ay, sBid, sAsk, H, W]);
 
   const leaning = trend !== "none" && (spreadZeroForOne > 0 || spreadOneForZero > 0);
   const accent = trend === "up" ? "var(--up)" : trend === "down" ? "var(--down)" : "var(--lav)";
+  const accentInk = trend === "up" ? "var(--up-ink)" : trend === "down" ? "var(--down-ink)" : "var(--lav-ink)";
 
   return (
-    <div className="relative rounded-md overflow-hidden" style={{ background: "var(--scope-bg)", border: "1px solid var(--border)" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height, display: "block" }}>
+    <div ref={wrapRef} className="relative rounded-md overflow-hidden" style={{ background: "var(--scope-bg)", border: "1px solid var(--border)" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height, display: "block" }} role="img" aria-label={`Constant-product curve with the pool's current position. ${leaning ? `Leaning ${trend}: buy spread ${(spreadZeroForOne * 100).toFixed(2)}%, sell spread ${(spreadOneForZero * 100).toFixed(2)}%.` : "Calm: no spread on either side."}`}>
         {[0.25, 0.5, 0.75].map((g) => (
           <g key={g}>
-            <line x1={pad + g * (W - 2 * pad)} y1={pad} x2={pad + g * (W - 2 * pad)} y2={H - pad} stroke="var(--divider)" strokeWidth={1} />
-            <line x1={pad} y1={pad + g * (H - 2 * pad)} x2={W - pad} y2={pad + g * (H - 2 * pad)} stroke="var(--divider)" strokeWidth={1} />
+            <line x1={pad + g * (plotR - pad)} y1={pad} x2={pad + g * (plotR - pad)} y2={H - pad} stroke="var(--divider)" strokeWidth={1} />
+            <line x1={pad} y1={pad + g * (H - 2 * pad)} x2={plotR} y2={pad + g * (H - 2 * pad)} stroke="var(--divider)" strokeWidth={1} />
           </g>
         ))}
 
@@ -144,12 +151,12 @@ export function BondingCurve({
         </circle>
       </svg>
 
-      <div className="absolute left-3 top-2.5 hidden sm:block" style={{ fontSize: 10, fontWeight: 600, color: "var(--faint)" }}>x · y = k · WETH ↔ USDC</div>
-      <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 10, fontWeight: 700 }}>
-        <span style={{ color: "var(--up)" }}>● buy quote</span>
-        <span style={{ color: "var(--down)" }}>● sell quote</span>
+      <div className="absolute left-3 top-2.5 hidden sm:block" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>x · y = k · WETH ↔ USDC</div>
+      <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 12, fontWeight: 700 }}>
+        <span style={{ color: "var(--up-ink)" }}>● buy quote</span>
+        <span style={{ color: "var(--down-ink)" }}>● sell quote</span>
       </div>
-      <div className="absolute left-3 bottom-2" style={{ fontSize: 10, fontWeight: 600, color: leaning ? accent : "var(--faint)" }}>
+      <div className="absolute left-3 bottom-2" style={{ fontSize: 12, fontWeight: 600, color: leaning ? accentInk : "var(--muted)" }}>
         {leaning ? "trend detected · κ charged on one side" : "calm · both sides at the pool price"}
       </div>
     </div>

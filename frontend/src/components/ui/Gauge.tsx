@@ -23,8 +23,8 @@ export function Gauge({
   const display = Math.round(value * scale);
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width={size} height={size} viewBox="0 0 92 92">
+    <figure className="flex flex-col items-center gap-2">
+      <svg width={size} height={size} viewBox="0 0 92 92" role="img" aria-label={`${label}: ${display}${suffix} of ${Math.round(max * scale)}${suffix}`}>
         <circle cx="46" cy="46" r={r} fill="none" strokeWidth="8" style={{ stroke: "var(--track)" }} />
         <circle
           cx="46"
@@ -43,12 +43,12 @@ export function Gauge({
           {display}
           {suffix}
         </text>
-        <text x="46" y="58" textAnchor="middle" fontSize="8.5" fontWeight="700" fontFamily="Nunito" style={{ fill: "var(--muted)" }}>
+        <text x="46" y="58" textAnchor="middle" fontSize="10" fontWeight="700" fontFamily="Nunito" style={{ fill: "var(--muted)" }}>
           of {Math.round(max * scale)}
           {suffix}
         </text>
       </svg>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3)" }}>{label}</div>
-    </div>
+      <figcaption style={{ fontSize: 13, fontWeight: 700, color: "var(--text-3)" }}>{label}</figcaption>
+    </figure>
   );
 }
