@@ -1,45 +1,32 @@
 import type { ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, lightTheme, darkTheme } from "@rainbow-me/rainbowkit";
-import { wagmiConfig } from "@/config/wagmi";
-import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { MotionConfig } from "framer-motion";
+import { readConfig } from "@/config/chains";
+import { ThemeProvider } from "./ThemeProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 5_000 } },
 });
 
-const rkBase = {
-  accentColor: "#8E88D8",
-  accentColorForeground: "#ffffff",
-  borderRadius: "large",
-  fontStack: "system",
-  overlayBlur: "small",
-} as const;
-
-function RainbowKitThemed({ children }: { children: ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <RainbowKitProvider
-      theme={theme === "dark" ? darkTheme(rkBase) : lightTheme(rkBase)}
-      modalSize="compact"
-    >
-      {children}
-    </RainbowKitProvider>
-  );
-}
-
+/**
+ * What every page needs: theme, toasts, the query cache and a read-only chain connection. The
+ * wallet layer (connectors, RainbowKit) is in `AppProviders`, which loads with /app only.
+ */
 export function Providers({ children }: { children: ReactNode }) {
   return (
+    // reducedMotion="user": framer-motion drops transform animations when the OS asks for less motion.
+    <MotionConfig reducedMotion="user">
     <ThemeProvider>
       <ToastProvider>
-        <WagmiProvider config={wagmiConfig}>
-          <QueryClientProvider client={queryClient}>
-            <RainbowKitThemed>{children}</RainbowKitThemed>
-          </QueryClientProvider>
-        </WagmiProvider>
+        <QueryClientProvider client={queryClient}>
+          <WagmiProvider config={readConfig} reconnectOnMount={false}>
+            {children}
+          </WagmiProvider>
+        </QueryClientProvider>
       </ToastProvider>
     </ThemeProvider>
+    </MotionConfig>
   );
 }
