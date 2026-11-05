@@ -13,7 +13,7 @@ import { AppFooter } from "./AppFooter";
 import { CommandMenu } from "./CommandMenu";
 import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 import { WrongNetworkBanner } from "@/components/ui/WrongNetworkBanner";
-import { useWalletIdentity } from "@/hooks/useBackend";
+import { useFlushPendingRecords, useWalletIdentity } from "@/hooks/useBackend";
 
 /** The config layer binds to one chain per page load; when the wallet lands on another
  *  live chain, persist that choice and reload so every module-level capture follows. */
@@ -47,6 +47,7 @@ export function AppShell() {
   const [menu, setMenu] = useState(false);
   const mobile = useIsMobile();
   useWalletIdentity();
+  useFlushPendingRecords();
   useChainSync();
 
   if (!isConnected) return <WalletGate />;
