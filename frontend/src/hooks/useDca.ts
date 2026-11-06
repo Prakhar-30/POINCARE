@@ -10,12 +10,17 @@ import {
   buildCancelTx,
   buildCloseExpiredTx,
   buildCreateOrderTx,
+  buildEditParams,
+  buildEditTx,
   buildOrderParams,
+  buildPauseTx,
+  buildResumeTx,
   formatAmount,
   getOrdersOf,
   orderIdFromReceipt,
   previewSlice,
   withDca,
+  type DcaEditInput,
   type DcaOrder,
   type DcaOrderInput,
   type PoincareDeployment,
@@ -62,7 +67,8 @@ export function useDcaOrders() {
   });
 }
 
-/** Create / cancel / refund, with the same step overlay, nonce pinning and explicit gas as swaps. */
+/** Create / cancel / refund / pause / resume / edit, with the same step overlay, nonce pinning and
+ *  explicit gas as swaps. */
 export function useDcaActions() {
   const { address } = useAccount();
   const publicClient = usePublicClient() as unknown as PublicClient | undefined;
@@ -146,10 +152,36 @@ export function useDcaActions() {
       }
     });
 
+  /** Pause / resume / edit: one owner transaction each. Resolves to true once it is mined. */
+  const manage = (kind: "pause" | "resume" | "edit", id: bigint, build: (dep: PoincareDeployment) => TxRequest) =>
+    guarded(async () => {
+      const COPY = {
+        pause: ["Plan paused", "No buys until you resume it", "Pause failed"],
+        resume: ["Plan resumed", "Buys continue on schedule", "Resume failed"],
+        edit: ["Plan updated", "The rest of your budget follows the new schedule", "Edit failed"],
+      } as const;
+      const [ok, detail, failed] = COPY[kind];
+      try {
+        const receipt = await send(build(DCA_DEPLOYMENT!));
+        toast.success(ok, `Order #${id}: ${detail.toLowerCase()}`, `${EXPLORER}/tx/${receipt.transactionHash}`);
+        return true;
+      } catch (e) {
+        toast.error(failed, humanizeError(e));
+        return false;
+      }
+    });
+
   return {
     create,
     cancel: (id: bigint) => closeOut("cancel", id),
     refund: (id: bigint) => closeOut("refund", id),
+    pause: (id: bigint) => manage("pause", id, (dep) => buildPauseTx(dep, id)),
+    resume: (id: bigint) => manage("resume", id, (dep) => buildResumeTx(dep, id)),
+    /** Validated like editOrder before anything is signed (throws DcaParamError otherwise). */
+    edit: (o: DcaOrder, input: DcaEditInput) => {
+      const params = buildEditParams(o, input);
+      return manage("edit", o.id, (dep) => buildEditTx(dep, o.id, params));
+    },
     busy,
     stepper,
   };

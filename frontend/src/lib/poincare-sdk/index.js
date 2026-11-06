@@ -877,6 +877,71 @@ var dcaAbi = [
   },
   {
     "type": "function",
+    "name": "editOrder",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct PoincareDCA.EditParams",
+        "components": [
+          {
+            "name": "slices",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "interval",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "startTime",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "maxSpreadBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "pauseOnTrend",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "catchUp",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "maxSlippageBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "minPriceWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeSlice",
     "inputs": [
       {
@@ -941,6 +1006,11 @@ var dcaAbi = [
             "internalType": "bool"
           },
           {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
             "name": "maxSpreadBps",
             "type": "uint16",
             "internalType": "uint16"
@@ -966,6 +1036,11 @@ var dcaAbi = [
             "internalType": "uint32"
           },
           {
+            "name": "scheduleFilled",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
             "name": "startTime",
             "type": "uint64",
             "internalType": "uint64"
@@ -982,6 +1057,11 @@ var dcaAbi = [
           },
           {
             "name": "amountIn",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "scheduleBudget",
             "type": "uint128",
             "internalType": "uint128"
           },
@@ -1134,6 +1214,19 @@ var dcaAbi = [
   },
   {
     "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pendingOwner",
     "inputs": [],
     "outputs": [
@@ -1175,6 +1268,19 @@ var dcaAbi = [
     "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "resume",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1343,6 +1449,43 @@ var dcaAbi = [
   },
   {
     "type": "event",
+    "name": "OrderEdited",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "slices",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "interval",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "startTime",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "deadline",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OrderExpired",
     "inputs": [
       {
@@ -1374,6 +1517,32 @@ var dcaAbi = [
         "name": "amountOut",
         "type": "uint256",
         "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrderPaused",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrderResumed",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -1487,6 +1656,11 @@ var dcaAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "AlreadyInState",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1827,7 +2001,8 @@ var DCA_STATUS = [
   "waiting-for-slot",
   "spread-too-high",
   "trend-against",
-  "below-limit"
+  "below-limit",
+  "paused"
 ];
 var DCA_STATUS_TEXT = {
   ready: "The next slice can fill now.",
@@ -1839,7 +2014,8 @@ var DCA_STATUS_TEXT = {
   "waiting-for-slot": "This slot is already filled; the next slice opens at the next slot.",
   "spread-too-high": "The trend spread on this order's side is above its cap; the slice is held.",
   "trend-against": "A trend runs with this order's side (the side the pool charges); the order is paused until it ends.",
-  "below-limit": "The pool price is worse than the order's limit price."
+  "below-limit": "The pool price is worse than the order's limit price.",
+  paused: "The owner paused the order; no slice fills until it is resumed."
 };
 var statusOf = (code) => DCA_STATUS[code] ?? "unknown";
 var MIN_INTERVAL = 60;
@@ -1912,15 +2088,53 @@ function slotInfo(o, now) {
   return { slot, lastSlot, nextSlotAt: now < o.startTime ? o.startTime : next <= o.deadline ? next : 0n };
 }
 function sliceAmount(o, slot, lastSlot) {
-  const base = o.amountIn / BigInt(o.slices);
+  const base = o.scheduleBudget / BigInt(o.slices);
   let amt = base;
   if (o.catchUp) {
     const slotsLeft = lastSlot - slot + 1n;
     const even = (o.remaining + slotsLeft - 1n) / slotsLeft;
     if (even > amt) amt = even;
   }
-  if (o.filled + 1 >= o.slices || amt > o.remaining) amt = o.remaining;
+  if (o.scheduleFilled + 1 >= o.slices || amt > o.remaining) amt = o.remaining;
   return amt;
+}
+function buildEditParams(o, input, nowSec = Math.floor(Date.now() / 1e3)) {
+  const now = BigInt(nowSec);
+  if (o.cancelled || o.remaining === 0n) throw new DcaParamError("closed", "the order is no longer open");
+  const slices = input.slices ?? o.slices;
+  const interval = input.interval ?? o.interval;
+  const startTime = input.startTime === void 0 ? 0n : BigInt(input.startTime);
+  const start = startTime === 0n ? now : startTime;
+  const deadline = input.deadline !== void 0 ? BigInt(input.deadline) : input.duration !== void 0 ? start + BigInt(Math.max(0, Math.trunc(input.duration))) : start + BigInt(Math.max(0, slices)) * BigInt(interval);
+  const p = {
+    slices,
+    interval,
+    startTime,
+    deadline,
+    maxSpreadBps: input.maxSpreadBps ?? o.maxSpreadBps,
+    pauseOnTrend: input.pauseOnTrend ?? o.pauseOnTrend,
+    catchUp: input.catchUp ?? o.catchUp,
+    maxSlippageBps: input.maxSlippageBps ?? o.maxSlippageBps,
+    minPriceWad: input.limitPrice === void 0 ? o.minPriceWad : input.limitPrice === null ? 0n : limitToMinPriceWad(o.side, input.limitPrice)
+  };
+  validateOrderParams(
+    {
+      zeroForOne: o.zeroForOne,
+      amountIn: o.remaining,
+      slices: p.slices,
+      interval: p.interval,
+      startTime: p.startTime,
+      deadline: p.deadline,
+      maxSpreadBps: p.maxSpreadBps,
+      pauseOnTrend: p.pauseOnTrend,
+      catchUp: p.catchUp,
+      maxSlippageBps: p.maxSlippageBps,
+      minPriceWad: p.minPriceWad,
+      recipient: o.recipient
+    },
+    now
+  );
+  return p;
 }
 function planSlice(o, ctx) {
   const plan = { status: "ready", amountIn: 0n, minOut: 0n, slot: 0n, nextSlotAt: 0n };
@@ -1928,6 +2142,7 @@ function planSlice(o, ctx) {
   if (o.cancelled) return done("cancelled");
   if (o.remaining === 0n) return done("filled");
   if (ctx.now > o.deadline) return done("expired");
+  if (o.paused) return done("paused");
   if (ctx.now < o.startTime) return { ...done("not-started"), nextSlotAt: o.startTime };
   const { slot, lastSlot, nextSlotAt } = slotInfo(o, ctx.now);
   plan.slot = slot;
@@ -1973,7 +2188,7 @@ var PROTECTIONS = {
 var PROTECTION_TEXT = {
   "spread-guard": {
     title: "Spread guard",
-    detail: "Never pays the trend spread. A buy that would pay it waits, and later buys catch up so the plan still finishes."
+    detail: "Never pays the trend spread. A fill that would pay it waits, and later fills catch up so the plan still finishes."
   },
   "trend-pause": {
     title: "Trend pause",
@@ -1981,7 +2196,7 @@ var PROTECTION_TEXT = {
   },
   always: {
     title: "Always fill",
-    detail: "Buys every period whatever the spread, like a plain recurring buy on an exchange."
+    detail: "Fills every period whatever the spread, like a plain recurring order on an exchange."
   }
 };
 function recurringOrder(r) {
@@ -2029,7 +2244,10 @@ var DCA_GAS = {
   createOrder: 450000n,
   executeSlice: 1500000n,
   cancel: 200000n,
-  closeExpired: 200000n
+  closeExpired: 200000n,
+  pause: 80000n,
+  resume: 80000n,
+  editOrder: 150000n
 };
 var inputToken = (dep, side) => side === "buy" ? dep.usdc : dep.weth;
 async function getOrder(client, dep, id) {
@@ -2110,6 +2328,31 @@ var simple = (fn, label) => (dep, id) => ({
 });
 var buildExecuteSliceTx = simple("executeSlice", "Fill a slice of");
 var buildCancelTx = simple("cancel", "Cancel");
+var buildPauseTx = simple("pause", "Pause");
+var buildResumeTx = simple("resume", "Resume");
+function buildEditTx(dep, id, p) {
+  return {
+    to: requireDca(dep),
+    data: encodeFunctionData({
+      abi: dcaAbi,
+      functionName: "editOrder",
+      args: [id, {
+        slices: p.slices,
+        interval: p.interval,
+        startTime: p.startTime,
+        deadline: p.deadline,
+        maxSpreadBps: p.maxSpreadBps,
+        pauseOnTrend: p.pauseOnTrend,
+        catchUp: p.catchUp,
+        maxSlippageBps: p.maxSlippageBps,
+        minPriceWad: p.minPriceWad
+      }]
+    }),
+    value: 0n,
+    gas: DCA_GAS.editOrder,
+    description: `Edit DCA order #${id} (${p.slices} slices)`
+  };
+}
 var buildCloseExpiredTx = simple("closeExpired", "Refund expired");
 async function planCreateOrder(client, dep, owner, p) {
   const side = p.zeroForOne ? "buy" : "sell";
@@ -2184,7 +2427,15 @@ function createPoincareClient(opts = {}) {
         create: (from, input) => planCreateOrder(publicClient, deployment, from, buildOrderParams(input)),
         execute: (id) => buildExecuteSliceTx(deployment, id),
         cancel: (id) => buildCancelTx(deployment, id),
-        closeExpired: (id) => buildCloseExpiredTx(deployment, id)
+        closeExpired: (id) => buildCloseExpiredTx(deployment, id),
+        pause: (id) => buildPauseTx(deployment, id),
+        resume: (id) => buildResumeTx(deployment, id),
+        /** Reads the order, validates the edit like the contract, builds editOrder. */
+        edit: async (id, input) => {
+          const o = await getOrder(publicClient, deployment, id);
+          if (!o) throw new Error(`no DCA order #${id}`);
+          return buildEditTx(deployment, id, buildEditParams(o, input));
+        }
       },
       /** Approve (exact amount, if needed) and create; resolves to the new order id. */
       create: async (input) => {
@@ -2196,7 +2447,14 @@ function createPoincareClient(opts = {}) {
       },
       execute: (id) => sendTx(needWallet(), publicClient, buildExecuteSliceTx(deployment, id)),
       cancel: (id) => sendTx(needWallet(), publicClient, buildCancelTx(deployment, id)),
-      closeExpired: (id) => sendTx(needWallet(), publicClient, buildCloseExpiredTx(deployment, id))
+      closeExpired: (id) => sendTx(needWallet(), publicClient, buildCloseExpiredTx(deployment, id)),
+      pause: (id) => sendTx(needWallet(), publicClient, buildPauseTx(deployment, id)),
+      resume: (id) => sendTx(needWallet(), publicClient, buildResumeTx(deployment, id)),
+      edit: async (id, input) => {
+        const o = await getOrder(publicClient, deployment, id);
+        if (!o) throw new Error(`no DCA order #${id}`);
+        return sendTx(needWallet(), publicClient, buildEditTx(deployment, id, buildEditParams(o, input)));
+      }
     }
   };
 }
@@ -2222,8 +2480,12 @@ export {
   buildCancelTx,
   buildCloseExpiredTx,
   buildCreateOrderTx,
+  buildEditParams,
+  buildEditTx,
   buildExecuteSliceTx,
   buildOrderParams,
+  buildPauseTx,
+  buildResumeTx,
   classify,
   createPoincareClient,
   dcaAbi,

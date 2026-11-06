@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { hasDca } from "@/config/contracts";
 import type { PoolState } from "@/hooks/usePoolState";
 import { useDcaActions } from "@/hooks/useDca";
@@ -52,6 +52,8 @@ const SLIPPAGE = [0.1, 0.5, 1] as const;
 const DEC = /^\d*\.?\d*$/;
 
 const toBpsUp = (frac: number) => Math.ceil(frac * 10_000 - 1e-9);
+/** A typed amount the SDK can parse: "." or "" become "0" (no amount yet), "1." becomes "1". */
+const amountOrZero = (v: string) => (DEC.test(v) && Number(v) > 0 ? v.replace(/\.$/, "") : "0");
 const when = (unixSec: number | bigint) =>
   new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(Number(unixSec) * 1000));
 const cleanDecimal = (v: string) => v.replace(/,/g, ".").replace(/[^0-9.]/g, "");
@@ -76,14 +78,15 @@ export function DcaTicket({
   const paySym = side === "buy" ? "USDC" : "WETH";
   const getSym = side === "buy" ? "WETH" : "USDC";
   const dp = (sym: string) => (sym === "WETH" ? 4 : 2);
+  const one = side === "buy" ? "buy" : "sell"; // a sell plan says "each sell", never "each buy"
   const sideSpread = side === "buy" ? s.spreadZeroForOne : s.spreadOneForZero;
   const trendWithSide = (s.trend === "up" && side === "buy") || (s.trend === "down" && side === "sell");
 
   const common = { side, protection, limitPrice: limit && Number(limit) > 0 ? limit : undefined, maxSlippageBps: Math.round(slip * 100) };
   const input: DcaOrderInput =
     kind === "recurring"
-      ? { ...recurringOrder({ ...common, amountPerBuy: DEC.test(perBuy) && perBuy ? perBuy : "0", frequency: freq, count }), catchUp }
-      : { ...twapOrder({ ...common, total: DEC.test(total) && total ? total : "0", durationSec: windowSec }), catchUp };
+      ? { ...recurringOrder({ ...common, amountPerBuy: amountOrZero(perBuy), frequency: freq, count }), catchUp }
+      : { ...twapOrder({ ...common, total: amountOrZero(total), durationSec: windowSec }), catchUp };
 
   // Validate exactly as the contract will, and preview the first buy under this block's regime.
   const plan = useMemo(() => {
@@ -105,6 +108,23 @@ export function DcaTicket({
   const setupBlocked = empty || insufficient || !plan.ok;
 
   const setupCta = empty ? "Enter an amount" : insufficient ? `Insufficient ${paySym}` : !plan.ok ? "Check the plan" : "Review plan";
+  // Flag the field itself, like the market ticket: the total is what gets escrowed.
+  const amountError = insufficient
+    ? kind === "recurring"
+      ? `${count} ${one}s need ${fmtNum(totalNum, dp(paySym))} ${paySym}; you have ${fmtNum(payBal, dp(paySym))}`
+      : `More than your ${fmtNum(payBal, dp(paySym))} ${paySym}`
+    : null;
+
+  // Keyboard focus follows the step: the review heading on the way in, the CTA on the way back.
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const cameBack = useRef(false);
+  useEffect(() => {
+    if (step === "setup" && cameBack.current) submitRef.current?.focus();
+  }, [step]);
+  const backToSetup = () => {
+    cameBack.current = true;
+    setStep("setup");
+  };
 
   const switchSide = (next: Side) => {
     if (next === side) return;
@@ -140,7 +160,7 @@ export function DcaTicket({
         <Review
           plan={plan.p} first={plan.first} now={plan.now} side={side} kind={kind} freq={freq} windowSec={windowSec}
           protection={protection} catchUp={catchUp} slip={slip} limit={limit} s={s} perNum={perNum} totalNum={totalNum}
-          paySym={paySym} getSym={getSym} busy={busy} onBack={() => setStep("setup")} onConfirm={() => void onConfirm()}
+          paySym={paySym} getSym={getSym} busy={busy} onBack={backToSetup} onConfirm={() => void onConfirm()}
         />
       ) : (
         <form onSubmit={onSubmitSetup} noValidate className="flex flex-col flex-1 min-h-0" aria-label="DCA plan">
@@ -154,16 +174,16 @@ export function DcaTicket({
 
             {kind === "recurring" ? (
               <>
-                <AmountField id="dca-per" label="Each buy" value={perBuy} onChange={setPerBuy} sym={paySym}
+                <AmountField id="dca-per" label={one === "buy" ? "Each buy" : "Each sell"} value={perBuy} onChange={setPerBuy} sym={paySym} error={amountError}
                   foot={<>Avbl <b style={{ color: "var(--text-2)" }}>{fmtNum(payBal, dp(paySym))} {paySym}</b></>} />
                 <Chips label="Frequency" value={freq} onChange={(v) => setFreq(v as Frequency)}
                   options={FREQS.map((f) => ({ id: f, label: FREQUENCY_LABEL[f].replace("Every ", "") }))} />
-                <Chips label="Number of buys" value={String(count)} onChange={(v) => setCount(Number(v))}
+                <Chips label={`Number of ${one}s`} value={String(count)} onChange={(v) => setCount(Number(v))}
                   options={COUNTS.map((n) => ({ id: String(n), label: String(n) }))} />
               </>
             ) : (
               <>
-                <AmountField id="dca-total" label="Total" value={total} onChange={setTotal} sym={paySym}
+                <AmountField id="dca-total" label="Total" value={total} onChange={setTotal} sym={paySym} error={amountError}
                   foot={<>Avbl <b style={{ color: "var(--text-2)" }}>{fmtNum(payBal, dp(paySym))} {paySym}</b></>} />
                 <Chips label="Spread it over" value={String(windowSec)} onChange={(v) => setWindowSec(Number(v))}
                   options={TWAP_WINDOWS.map((w) => ({ id: String(w.s), label: w.label }))} />
@@ -174,15 +194,18 @@ export function DcaTicket({
               {plan.ok
                 ? kind === "recurring"
                   ? <>{fmtNum(totalNum, dp(paySym))} {paySym} in total, {FREQUENCY_LABEL[freq].toLowerCase()}, done by {when(plan.p.deadline)}.</>
-                  : <>{plan.p.slices} buys of ≈{fmtNum(perNum, dp(paySym))} {paySym}, one every {Math.round(plan.p.interval / 60)} min, done by {when(plan.p.deadline)}.</>
-                : <span style={{ color: "var(--down-ink)", fontWeight: 700 }}>{paramHint(plan.error ?? "")}</span>}
+                  : <>{plan.p.slices} {one}s of ≈{fmtNum(perNum, dp(paySym))} {paySym}, one every {Math.round(plan.p.interval / 60)} min, done by {when(plan.p.deadline)}.</>
+                : empty
+                  ? "Enter an amount to see the schedule."
+                  : <span role="alert" style={{ color: "var(--down-ink)", fontWeight: 700 }}>{paramHint(plan.error ?? "")}</span>}
             </p>
 
             <fieldset>
               <legend style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>Protection from the trend spread</legend>
+              {/* Native radios: arrow keys move the choice, screen readers announce "1 of 3". */}
               <div className="flex flex-col" style={{ gap: 6 }}>
                 {PROTECTION_ORDER.map((p) => (
-                  <ProtectionCard key={p} id={p} selected={protection === p} onSelect={() => setProtection(p)}
+                  <ProtectionCard key={p} id={p} name="dca-protection" selected={protection === p} onSelect={() => setProtection(p)}
                     now={protectionNow(p, side, sideSpread, trendWithSide)} recommended={p === "spread-guard"} />
                 ))}
               </div>
@@ -205,7 +228,7 @@ export function DcaTicket({
                         style={{ background: "transparent", border: "none", fontSize: 14, fontWeight: 800, color: "var(--text)" }} />
                     </div>
                     <div>
-                      <div id="dca-slip-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>Slippage per buy</div>
+                      <div id="dca-slip-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>Slippage per {one}</div>
                       <div className="flex gap-1" role="group" aria-labelledby="dca-slip-label">
                         {SLIPPAGE.map((v) => (
                           <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md"
@@ -216,14 +239,14 @@ export function DcaTicket({
                       </div>
                     </div>
                   </div>
-                  <Toggle checked={catchUp} onChange={setCatchUp} label="Catch up skipped buys" hint="Later buys grow so the plan still completes by its end time." />
+                  <Toggle checked={catchUp} onChange={setCatchUp} label={`Catch up skipped ${one}s`} hint={`Later ${one}s grow so the plan still completes by its end time.`} />
                 </div>
               )}
             </div>
           </div>
 
           <div className="flex flex-col shrink-0" style={{ gap: 8, padding: "10px 16px 14px", borderTop: "1px solid var(--divider)", background: "var(--surface)", borderRadius: "0 0 var(--r-card) var(--r-card)" }}>
-            <button type="submit" disabled={setupBlocked} className={`btn btn-lg btn-block ${side === "buy" ? "btn-positive" : "btn-negative"}`}>
+            <button ref={submitRef} type="submit" disabled={setupBlocked} className={`btn btn-lg btn-block ${side === "buy" ? "btn-positive" : "btn-negative"}`}>
               {setupCta}
               {!setupBlocked && <Icon name="arrowRight" size={16} aria-hidden="true" />}
             </button>
@@ -248,11 +271,17 @@ function Review({
   paySym: string; getSym: string; busy: boolean; onBack: () => void; onConfirm: () => void;
 }) {
   const dp = (sym: string) => (sym === "WETH" ? 4 : 2);
+  const one = side === "buy" ? "buy" : "sell";
   const sideSpread = side === "buy" ? s.spreadZeroForOne : s.spreadOneForZero;
   const start = plan.startTime === 0n ? BigInt(now) : plan.startTime;
   const times = Array.from({ length: Math.min(plan.slices, 3) }, (_, i) => start + BigInt(i * plan.interval));
-  const estOut = s.price > 0 ? (side === "buy" ? (totalNum / s.price) * (1 - s.fee) : totalNum * s.price * (1 - s.fee)) : 0;
-  const label = kind === "recurring" ? `${FREQUENCY_LABEL[freq]} · ${plan.slices} buys` : `Over ${windowLabel(windowSec)} · ${plan.slices} buys`;
+  // The guarded presets wait the spread out; "Always fill" pays today's spread on every buy.
+  const paysSpread = protection === "always" && sideSpread > 0;
+  const keep = (1 - s.fee) * (paysSpread ? 1 - sideSpread : 1);
+  const estOut = s.price > 0 ? (side === "buy" ? (totalNum / s.price) * keep : totalNum * s.price * keep) : 0;
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
+  const label = kind === "recurring" ? `${FREQUENCY_LABEL[freq]} · ${plan.slices} ${one}s` : `Over ${windowLabel(windowSec)} · ${plan.slices} ${one}s`;
   const firstText =
     first === "ready"
       ? sideSpread > 0 ? `Now, paying the ${fmtPct(sideSpread)} trend spread` : "Now"
@@ -269,7 +298,7 @@ function Review({
           <button type="button" onClick={onBack} className="icon-btn icon-btn-plain" aria-label="Back to the plan">
             <Icon name="arrowRight" size={16} aria-hidden="true" style={{ transform: "rotate(180deg)" }} />
           </button>
-          <h3 className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>Review your plan</h3>
+          <h3 ref={heading} tabIndex={-1} className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", outline: "none" }}>Review your plan</h3>
         </div>
 
         <div className="rounded-xl" style={{ padding: "12px 14px", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
@@ -282,32 +311,32 @@ function Review({
           <div className="font-display" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginTop: 4 }}>
             {fmtNum(totalNum, dp(paySym))} {paySym}
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-3)" }}>escrowed now · ≈{fmtNum(perNum, dp(paySym))} {paySym} per buy</div>
+          <div style={{ fontSize: 12, color: "var(--text-3)" }}>escrowed now · ≈{fmtNum(perNum, dp(paySym))} {paySym} per {one}</div>
         </div>
 
         <dl className="flex flex-col" style={{ gap: 6 }}>
-          <Row label="First buy">{firstText}</Row>
+          <Row label={`First ${one}`}>{firstText}</Row>
           <Row label="Done by">{when(plan.deadline)}</Row>
           <Row label="Protection">{PROTECTION_TEXT[protection].title}{catchUp ? " · catches up" : ""}</Row>
           <Row label="Limit">{limit && Number(limit) > 0 ? `${side === "buy" ? "Max" : "Min"} ${fmtNum(Number(limit), 2)} USDC/WETH` : "None"}</Row>
-          <Row label="Slippage per buy">{slip}%</Row>
-          <Row label="Fee per buy">{fmtPct(s.fee)} base fee{protection === "always" ? " + any trend spread" : ""}</Row>
-          <Row label={`≈ ${getSym} at today's price`}>{estOut > 0 ? `${fmtNum(estOut, dp(getSym))} ${getSym}` : "—"}</Row>
+          <Row label={`Slippage per ${one}`}>{slip}%</Row>
+          <Row label={`Fee per ${one}`}>{fmtPct(s.fee)} base fee{protection === "always" ? " + any trend spread" : ""}</Row>
+          <Row label={paysSpread ? `≈ ${getSym} at today's price and spread` : `≈ ${getSym} at today's price`}>{estOut > 0 ? `${fmtNum(estOut, dp(getSym))} ${getSym}` : "—"}</Row>
         </dl>
 
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>Schedule</div>
           <ol className="flex flex-col" style={{ gap: 3, fontSize: 12, color: "var(--text-2)" }}>
             {times.map((t, i) => (
-              <li key={i} className="flex justify-between"><span>Buy {i + 1}</span><span>{when(t)}</span></li>
+              <li key={i} className="flex justify-between"><span>{one === "buy" ? "Buy" : "Sell"} {i + 1}</span><span>{when(t)}</span></li>
             ))}
             {plan.slices > times.length && <li style={{ color: "var(--text-3)" }}>… and {plan.slices - times.length} more, every {intervalLabel(plan.interval)}</li>}
           </ol>
         </div>
 
         <p className="rounded-lg" style={{ padding: "8px 10px", fontSize: 12, lineHeight: 1.5, color: "var(--text-2)", background: "var(--lav-soft)", border: "1px solid var(--lav-dim)" }}>
-          Your budget is held by the PoincareDCA contract. A keeper submits each buy and the contract re-checks your protection
-          every time; skipped buys {catchUp ? "are made up later" : "are not made up"}. Cancel any time to get the rest back.
+          Your budget is held by the PoincareDCA contract. A keeper submits each {one} and the contract re-checks your protection
+          every time; skipped {one}s {catchUp ? "are made up later" : "are not made up"}. Cancel any time to get the rest back.
           Unaudited periphery contract on a testnet.
         </p>
       </div>
@@ -331,9 +360,9 @@ function firstBuy(p: DcaOrderParams, side: Side, now: number, spreadBps: number,
   return planSlice(
     {
       id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side, zeroForOne: p.zeroForOne,
-      pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps,
-      slices: p.slices, interval: p.interval, filled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n,
-      amountIn: p.amountIn, remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad,
+      pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false, maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps,
+      slices: p.slices, interval: p.interval, filled: 0, scheduleFilled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n,
+      amountIn: p.amountIn, scheduleBudget: p.amountIn, remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad,
     },
     { now: BigInt(now), spreadBps, trendWithSide },
   ).status;
@@ -342,17 +371,18 @@ function firstBuy(p: DcaOrderParams, side: Side, now: number, spreadBps: number,
 /** What a protection preset would do with a buy right now: a short chip, and the reason. */
 function protectionNow(p: Protection, side: Side, sideSpread: number, trendWithSide: boolean): { text: string; tone: "good" | "wait"; why?: string } {
   const who = side === "buy" ? "Buyers" : "Sellers";
-  if (p === "always") return sideSpread > 0 ? { text: `Pays ${fmtPct(sideSpread)}`, tone: "wait", why: `${who} pay ${fmtPct(sideSpread)} right now.` } : { text: "Buys now", tone: "good" };
+  if (p === "always") return sideSpread > 0 ? { text: `Pays ${fmtPct(sideSpread)}`, tone: "wait", why: `${who} pay ${fmtPct(sideSpread)} right now.` } : { text: side === "buy" ? "Buys now" : "Sells now", tone: "good" };
   if (sideSpread > 0) return { text: "Waits now", tone: "wait", why: `${who} pay ${fmtPct(sideSpread)} right now.` };
   if (p === "trend-pause" && trendWithSide) return { text: "Waits now", tone: "wait", why: "A trend runs in your direction right now." };
-  return { text: "Buys now", tone: "good" };
+  return { text: side === "buy" ? "Buys now" : "Sells now", tone: "good" };
 }
 
-function ProtectionCard({ id, selected, onSelect, now, recommended }: { id: Protection; selected: boolean; onSelect: () => void; now: { text: string; tone: "good" | "wait"; why?: string }; recommended: boolean }) {
+function ProtectionCard({ id, name, selected, onSelect, now, recommended }: { id: Protection; name: string; selected: boolean; onSelect: () => void; now: { text: string; tone: "good" | "wait"; why?: string }; recommended: boolean }) {
   const t = PROTECTION_TEXT[id];
   return (
-    <button type="button" role="radio" aria-checked={selected} onClick={onSelect} className="text-left rounded-xl"
+    <label className="radio-card block text-left rounded-xl"
       style={{ padding: "8px 10px", cursor: "pointer", background: selected ? "var(--lav-soft)" : "var(--surface)", border: `1px solid ${selected ? "var(--action)" : "var(--border)"}`, transition: "border-color .15s ease-out, background-color .15s ease-out" }}>
+      <input type="radio" name={name} value={id} checked={selected} onChange={onSelect} className="sr-only" aria-describedby={`${name}-${id}-detail`} />
       <span className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 min-w-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>
           <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: 14, height: 14, border: `2px solid ${selected ? "var(--action)" : "var(--border-strong)"}`, background: selected ? "radial-gradient(var(--action) 0 3px, transparent 4px)" : "transparent" }} />
@@ -363,11 +393,11 @@ function ProtectionCard({ id, selected, onSelect, now, recommended }: { id: Prot
           {now.text}
         </span>
       </span>
-      <span className="block" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4, marginTop: 3, paddingLeft: 22 }}>
+      <span id={`${name}-${id}-detail`} className="block" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4, marginTop: 3, paddingLeft: 22 }}>
         {now.why && <b style={{ color: "var(--honey-ink)", fontWeight: 700 }}>{now.why} </b>}
         {t.detail}
       </span>
-    </button>
+    </label>
   );
 }
 
@@ -395,24 +425,28 @@ function SideToggle({ side, s, onChange }: { side: Side; s: PoolState; onChange:
   );
 }
 
-function AmountField({ id, label, value, onChange, sym, foot }: { id: string; label: string; value: string; onChange: (v: string) => void; sym: string; foot: ReactNode }) {
+function AmountField({ id, label, value, onChange, sym, foot, error }: { id: string; label: string; value: string; onChange: (v: string) => void; sym: string; foot: ReactNode; error?: string | null }) {
   return (
-    <div className="field" style={{ padding: "9px 12px", borderRadius: 12 }}>
-      <div className="flex items-center gap-3">
-        <label htmlFor={id} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 64, flexShrink: 0 }}>{label}</label>
-        <input id={id} value={value} inputMode="decimal" autoComplete="off" spellCheck={false} placeholder="0.00"
-          onChange={(e) => onChange(cleanDecimal(e.target.value))} className="flex-1 min-w-0 text-right"
-          style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 800, color: "var(--text)" }} />
-        <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>
-          <TokenIcon sym={sym} size={16} />{sym}
-        </span>
+    <div>
+      <div className="field" style={{ padding: "9px 12px", borderRadius: 12, borderColor: error ? "var(--negative)" : undefined }}>
+        <div className="flex items-center gap-3">
+          <label htmlFor={id} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 64, flexShrink: 0 }}>{label}</label>
+          <input id={id} value={value} inputMode="decimal" autoComplete="off" spellCheck={false} placeholder="0.00"
+            aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
+            onChange={(e) => onChange(cleanDecimal(e.target.value))} className="flex-1 min-w-0 text-right"
+            style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 800, color: "var(--text)" }} />
+          <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>
+            <TokenIcon sym={sym} size={16} />{sym}
+          </span>
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-3)" }}>{foot}</div>
       </div>
-      <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-3)" }}>{foot}</div>
+      {error && <p id={`${id}-error`} role="alert" style={{ fontSize: 12, fontWeight: 700, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
     </div>
   );
 }
 
-function Chips({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { id: string; label: string }[] }) {
+export function Chips({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { id: string; label: string }[] }) {
   const lid = `chips-${label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <div>
@@ -433,10 +467,14 @@ function Chips({ label, value, onChange, options }: { label: string; value: stri
 }
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
+  const hid = `hint-${label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
-    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} title={hint}
+    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} aria-describedby={hid}
       className="flex items-center justify-between gap-3 text-left" style={{ cursor: "pointer", minHeight: 30 }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}>{label}</span>
+      <span className="flex flex-col">
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}>{label}</span>
+        <span id={hid} style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4 }}>{hint}</span>
+      </span>
       <span aria-hidden="true" className="shrink-0 rounded-full relative" style={{ width: 34, height: 20, background: checked ? "var(--action)" : "var(--track)", transition: "background-color .15s ease-out" }}>
         <span className="absolute rounded-full" style={{ top: 2, left: checked ? 16 : 2, width: 16, height: 16, background: "#fff", boxShadow: "var(--shadow-sm)", transition: "left .15s ease-out" }} />
       </span>
@@ -453,7 +491,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function paramHint(reason: string): string {
+export function paramHint(reason: string): string {
   switch (reason) {
     case "amountIn below slices":
     case "amountIn":
@@ -461,11 +499,15 @@ function paramHint(reason: string): string {
     case "limitPrice":
       return "The limit price must be above zero.";
     case "deadline":
-      return "The end time leaves no room for every buy.";
+      return "The end time leaves no room for every fill.";
     case "interval":
-      return "Buys must be at least a minute apart.";
+      return "Fills must be at least a minute apart.";
+    case "slices":
+      return "A plan needs between 1 and 10,000 fills.";
+    case "bps":
+      return "Slippage and spread caps must be between 0% and 100%.";
     default:
-      return `Check the plan (${reason}).`;
+      return "This plan can't be created as set. Adjust the amount or the schedule.";
   }
 }
 

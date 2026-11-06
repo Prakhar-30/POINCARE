@@ -684,6 +684,57 @@ declare const dcaAbi: readonly [{
     readonly stateMutability: "nonpayable";
 }, {
     readonly type: "function";
+    readonly name: "editOrder";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly internalType: "uint256";
+    }, {
+        readonly name: "p";
+        readonly type: "tuple";
+        readonly internalType: "struct PoincareDCA.EditParams";
+        readonly components: readonly [{
+            readonly name: "slices";
+            readonly type: "uint32";
+            readonly internalType: "uint32";
+        }, {
+            readonly name: "interval";
+            readonly type: "uint32";
+            readonly internalType: "uint32";
+        }, {
+            readonly name: "startTime";
+            readonly type: "uint64";
+            readonly internalType: "uint64";
+        }, {
+            readonly name: "deadline";
+            readonly type: "uint64";
+            readonly internalType: "uint64";
+        }, {
+            readonly name: "maxSpreadBps";
+            readonly type: "uint16";
+            readonly internalType: "uint16";
+        }, {
+            readonly name: "pauseOnTrend";
+            readonly type: "bool";
+            readonly internalType: "bool";
+        }, {
+            readonly name: "catchUp";
+            readonly type: "bool";
+            readonly internalType: "bool";
+        }, {
+            readonly name: "maxSlippageBps";
+            readonly type: "uint16";
+            readonly internalType: "uint16";
+        }, {
+            readonly name: "minPriceWad";
+            readonly type: "uint256";
+            readonly internalType: "uint256";
+        }];
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
     readonly name: "executeSlice";
     readonly inputs: readonly [{
         readonly name: "id";
@@ -733,6 +784,10 @@ declare const dcaAbi: readonly [{
             readonly type: "bool";
             readonly internalType: "bool";
         }, {
+            readonly name: "paused";
+            readonly type: "bool";
+            readonly internalType: "bool";
+        }, {
             readonly name: "maxSpreadBps";
             readonly type: "uint16";
             readonly internalType: "uint16";
@@ -753,6 +808,10 @@ declare const dcaAbi: readonly [{
             readonly type: "uint32";
             readonly internalType: "uint32";
         }, {
+            readonly name: "scheduleFilled";
+            readonly type: "uint32";
+            readonly internalType: "uint32";
+        }, {
             readonly name: "startTime";
             readonly type: "uint64";
             readonly internalType: "uint64";
@@ -766,6 +825,10 @@ declare const dcaAbi: readonly [{
             readonly internalType: "uint64";
         }, {
             readonly name: "amountIn";
+            readonly type: "uint128";
+            readonly internalType: "uint128";
+        }, {
+            readonly name: "scheduleBudget";
             readonly type: "uint128";
             readonly internalType: "uint128";
         }, {
@@ -881,6 +944,16 @@ declare const dcaAbi: readonly [{
     readonly stateMutability: "view";
 }, {
     readonly type: "function";
+    readonly name: "pause";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly internalType: "uint256";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
     readonly name: "pendingOwner";
     readonly inputs: readonly [];
     readonly outputs: readonly [{
@@ -913,6 +986,16 @@ declare const dcaAbi: readonly [{
     readonly type: "function";
     readonly name: "renounceOwnership";
     readonly inputs: readonly [];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "resume";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly internalType: "uint256";
+    }];
     readonly outputs: readonly [];
     readonly stateMutability: "nonpayable";
 }, {
@@ -1046,6 +1129,36 @@ declare const dcaAbi: readonly [{
     readonly anonymous: false;
 }, {
     readonly type: "event";
+    readonly name: "OrderEdited";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly indexed: true;
+        readonly internalType: "uint256";
+    }, {
+        readonly name: "slices";
+        readonly type: "uint32";
+        readonly indexed: false;
+        readonly internalType: "uint32";
+    }, {
+        readonly name: "interval";
+        readonly type: "uint32";
+        readonly indexed: false;
+        readonly internalType: "uint32";
+    }, {
+        readonly name: "startTime";
+        readonly type: "uint64";
+        readonly indexed: false;
+        readonly internalType: "uint64";
+    }, {
+        readonly name: "deadline";
+        readonly type: "uint64";
+        readonly indexed: false;
+        readonly internalType: "uint64";
+    }];
+    readonly anonymous: false;
+}, {
+    readonly type: "event";
     readonly name: "OrderExpired";
     readonly inputs: readonly [{
         readonly name: "id";
@@ -1071,6 +1184,26 @@ declare const dcaAbi: readonly [{
         readonly name: "amountOut";
         readonly type: "uint256";
         readonly indexed: false;
+        readonly internalType: "uint256";
+    }];
+    readonly anonymous: false;
+}, {
+    readonly type: "event";
+    readonly name: "OrderPaused";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly indexed: true;
+        readonly internalType: "uint256";
+    }];
+    readonly anonymous: false;
+}, {
+    readonly type: "event";
+    readonly name: "OrderResumed";
+    readonly inputs: readonly [{
+        readonly name: "id";
+        readonly type: "uint256";
+        readonly indexed: true;
         readonly internalType: "uint256";
     }];
     readonly anonymous: false;
@@ -1160,6 +1293,10 @@ declare const dcaAbi: readonly [{
         readonly type: "address";
         readonly internalType: "address";
     }];
+}, {
+    readonly type: "error";
+    readonly name: "AlreadyInState";
+    readonly inputs: readonly [];
 }, {
     readonly type: "error";
     readonly name: "FailedInnerCall";
@@ -1509,7 +1646,7 @@ declare function quoteExactInput(client: PublicClient, dep: PoincareDeployment, 
  * PoincareDCA's slice rules. Nothing here touches the network; see dcaClient.ts for that.
  */
 /** PoincareDCA.Status, in on-chain enum order. */
-declare const DCA_STATUS: readonly ["ready", "unknown", "cancelled", "filled", "expired", "not-started", "waiting-for-slot", "spread-too-high", "trend-against", "below-limit"];
+declare const DCA_STATUS: readonly ["ready", "unknown", "cancelled", "filled", "expired", "not-started", "waiting-for-slot", "spread-too-high", "trend-against", "below-limit", "paused"];
 type DcaStatus = (typeof DCA_STATUS)[number];
 declare const DCA_STATUS_TEXT: Record<DcaStatus, string>;
 declare const statusOf: (code: number) => DcaStatus;
@@ -1583,15 +1720,23 @@ type DcaOrder = {
     pauseOnTrend: boolean;
     catchUp: boolean;
     cancelled: boolean;
+    paused: boolean;
     maxSpreadBps: number;
     maxSlippageBps: number;
+    /** Planned fills of the CURRENT schedule. */
     slices: number;
     interval: number;
+    /** Fills over the order's life. */
     filled: number;
+    /** Fills in the current schedule (resets when the order is edited). */
+    scheduleFilled: number;
     startTime: bigint;
     deadline: bigint;
     lastSlotPlusOne: bigint;
+    /** Total deposited; never changes. */
     amountIn: bigint;
+    /** What the current schedule spreads (amountIn, then the remainder at each edit). */
+    scheduleBudget: bigint;
     remaining: bigint;
     amountOut: bigint;
     minPriceWad: bigint;
@@ -1604,7 +1749,39 @@ declare function slotInfo(o: Pick<DcaOrder, "startTime" | "interval" | "deadline
     nextSlotAt: bigint;
 };
 /** PoincareDCA._sliceAmount. */
-declare function sliceAmount(o: Pick<DcaOrder, "amountIn" | "remaining" | "slices" | "filled" | "catchUp">, slot: bigint, lastSlot: bigint): bigint;
+declare function sliceAmount(o: Pick<DcaOrder, "scheduleBudget" | "remaining" | "slices" | "scheduleFilled" | "catchUp">, slot: bigint, lastSlot: bigint): bigint;
+/** What PoincareDCA.editOrder takes: a new schedule and rules for the REMAINING budget. */
+type DcaEditParams = {
+    slices: number;
+    interval: number;
+    startTime: bigint;
+    deadline: bigint;
+    maxSpreadBps: number;
+    pauseOnTrend: boolean;
+    catchUp: boolean;
+    maxSlippageBps: number;
+    minPriceWad: bigint;
+};
+/** Human-friendly edit. Anything omitted keeps the order's current value. */
+type DcaEditInput = {
+    slices?: number;
+    interval?: number;
+    startTime?: number | bigint;
+    deadline?: number | bigint;
+    /** Alternative to `deadline`: seconds from the new start. */
+    duration?: number;
+    maxSpreadBps?: number;
+    pauseOnTrend?: boolean;
+    catchUp?: boolean;
+    maxSlippageBps?: number;
+    /** USDC per WETH; `null` removes the limit. */
+    limitPrice?: string | number | null;
+};
+/**
+ * Edit params validated exactly like PoincareDCA.editOrder: the remaining budget is re-planned
+ * from the new start. The deadline defaults to one spare slot after the last new slice.
+ */
+declare function buildEditParams(o: DcaOrder, input: DcaEditInput, nowSec?: number | bigint): DcaEditParams;
 type SlicePlan = {
     status: DcaStatus;
     amountIn: bigint;
@@ -1710,6 +1887,9 @@ declare const DCA_GAS: {
     readonly executeSlice: 1500000n;
     readonly cancel: 200000n;
     readonly closeExpired: 200000n;
+    readonly pause: 80000n;
+    readonly resume: 80000n;
+    readonly editOrder: 150000n;
 };
 /** An unsigned transaction: send it from any wallet. */
 type TxRequest = {
@@ -1743,6 +1923,12 @@ declare function buildCreateOrderTx(dep: PoincareDeployment, p: DcaOrderParams):
 declare const buildExecuteSliceTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
 /** Cancel and refund. Only the order's owner may send it. */
 declare const buildCancelTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
+/** Hold the order. Only the order's owner may send it. */
+declare const buildPauseTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
+/** Let a paused order fill again. Only the order's owner may send it. */
+declare const buildResumeTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
+/** Re-plan the remaining budget (build the params with buildEditParams). Owner only. */
+declare function buildEditTx(dep: PoincareDeployment, id: bigint, p: DcaEditParams): TxRequest;
 /** After the deadline, refund the unfilled budget to the owner. Anyone may send it. */
 declare const buildCloseExpiredTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
 /** Everything a wallet must sign to open this order: an approval if needed, then the order. */
@@ -3578,14 +3764,21 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
             execute: (id: bigint) => TxRequest;
             cancel: (id: bigint) => TxRequest;
             closeExpired: (id: bigint) => TxRequest;
+            pause: (id: bigint) => TxRequest;
+            resume: (id: bigint) => TxRequest;
+            /** Reads the order, validates the edit like the contract, builds editOrder. */
+            edit: (id: bigint, input: DcaEditInput) => Promise<TxRequest>;
         };
         /** Approve (exact amount, if needed) and create; resolves to the new order id. */
         create: (input: DcaOrderInput) => Promise<bigint>;
         execute: (id: bigint) => Promise<viem.TransactionReceipt>;
         cancel: (id: bigint) => Promise<viem.TransactionReceipt>;
         closeExpired: (id: bigint) => Promise<viem.TransactionReceipt>;
+        pause: (id: bigint) => Promise<viem.TransactionReceipt>;
+        resume: (id: bigint) => Promise<viem.TransactionReceipt>;
+        edit: (id: bigint, input: DcaEditInput) => Promise<viem.TransactionReceipt>;
     };
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;
 
-export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildExecuteSliceTx, buildOrderParams, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
+export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
