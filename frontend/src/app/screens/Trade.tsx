@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { usePoolState, type PoolState } from "@/hooks/usePoolState";
@@ -152,7 +152,7 @@ export function Trade() {
     setBookSel(null);
     setAmtRaw(v);
   };
-  const [slip, setSlip] = useState<number>(0.5); // %
+  const [slip, setSlip] = useState<number>(0.5); // %, a personal setting: deliberately not in the URL
   const [impactAck, setImpactAck] = useState(false);
 
   const invalid = !AMOUNT_RE.test(amt);
@@ -173,6 +173,15 @@ export function Trade() {
   const payBal = zeroForOne ? bal.usdc : bal.weth;
   const amtNum = invalid ? 0 : Number(amt);
   const insufficient = amtNum > payBal + 1e-9;
+
+  const outText = q.out > 0 ? big(q.out, getSym === "WETH" ? 5 : 2) : "0";
+  const outRef = useRef(outText);
+  outRef.current = outText;
+  const [spokenOut, setSpokenOut] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSpokenOut(outRef.current === "0" ? "" : outRef.current), 900);
+    return () => clearTimeout(t);
+  }, [amt, side]);
 
   // Price impact on its own, without the fee and spread the executed price also carries.
   const mid = s.price;
@@ -237,7 +246,7 @@ export function Trade() {
   }
 
   // ---- book / trades panel ----
-  const [panel, setPanel] = useState<"book" | "trades" | "dca">("book");
+  const [panel, setPanel] = useParam("panel", ["book", "trades", "dca"] as const, "book");
   const [step, setStep] = useState<(typeof BOOK_STEPS)[number]>(BOOK_STEPS[0]);
   const rowsPerSide = narrow ? 6 : Math.max(4, Math.min(12, Math.floor((panelBox.h - 240) / 2 / 24)));
   const book = useMemo(
@@ -338,7 +347,7 @@ export function Trade() {
             inputMode="decimal"
             autoComplete="off"
             spellCheck={false}
-            placeholder="0.00"
+            placeholder={zeroForOne ? "1000…" : "0.5…"}
             aria-invalid={invalid || (insufficient && amtNum > 0)}
             aria-describedby={invalid || (insufficient && amtNum > 0 && !faucetFirst) ? "ticket-amount-error" : undefined}
             className="w-full text-right"
@@ -347,28 +356,30 @@ export function Trade() {
         </InlineField>
 
         <InlineField label="Receive" unit={getSym} muted>
-          <output aria-live="polite" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>
-            {q.out > 0 ? big(q.out, getSym === "WETH" ? 5 : 2) : "0"}
+          <output htmlFor="ticket-amount" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>
+            {outText}
           </output>
         </InlineField>
+        {/* spoken once the typing settles, not on every block's quote refresh */}
+        <span className="sr-only" aria-live="polite">{spokenOut ? `You receive about ${spokenOut} ${getSym}` : ""}</span>
 
         <dl className="flex flex-col" style={{ gap: 5 }}>
           <Row label="Fee · scales with volatility">{fmtPct(s.fee)}</Row>
           <Row label="Trend spread" color={spread > 0 ? "var(--honey-ink)" : "var(--up-ink)"}>{spread > 0 ? fmtPct(spread) : "None"}</Row>
           <Row label="Price impact" color={highImpact ? "var(--down-ink)" : undefined}>{fmtImpact(pureImpact)}</Row>
           <Row label="Minimum received">{big(minOut, getSym === "WETH" ? 5 : 2)} {getSym}</Row>
+        </dl>
           <div className="flex justify-between items-center gap-3" style={{ fontSize: 12 }}>
             <span id="slippage-label" style={{ color: "var(--text-3)" }}>Slippage</span>
             <div className="flex gap-1" role="group" aria-labelledby="slippage-label">
               {SLIPPAGE_OPTIONS.map((v) => (
-                <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md"
+                <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md chip-touch"
                   style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
                   {v}%
                 </button>
               ))}
             </div>
           </div>
-        </dl>
         {/* stacked layouts: the hook check scrolls with the form, so only the button rides the screen's edge */}
         {narrow && hookCheck}
         </div>
@@ -438,7 +449,7 @@ export function Trade() {
         {panel === "dca" ? null : panel === "book" ? (
           <div className="flex gap-1" role="group" aria-label="Price step">
             {BOOK_STEPS.map((st) => (
-              <button key={st} type="button" aria-pressed={step === st} onClick={() => { setStep(st); setBookSel(null); }} className="rounded-md"
+              <button key={st} type="button" aria-pressed={step === st} onClick={() => { setStep(st); setBookSel(null); }} className="rounded-md chip-touch"
                 style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", minHeight: 24, cursor: "pointer", color: step === st ? "var(--text)" : "var(--text-3)", background: step === st ? "var(--surface-2)" : "transparent", border: `1px solid ${step === st ? "var(--border-strong)" : "transparent"}` }}>
                 {fmtPct(st, 1)}
               </button>
@@ -447,7 +458,7 @@ export function Trade() {
         ) : (
           <div className="flex gap-1" role="group" aria-label="Whose trades">
             {([[false, "All"], [true, "Yours"]] as const).map(([v, l]) => (
-              <button key={l} type="button" aria-pressed={mine === v} onClick={() => { setMine(v); setVisible(PAGE); }} className="rounded-md"
+              <button key={l} type="button" aria-pressed={mine === v} onClick={() => { setMine(v); setVisible(PAGE); }} className="rounded-md chip-touch"
                 style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: mine === v ? "var(--text)" : "var(--text-3)", background: mine === v ? "var(--surface-2)" : "transparent", border: `1px solid ${mine === v ? "var(--border-strong)" : "transparent"}` }}>
                 {l}{v && myRows.length > 0 ? ` ${myRows.length}` : ""}
               </button>
@@ -547,7 +558,7 @@ function TickerBar({ s, risk, ready, spreadCap }: { s: PoolState; risk: RiskStat
               <div style={{ fontSize: 12, color: "var(--text-3)", whiteSpace: "nowrap" }}>Poincaré pool</div>
             </div>
           </div>
-          <div className="font-display text-right lg:text-left" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} aria-label={`Mid price ${fmtUsd(s.price, { dp: 2 })}`}>
+          <div className="font-display text-right lg:text-left" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>
             {s.loading ? <Skel w="7ch" /> : s.price > 0 ? fmtNum(s.price, 2) : "—"}
             <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", fontFamily: "inherit" }}>Mid price</span>
           </div>
@@ -634,8 +645,17 @@ function HookCheck({ s, side, spread, q, risk, onDca }: { s: PoolState; side: Si
         : diff > 0 ? `${fmtUsd(diff, { dp: 2 })} better than a standard 0.3% pool.`
           : `${fmtUsd(-diff, { dp: 2 })} more than a standard 0.3% pool${q.withTrend ? ", paid to LPs" : ""}.`;
 
+  // What a screen reader hears: the hook's verdict only, so it speaks when the verdict changes
+  // (a spread starts or ends), not every block the percentages move.
+  const verdict =
+    spread > 0 ? `Hook: this ${side} pushes with the trend and pays a spread.`
+      : other > 0 ? "Hook: no spread; this order trades against the trend."
+        : risk.level === "watching" && !risk.gated ? "Hook: no spread yet; trend evidence is building."
+          : "Hook: no trend spread right now.";
+
   return (
-    <div className="flex gap-2 rounded-lg" role="status" style={{ padding: "8px 10px", background: bg, border: `1px solid ${border}` }}>
+    <div className="flex gap-2 rounded-lg" style={{ padding: "8px 10px", background: bg, border: `1px solid ${border}` }}>
+      <span className="sr-only" aria-live="polite">{verdict}</span>
       <span aria-hidden="true" style={{ color: tone, marginTop: 1 }}><Icon name={icon} size={14} /></span>
       <div style={{ fontSize: 12, lineHeight: 1.45, color: "var(--text-2)" }}>
         <b style={{ color: tone }}>Hook · </b>{text}

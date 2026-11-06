@@ -15,6 +15,7 @@ import { fromWei } from "@/lib/units";
 import { fmtNum, fmtPct, fmtUsd, shorten } from "@/lib/format";
 import { CONTRACTS, EXPLORER } from "@/config/contracts";
 import { loadAppRoute } from "@/app/preload";
+import { scrollBehavior } from "@/lib/platform";
 
 // start fetching the app chunk the moment a visitor shows intent, so the click lands instantly
 const warmApp = { onPointerEnter: () => void loadAppRoute(), onFocus: () => void loadAppRoute(), onTouchStart: () => void loadAppRoute() };
@@ -41,8 +42,10 @@ const enter = (delay = 0) => ({
 });
 
 // In-page scroll (HashRouter owns the URL hash, so these are buttons, not href="#id").
-const scrollToId = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+const scrollToId = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: scrollBehavior() });
+const scrollTop = () => window.scrollTo({ top: 0, behavior: scrollBehavior() });
+/** Read by screen readers after a link that opens a new tab (the icon beside it is decorative). */
+const NewTab = () => <span className="sr-only"> (opens in a new tab)</span>;
 
 const NAV = [
   { id: "how", label: "How it works" },
@@ -118,7 +121,7 @@ function Nav() {
         </div>
         <div className="ml-auto lg:ml-0 flex items-center gap-2 sm:gap-3">
           <a href={REPO} target="_blank" rel="noreferrer" className="link-quiet hidden sm:inline-flex items-center gap-1.5 rounded-full px-3" style={{ minHeight: 40, fontSize: 15, fontWeight: 700 }}>
-            GitHub <Icon name="external" size={13} aria-hidden="true" />
+            GitHub <Icon name="external" size={13} aria-hidden="true" /><NewTab />
           </a>
           <ThemeToggle />
           <LaunchButton nav />
@@ -159,7 +162,7 @@ function Hero() {
         <motion.div {...enter(0.15)} className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
           <LaunchButton size="lg" />
           <a href={README} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1.5" style={{ fontSize: 15, fontWeight: 700, minHeight: 44 }}>
-            Read the research <Icon name="external" size={14} aria-hidden="true" />
+            Read the research <Icon name="external" size={14} aria-hidden="true" /><NewTab />
           </a>
         </motion.div>
 
@@ -418,9 +421,10 @@ function EvidenceBand() {
         <div className="mt-16 mb-4" style={{ fontSize: 14, fontWeight: 700, color: "var(--lp-band-muted)" }}>From the backtests: real-data replays and synthetic stress paths</div>
         <dl className="grid gap-px overflow-hidden rounded-3xl sm:grid-cols-2 lg:grid-cols-4" style={{ background: "var(--lp-band-line)", border: "1px solid var(--lp-band-line)" }}>
           {figures.map((f) => (
-            <div key={f.l} className="p-6 sm:p-8" style={{ background: "var(--lp-band)" }}>
-              <dd className="lp-head" style={{ fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 1, color: "var(--lp-band-text)", fontVariantNumeric: "tabular-nums" }}>{f.v}</dd>
+            // dt first, as the markup requires; column-reverse keeps the figure on top visually
+            <div key={f.l} className="p-6 sm:p-8 flex flex-col-reverse" style={{ background: "var(--lp-band)" }}>
               <dt className="mt-3" style={{ fontSize: 15, lineHeight: 1.5, color: "var(--lp-band-muted)" }}>{f.l}</dt>
+              <dd className="lp-head" style={{ fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 1, color: "var(--lp-band-text)", fontVariantNumeric: "tabular-nums" }}>{f.v}</dd>
             </div>
           ))}
         </dl>
@@ -448,8 +452,8 @@ function EvidenceBand() {
 function Proof() {
   // Four-year replay, $2,000,000 position, arbitrage extracted (README, "Four years of real data").
   const rows = [
-    { l: "Normal pool, 5 bps fee", v: 473_696, c: "var(--faint)" },
-    { l: "Normal pool, 30 bps fee", v: 387_110, c: "var(--faint)" },
+    { l: "Normal pool, 5 bps fee", v: 473_696, c: "var(--faint)" },
+    { l: "Normal pool, 30 bps fee", v: 387_110, c: "var(--faint)" },
     { l: "Poincaré", v: 264_835, c: "var(--lav)" },
   ];
   const max = rows[0].v;
@@ -462,9 +466,9 @@ function Proof() {
           <span className="font-display" style={{ fontSize: 18, fontWeight: 700, color: "var(--lp-head)" }}>Value taken by arbitrageurs</span>
           <span style={{ fontSize: 13, color: "var(--text-3)" }}>$2M position, ETH/USDC 2022 to 2026</span>
         </figcaption>
-        <div className="flex flex-col" style={{ gap: 22 }} role="list">
+        <ul className="flex flex-col" style={{ gap: 22 }}>
           {rows.map((r) => (
-            <div key={r.l} role="listitem">
+            <li key={r.l}>
               <div className="flex justify-between" style={{ fontSize: 15, marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, color: r.l === "Poincaré" ? "var(--lp-head)" : "var(--text-2)" }}>{r.l}</span>
                 <span className="font-display" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: r.l === "Poincaré" ? "var(--lav-ink)" : "var(--text-2)" }}>{fmtUsd(r.v, { dp: 0 })}</span>
@@ -473,9 +477,9 @@ function Proof() {
                 <motion.div initial={{ scaleX: 0 }} whileInView={{ scaleX: r.v / max }} viewport={{ once: true }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
                   style={{ height: "100%", width: "100%", background: r.c, transformOrigin: "left", borderRadius: 99 }} />
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
 
         <details className="faq mt-10 pt-6" style={{ borderTop: "1px solid var(--border)" }}>
           <summary className="flex items-center justify-between gap-4" style={{ cursor: "pointer", fontSize: 15, fontWeight: 800, color: "var(--lp-head)", listStyle: "none" }}>
@@ -498,7 +502,7 @@ function Proof() {
               <li><b style={{ color: "var(--text-2)" }}>Stress harness:</b> five seeded trend-dense paths (47.1% to 53.2%), fresh order book per run.</li>
             </ul>
             <a href={README} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1 self-start" style={{ fontSize: 13, fontWeight: 700 }}>
-              Full results in the README <Icon name="external" size={12} aria-hidden="true" />
+              Full results in the README <Icon name="external" size={12} aria-hidden="true" /><NewTab />
             </a>
           </div>
         </details>
@@ -521,7 +525,7 @@ function Security() {
         <Heading id="security-title" align="left" title="Built so that faking a trend doesn't pay."
           lede="Triggering the detector means really moving the price and paying impact the whole way, while arbitrageurs undo the move behind you." />
         <a href={SECURITY_DOC} target="_blank" rel="noreferrer" className="btn lp-btn-ghost" style={{ padding: "0 20px" }}>
-          Security model <Icon name="external" size={14} aria-hidden="true" />
+          Security model <Icon name="external" size={14} aria-hidden="true" /><NewTab />
         </a>
       </div>
       <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -624,7 +628,7 @@ function Footer() {
               <Link to={l.to} {...warmApp} className="link-quiet" style={{ fontSize: 14 }}>{l.label}</Link>
             ) : (
               <a href={l.href} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" style={{ fontSize: 14, fontFamily: l.mono ? "var(--font-mono)" : undefined }} translate={l.mono ? "no" : undefined}>
-                {l.label} <Icon name="external" size={12} aria-hidden="true" />
+                {l.label} <Icon name="external" size={12} aria-hidden="true" /><NewTab />
               </a>
             )}
           </li>

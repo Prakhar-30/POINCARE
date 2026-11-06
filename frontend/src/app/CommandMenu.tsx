@@ -8,8 +8,7 @@ import { TABS, type Tab } from "./TopNav";
 
 const README = "https://github.com/Prakhar-30/POINCARE#readme";
 
-/** The platform's modifier, for the hint text only: ⌘ on Apple devices, Ctrl elsewhere. */
-export const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+export { MOD } from "@/lib/platform";
 
 type Command = { id: string; label: string; icon: IconName; hint?: string; run: () => void };
 

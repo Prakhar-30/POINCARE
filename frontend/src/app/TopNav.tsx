@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { motion } from "framer-motion";
@@ -6,9 +7,14 @@ import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { MOD } from "./CommandMenu";
+import { MOD } from "@/lib/platform";
 
 export type Tab = "dashboard" | "trade" | "pool" | "analytics";
+
+/** Each section is a real link (#/app?tab=…), so Cmd/Ctrl-click and middle-click open it in a new
+ *  tab. A plain click still goes through setTab, which also scrolls back to the top. */
+const tabHref = (t: Tab) => ({ search: t === "dashboard" ? "" : `?tab=${t}` });
+const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -53,9 +59,9 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
               const active = t.id === tab;
               return (
                 <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setTab(t.id)}
+                  <Link
+                    to={tabHref(t.id)}
+                    onClick={(e) => { if (plainClick(e)) { e.preventDefault(); setTab(t.id); } }}
                     aria-current={active ? "page" : undefined}
                     aria-label={t.label}
                     aria-keyshortcuts={String(i + 1)}
@@ -73,9 +79,9 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
                     )}
                     <span className="relative z-10 flex items-center gap-2">
                       <Icon name={t.icon} size={16} aria-hidden="true" />
-                      <span className="hidden lg:block">{t.label}</span>
+                      <span className="hidden lg:block" aria-hidden="true">{t.label}</span>
                     </span>
-                  </button>
+                  </Link>
                 </li>
               );
             })}
@@ -118,9 +124,9 @@ export function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void 
           const active = t.id === tab;
           return (
             <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => setTab(t.id)}
+              <Link
+                to={tabHref(t.id)}
+                onClick={(e) => { if (plainClick(e)) { e.preventDefault(); setTab(t.id); } }}
                 aria-current={active ? "page" : undefined}
                 className="bottom-nav-item"
               >
@@ -136,7 +142,7 @@ export function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void 
                   <Icon name={t.icon} size={20} aria-hidden="true" className="relative" />
                 </span>
                 {t.label}
-              </button>
+              </Link>
             </li>
           );
         })}

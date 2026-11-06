@@ -5,6 +5,7 @@ import { usePoolState } from "@/hooks/usePoolState";
 import { usePosition } from "@/hooks/usePosition";
 import { useBalances } from "@/hooks/useBalances";
 import { useLiquidity } from "@/hooks/useLiquidity";
+import { useFaucet } from "@/hooks/useSwap";
 import { usePoolTotals, useWalletActivity } from "@/hooks/useBackend";
 import { useDetectorConfig } from "@/hooks/useDetectorConfig";
 import { useParam } from "@/hooks/useParam";
@@ -66,6 +67,7 @@ export function Pool() {
   const narrow = useIsNarrow();
   const mobile = useIsMobile();
 
+  // not in the URL: a shared link should never open straight on Withdraw
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [chart, setChart] = useParam("chart", ["depth", "curve"] as const, "depth");
   const [rangeId, setRangeId] = useParam<RangeId>("window", RANGES.map((r) => r.id), "10");
@@ -277,7 +279,7 @@ export function Pool() {
   );
 
   const historyTab = (
-    <div className="overflow-auto" style={{ maxHeight: 340 }} tabIndex={0} aria-label="Your liquidity events">
+    <div className="overflow-auto" style={{ maxHeight: 340 }} tabIndex={0} role="region" aria-label="Your liquidity events">
       {me.loading ? (
         <p style={{ padding: 24, fontSize: 13, color: "var(--muted)", textAlign: "center" }}>Loading your history…</p>
       ) : me.lpEvents.length === 0 ? (
@@ -288,7 +290,7 @@ export function Pool() {
           <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
             <tr>
               {["Time", "Action", "USDC", "WETH", "Shares", "Value", ""].map((h, i) => (
-                <th key={h || i} scope="col" style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h}</th>
+                <th key={h || i} scope="col" style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h || <span className="sr-only">Transaction</span>}</th>
               ))}
             </tr>
           </thead>
@@ -414,10 +416,13 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
     if (price > 0 && n > 0) setUsdc((n * price).toFixed(2));
   };
 
+  const faucet = useFaucet();
   const u = Number(usdc) || 0;
   const w = Number(weth) || 0;
   const valueUsdc = u + w * price;
-  const insufficient = u > bal.usdc + 1e-6 || w > bal.weth + 1e-9;
+  const shortUsdc = u > bal.usdc + 1e-6;
+  const shortWeth = w > bal.weth + 1e-9;
+  const insufficient = shortUsdc || shortWeth;
   const busy = lp.status === "busy";
   const disabled = busy || u <= 0 || w <= 0 || insufficient;
 
@@ -428,30 +433,39 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
   }
 
   return (
+    // a form, so Enter in either amount submits, as on the trade ticket
+    <form noValidate className={pinned ? "flex flex-col flex-1 min-h-0" : "flex flex-col"}
+      onSubmit={(e) => { e.preventDefault(); if (!disabled) void onAdd(); }}>
     <TicketBody
       pinned={pinned}
       footer={
         <>
-          <button type="button" onClick={onAdd} disabled={disabled} aria-busy={busy} className="btn btn-positive btn-lg btn-block">
+          <button type="submit" disabled={disabled} aria-busy={busy} className="btn btn-positive btn-lg btn-block">
             {busy && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
             {lp.status === "success" && <Icon name="check" size={17} aria-hidden="true" />}
             {busy ? "Confirming…" : lp.status === "success" ? "Added" : insufficient ? "Insufficient balance" : "Add liquidity"}
           </button>
-          {(bal.usdc < u || bal.weth < w) && (
-            <p className="mt-2 text-center" style={{ fontSize: 12, color: "var(--muted)" }}>Need test tokens? Grab them from the Trade tab faucet.</p>
+          {insufficient && (
+            <button type="button" onClick={() => void faucet.mint().then(() => bal.refetch())} disabled={faucet.minting} aria-busy={faucet.minting}
+              className="link-quiet w-full mt-1.5" style={{ fontSize: 12, fontWeight: 700, minHeight: 28 }}>
+              {faucet.minting ? "Minting test tokens…" : "Get free test tokens: 50k USDC + 20 WETH"}
+            </button>
           )}
         </>
       }
     >
-      <LiqInput label="USDC" sub={`Avbl ${big(bal.usdc, 2)}`} value={usdc} onInput={onUsdc} />
+      <LiqInput label="USDC" sub={`Avbl ${big(bal.usdc, 2)}`} value={usdc} onInput={onUsdc}
+        error={shortUsdc ? `More than your ${big(bal.usdc, 2)} USDC` : null} />
       <div className="flex items-center justify-center" style={{ margin: "6px 0", color: "var(--muted)" }} aria-hidden="true"><Icon name="plus" size={14} /></div>
-      <LiqInput label="WETH" sub={`Avbl ${big(bal.weth, 4)}`} value={weth} onInput={onWeth} />
+      <LiqInput label="WETH" sub={`Avbl ${big(bal.weth, 4)}`} value={weth} onInput={onWeth}
+        error={shortWeth ? `More than your ${big(bal.weth, 4)} WETH` : null} />
       <dl className="mt-3.5 flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
         <Detail label="Deposit value" value={fmtUsd(valueUsdc, { dp: 2, compact: valueUsdc >= 1e6 })} />
         <Detail label="Pool ratio" value={`${fmtUsd(price)} / WETH`} />
         <Detail label="Added at" value="Current reserve ratio" />
       </dl>
     </TicketBody>
+    </form>
   );
 }
 
@@ -511,22 +525,26 @@ function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>;
   );
 }
 
-function LiqInput({ label, sub, value, onInput }: { label: string; sub: string; value: string; onInput: (v: string) => void }) {
+function LiqInput({ label, sub, value, onInput, error }: { label: string; sub: string; value: string; onInput: (v: string) => void; error?: string | null }) {
   const id = `liq-${label.toLowerCase()}`;
   return (
-    <div className="field" style={{ padding: "10px 14px" }}>
+    <div>
+    <div className="field" style={{ padding: "10px 14px", borderColor: error ? "var(--negative)" : undefined }}>
       <div className="field-label">
         <label htmlFor={id}>{label} amount</label><span className="truncate">{sub}</span>
       </div>
       <div className="flex items-center gap-2.5">
         <input id={id} name={id} value={value} onChange={(e) => onInput(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
-          autoComplete="off" spellCheck={false} placeholder="0.0"
+          autoComplete="off" spellCheck={false} placeholder={label === "USDC" ? "3000…" : "1.5…"}
+          aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
           style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", color: "var(--text)", fontSize: 22, fontWeight: 800 }} />
         <div className="flex items-center gap-2 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--nav-border)", borderRadius: 22, padding: "5px 11px 5px 6px", boxShadow: "var(--shadow-sm)" }}>
           <TokenIcon sym={label} size={18} />
           <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{label}</span>
         </div>
       </div>
+    </div>
+    {error && <p id={`${id}-error`} style={{ fontSize: 12, fontWeight: 700, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
     </div>
   );
 }

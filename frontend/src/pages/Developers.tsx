@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon } from "@/components/ui/Icon";
+import { useModal } from "@/hooks/useModal";
+import { MOD, scrollBehavior } from "@/lib/platform";
 import { GROUPS, PAGES, REPO, pageBySlug, type DocPage } from "./devdocs/pages";
 
 /**
@@ -98,7 +100,7 @@ export function Developers() {
                         onClick={(e) => {
                           e.preventDefault();
                           const el = document.getElementById(t.id);
-                          el?.scrollIntoView({ behavior: "smooth" });
+                          el?.scrollIntoView({ behavior: scrollBehavior() });
                           el?.focus({ preventScroll: true });
                         }}
                         aria-current={toc.active === t.id ? "location" : undefined}
@@ -138,10 +140,11 @@ function TopBar({ onSearch, onMenu }: { onSearch: () => void; onMenu: () => void
         </Link>
         <Link to="/developers" className="rounded-full px-2.5 shrink-0" style={{ fontSize: 12.5, fontWeight: 800, color: "var(--lav-ink)", background: "var(--lav-soft)", border: "1px solid var(--lav-dim)", lineHeight: "24px" }}>Docs</Link>
 
-        <button type="button" onClick={onSearch} className="field docs-search hidden md:flex items-center gap-2 ml-4 flex-1 text-left" aria-label="Search the docs"
+        <button type="button" onClick={onSearch} className="field docs-search hidden md:flex items-center gap-2 ml-4 flex-1 text-left"
+          aria-keyshortcuts="Control+K Meta+K /"
           style={{ maxWidth: 360, padding: "0 10px", minHeight: 38, borderRadius: 10, cursor: "pointer", color: "var(--text-3)", fontSize: 14 }}>
           <Icon name="search" size={15} aria-hidden="true" /> Search docs
-          <kbd className="ml-auto" style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "1px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)" }}>Ctrl K</kbd>
+          <kbd className="ml-auto" aria-hidden="true" style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "1px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", whiteSpace: "nowrap" }}>{MOD}&nbsp;K</kbd>
         </button>
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
@@ -158,12 +161,14 @@ function TopBar({ onSearch, onMenu }: { onSearch: () => void; onMenu: () => void
 }
 
 function Sidebar({ current }: { current: string }) {
+  // rendered twice (desktop rail and phone drawer), so heading ids are made unique per instance
+  const uid = useId();
   return (
     <div className="flex flex-col" style={{ gap: 22 }}>
       {GROUPS.map((g) => (
         <div key={g}>
-          <p style={{ fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase", padding: "0 10px", marginBottom: 6 }}>{g}</p>
-          <ul className="flex flex-col" style={{ gap: 1 }}>
+          <h2 id={`${uid}-${g.replace(/\W+/g, "-").toLowerCase()}`} style={{ fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase", padding: "0 10px", marginBottom: 6 }}>{g}</h2>
+          <ul className="flex flex-col" style={{ gap: 1 }} aria-labelledby={`${uid}-${g.replace(/\W+/g, "-").toLowerCase()}`}>
             {PAGES.filter((p) => p.group === g).map((p) => {
               const on = p.slug === current;
               return (
@@ -184,16 +189,15 @@ function Sidebar({ current }: { current: string }) {
 
 function Drawer({ current, onClose }: { current: string; onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
+  // Tab stays in the drawer, Escape closes, the page behind holds still, focus returns to the menu button
+  useModal(panel, onClose);
   useEffect(() => {
     panel.current?.querySelector<HTMLElement>("button")?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Docs menu">
       <button type="button" tabIndex={-1} aria-label="Close the docs menu" className="absolute inset-0" style={{ background: "rgba(10, 8, 20, 0.35)" }} onClick={onClose} />
-      <div ref={panel} className="absolute left-0 top-0 bottom-0 overflow-y-auto" style={{ width: "min(300px, 86vw)", background: "var(--page)", borderRight: "1px solid var(--border)", padding: "16px 12px 32px" }}>
+      <div ref={panel} className="absolute left-0 top-0 bottom-0 overflow-y-auto" style={{ width: "min(300px, 86vw)", background: "var(--page)", borderRight: "1px solid var(--border)", padding: "16px 12px 32px", overscrollBehavior: "contain" }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
           <span className="font-display" style={{ fontWeight: 700, fontSize: 16, paddingLeft: 10 }}>Docs</span>
           <button type="button" onClick={onClose} className="icon-btn icon-btn-plain" aria-label="Close the docs menu"><Icon name="close" size={16} aria-hidden="true" /></button>
@@ -210,6 +214,8 @@ function Search({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+  useModal(card, onClose);
   useEffect(() => input.current?.focus(), []);
   const results = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -224,6 +230,10 @@ function Search({ onClose }: { onClose: () => void }) {
       .sort((a, b) => b.score - a.score)
       .map((r) => r.p);
   }, [q]);
+  // keep the highlighted result in view while the arrows move it
+  useEffect(() => {
+    if (results[sel]) document.getElementById(`doc-opt-${results[sel].slug}`)?.scrollIntoView({ block: "nearest" });
+  }, [sel, results]);
   const go = (p: DocPage) => {
     onClose();
     navigate(`/developers/${p.slug}`);
@@ -232,31 +242,33 @@ function Search({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center px-4" role="dialog" aria-modal="true" aria-label="Search the docs" style={{ paddingTop: "12vh" }}>
       <button type="button" tabIndex={-1} aria-label="Close search" className="absolute inset-0" style={{ background: "rgba(10, 8, 20, 0.35)" }} onClick={onClose} />
-      <div className="card relative w-full overflow-hidden" style={{ maxWidth: 560, padding: 0 }}>
+      <div ref={card} className="card relative w-full overflow-hidden" style={{ maxWidth: 560, padding: 0 }}>
         <div className="flex items-center gap-2 px-4" style={{ borderBottom: "1px solid var(--divider)", minHeight: 52 }}>
           <Icon name="search" size={16} aria-hidden="true" style={{ color: "var(--text-3)" }} />
+          {/* combobox + listbox, as in the app's command menu: focus stays in the field, the arrows
+              move the highlighted result (aria-activedescendant), Enter opens it */}
           <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Search: regime, pause, MCP, endpoints…"
-            aria-label="Search the docs" aria-controls="docs-results" className="flex-1 min-w-0"
+            role="combobox" aria-expanded="true" aria-autocomplete="list" aria-controls="docs-results"
+            aria-activedescendant={results[sel] ? `doc-opt-${results[sel].slug}` : undefined}
+            aria-label="Search the docs" name="docs-search" autoComplete="off" spellCheck={false} className="flex-1 min-w-0"
             style={{ background: "transparent", border: "none", outline: "none", fontSize: 16, color: "var(--text)" }}
             onKeyDown={(e) => {
-              if (e.key === "Escape") onClose();
               if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, results.length - 1)); }
               if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
               if (e.key === "Enter" && results[sel]) go(results[sel]);
             }} />
           <kbd style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "1px 6px", borderRadius: 6, border: "1px solid var(--border)", color: "var(--text-3)" }}>Esc</kbd>
         </div>
-        <ul id="docs-results" role="listbox" aria-label="Results" className="overflow-y-auto" style={{ maxHeight: "50vh", padding: 6 }}>
-          {results.length === 0 && <li style={{ padding: 16, fontSize: 14, color: "var(--text-3)" }}>Nothing matches “{q}”.</li>}
+        <ul id="docs-results" role="listbox" aria-label="Results" className="overflow-y-auto" style={{ maxHeight: "50vh", padding: 6, overscrollBehavior: "contain" }}>
+          {results.length === 0 && <li role="presentation" style={{ padding: 16, fontSize: 14, color: "var(--text-3)" }}>Nothing matches “{q}”.</li>}
           {results.map((p, j) => (
-            <li key={p.slug} role="option" aria-selected={j === sel}>
-              <button type="button" onClick={() => go(p)} onMouseEnter={() => setSel(j)} className="w-full text-left rounded-lg"
-                style={{ padding: "9px 12px", cursor: "pointer", background: j === sel ? "var(--lav-soft)" : "transparent" }}>
-                <span className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 800, color: j === sel ? "var(--lav-ink)" : "var(--text)" }}>
-                  {p.title} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>{p.group}</span>
-                </span>
-                <span className="block truncate" style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>{p.lede}</span>
-              </button>
+            <li key={p.slug} id={`doc-opt-${p.slug}`} role="option" aria-selected={j === sel}
+              onClick={() => go(p)} onMouseMove={() => setSel(j)} className="rounded-lg"
+              style={{ padding: "9px 12px", cursor: "pointer", background: j === sel ? "var(--lav-soft)" : "transparent" }}>
+              <span className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 800, color: j === sel ? "var(--lav-ink)" : "var(--text)" }}>
+                {p.title} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>{p.group}</span>
+              </span>
+              <span className="block truncate" style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>{p.lede}</span>
             </li>
           ))}
         </ul>
@@ -270,7 +282,7 @@ function Pager({ page, dir }: { page: DocPage; dir: "prev" | "next" }) {
     <Link to={`/developers/${page.slug}`} className="card flex flex-col docs-card"
       style={{ padding: "12px 16px", gap: 2, textAlign: dir === "next" ? "right" : "left" }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{dir === "next" ? "Next" : "Previous"}</span>
-      <span className="font-display" style={{ fontSize: 16, fontWeight: 700, color: "var(--lav-ink)" }}>{dir === "prev" ? "← " : ""}{page.title}{dir === "next" ? " →" : ""}</span>
+      <span className="font-display" style={{ fontSize: 16, fontWeight: 700, color: "var(--lav-ink)" }}>{dir === "prev" && <span aria-hidden="true">← </span>}{page.title}{dir === "next" && <span aria-hidden="true"> →</span>}</span>
     </Link>
   );
 }

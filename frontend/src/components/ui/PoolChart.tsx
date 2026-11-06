@@ -140,7 +140,31 @@ export function PoolChart({ height = 220 }: { height?: number }) {
         </div>
       </div>
 
-      <div style={{ position: "relative", height: H, opacity: fetching && !loading ? 0.8 : 1, transition: "opacity .2s" }}>
+      {/* Keyboard: focus the chart, then the arrow keys step the crosshair trade by trade
+          (Home / End jump to the ends, Escape clears), the same readout the pointer gets. */}
+      <div
+        style={{ position: "relative", height: H, opacity: fetching && !loading ? 0.8 : 1, transition: "opacity .2s", borderRadius: 8 }}
+        tabIndex={model && model.trades.length > 0 ? 0 : undefined}
+        role={model && model.trades.length > 0 ? "group" : undefined}
+        aria-label={model && model.trades.length > 0 ? "Price chart: use the arrow keys to step through trades" : undefined}
+        onBlur={() => setHoverX(null)}
+        onKeyDown={(e) => {
+          if (!model || model.trades.length === 0) return;
+          const n = model.trades.length;
+          let next: number | null = null;
+          if (e.key === "ArrowRight") next = hi === null ? n - 1 : Math.min(hi + 1, n - 1);
+          else if (e.key === "ArrowLeft") next = hi === null ? n - 1 : Math.max(hi - 1, 0);
+          else if (e.key === "Home") next = 0;
+          else if (e.key === "End") next = n - 1;
+          else if (e.key === "Escape") { setHoverX(null); return; }
+          if (next === null) return;
+          e.preventDefault();
+          setHoverX(model.x(model.trades[next].t));
+        }}
+      >
+        <span className="sr-only" aria-live="polite">
+          {hp ? `${hp.buy ? "Buy" : "Sell"} ${fmtNum(hp.weth, 4)} WETH at ${fmtUsd(hp.p, { dp: 2 })}, ${tipFmt.format(new Date(hp.t))}` : ""}
+        </span>
         {!model ? (
           <div className="flex items-center justify-center gap-2" style={{ height: H, fontSize: 13, color: "var(--muted)" }}>
             {loading ? "Loading price history…" : "No trades yet."}
@@ -221,7 +245,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>
-              {new Date(hp.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {tipFmt.format(new Date(hp.t))}
             </div>
             <TipRow label="Price" value={fmtUsd(hp.p, { dp: 2 })} bold />
             <TipRow label="Side" value={hp.buy ? "Buy WETH" : "Sell WETH"} color={hp.buy ? "var(--up-ink)" : "var(--down-ink)"} />
@@ -233,6 +257,8 @@ export function PoolChart({ height = 220 }: { height?: number }) {
     </div>
   );
 }
+
+const tipFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 function TipRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
   return (

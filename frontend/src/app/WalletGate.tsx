@@ -30,7 +30,7 @@ export function WalletGate() {
 
       <div className="mt-7 flex items-center gap-2" style={{ color: "var(--muted)", fontSize: 13 }}>
         <Icon name="lock" size={14} aria-hidden="true" />
-        Non-custodial · we never see your keys · read-only until you sign
+        Non-custodial · your keys never leave your wallet · read-only until you sign
       </div>
 
       <Link to="/" className="link-quiet mt-10 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold">

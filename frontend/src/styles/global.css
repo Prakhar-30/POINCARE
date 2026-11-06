@@ -131,7 +131,8 @@
 .skip-link {
   position: fixed;
   left: 16px;
-  top: -64px;
+  top: 12px;
+  transform: translateY(-80px);
   z-index: 200;
   padding: 10px 16px;
   border-radius: 12px;
@@ -140,10 +141,18 @@
   font-weight: 800;
   font-size: 14px;
   box-shadow: var(--shadow-lg);
-  transition: top 0.15s ease-out;
+  transition: transform 0.15s ease-out;
 }
 .skip-link:focus-visible {
-  top: 12px;
+  transform: translateY(0);
+}
+
+/* Small inline chips (slippage, book step, DCA options) keep their compact size for a mouse and
+   grow to a comfortable touch target on touch screens. */
+@media (pointer: coarse) {
+  .chip-touch {
+    min-height: 36px !important;
+  }
 }
 
 /* Controls ---------------------------------------------------------------- */

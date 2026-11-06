@@ -130,7 +130,7 @@ export function Analytics() {
   const partialTape = (totals?.swap_count ?? 0) > tape.length;
 
   const study = [
-    { label: "LP value vs a 30bps pool", value: "+6.4%", sub: "4 years of real ETH/USDC", ink: "var(--up-ink)" },
+    { label: "LP value vs a 30 bps pool", value: "+6.4%", sub: "4 years of real ETH/USDC", ink: "var(--up-ink)" },
     { label: "Arbitrage extraction cut", value: "32%", sub: "Same four-year replay", ink: "var(--up-ink)" },
     { label: "LVR reduction, synthetic", value: "50.6%", sub: "Mean of 5 seeded stress paths", ink: "var(--lav-ink)" },
     { label: "LP advantage, 12m real", value: "+$34k", sub: "vs x·y=k, matched friction budget", ink: "var(--lav-ink)" },
@@ -294,7 +294,7 @@ export function Analytics() {
           {paramsOpen === "open" ? "Hide reasoning" : "Show reasoning"}
         </button>
       </PanelHead>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Pool parameters, scrollable">
         <table id="an-params-table" className="w-full" style={{ borderCollapse: "collapse" }}>
           <caption className="sr-only">Detector and curve parameters of the live hook: seven immutable values, each derived from an interpretable target.</caption>
           <thead>
@@ -410,9 +410,15 @@ function ReportBody({ open, onToggle, children, tall }: { open: boolean; onToggl
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const [closedH, setClosedH] = useState(0);
+  // Measured by a ResizeObserver while closed (the preview grows when the report text arrives),
+  // never by reading layout on every render.
   useLayoutEffect(() => {
-    if (!open && box.current) setClosedH(box.current.offsetHeight);
-  });
+    const el = box.current;
+    if (open || !el) return;
+    const ro = new ResizeObserver(() => setClosedH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
   return (
     <>
       <div

@@ -54,8 +54,8 @@ const DEC = /^\d*\.?\d*$/;
 const toBpsUp = (frac: number) => Math.ceil(frac * 10_000 - 1e-9);
 /** A typed amount the SDK can parse: "." or "" become "0" (no amount yet), "1." becomes "1". */
 const amountOrZero = (v: string) => (DEC.test(v) && Number(v) > 0 ? v.replace(/\.$/, "") : "0");
-const when = (unixSec: number | bigint) =>
-  new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(Number(unixSec) * 1000));
+const whenFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const when = (unixSec: number | bigint) => whenFmt.format(new Date(Number(unixSec) * 1000));
 const cleanDecimal = (v: string) => v.replace(/,/g, ".").replace(/[^0-9.]/g, "");
 
 export function DcaTicket({
@@ -190,14 +190,15 @@ export function DcaTicket({
               </>
             )}
 
-            <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.45 }}>
+            {/* polite, not an alert: this line changes on every keystroke */}
+            <p aria-live="polite" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.45 }}>
               {plan.ok
                 ? kind === "recurring"
                   ? <>{fmtNum(totalNum, dp(paySym))} {paySym} in total, {FREQUENCY_LABEL[freq].toLowerCase()}, done by {when(plan.p.deadline)}.</>
                   : <>{plan.p.slices} {one}s of ≈{fmtNum(perNum, dp(paySym))} {paySym}, one every {Math.round(plan.p.interval / 60)} min, done by {when(plan.p.deadline)}.</>
                 : empty
                   ? "Enter an amount to see the schedule."
-                  : <span role="alert" style={{ color: "var(--down-ink)", fontWeight: 700 }}>{paramHint(plan.error ?? "")}</span>}
+                  : <span style={{ color: "var(--down-ink)", fontWeight: 700 }}>{paramHint(plan.error ?? "")}</span>}
             </p>
 
             <fieldset>
@@ -223,7 +224,8 @@ export function DcaTicket({
                       <label htmlFor="dca-limit" style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>
                         {side === "buy" ? "Max price" : "Min price"} <span style={{ fontWeight: 600 }}>(optional)</span>
                       </label>
-                      <input id="dca-limit" value={limit} inputMode="decimal" autoComplete="off" placeholder={s.price > 0 ? fmtNum(s.price, 0) : "USDC"}
+                      <input id="dca-limit" name="dca-limit" value={limit} inputMode="decimal" autoComplete="off" spellCheck={false}
+                        placeholder={s.price > 0 ? `${fmtNum(s.price, 0)}…` : "USDC…"}
                         onChange={(e) => setLimit(cleanDecimal(e.target.value))} className="w-full"
                         style={{ background: "transparent", border: "none", fontSize: 14, fontWeight: 800, color: "var(--text)" }} />
                     </div>
@@ -231,7 +233,7 @@ export function DcaTicket({
                       <div id="dca-slip-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>Slippage per {one}</div>
                       <div className="flex gap-1" role="group" aria-labelledby="dca-slip-label">
                         {SLIPPAGE.map((v) => (
-                          <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md"
+                          <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md chip-touch"
                             style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 28, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
                             {v}%
                           </button>
@@ -431,7 +433,7 @@ function AmountField({ id, label, value, onChange, sym, foot, error }: { id: str
       <div className="field" style={{ padding: "9px 12px", borderRadius: 12, borderColor: error ? "var(--negative)" : undefined }}>
         <div className="flex items-center gap-3">
           <label htmlFor={id} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 64, flexShrink: 0 }}>{label}</label>
-          <input id={id} value={value} inputMode="decimal" autoComplete="off" spellCheck={false} placeholder="0.00"
+          <input id={id} name={id} value={value} inputMode="decimal" autoComplete="off" spellCheck={false} placeholder={sym === "WETH" ? "0.5…" : "100…"}
             aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
             onChange={(e) => onChange(cleanDecimal(e.target.value))} className="flex-1 min-w-0 text-right"
             style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 800, color: "var(--text)" }} />
@@ -455,7 +457,7 @@ export function Chips({ label, value, onChange, options }: { label: string; valu
         {options.map((o) => {
           const on = o.id === value;
           return (
-            <button key={o.id} type="button" aria-pressed={on} onClick={() => onChange(o.id)} className="rounded-md"
+            <button key={o.id} type="button" aria-pressed={on} onClick={() => onChange(o.id)} className="rounded-md chip-touch"
               style={{ fontSize: 12, fontWeight: 800, padding: "0 10px", minHeight: 30, cursor: "pointer", color: on ? "var(--lav-ink)" : "var(--text-3)", background: on ? "var(--lav-soft)" : "var(--surface-2)", border: `1px solid ${on ? "var(--action)" : "var(--border)"}` }}>
               {o.label}
             </button>
@@ -476,7 +478,7 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
         <span id={hid} style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4 }}>{hint}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 rounded-full relative" style={{ width: 34, height: 20, background: checked ? "var(--action)" : "var(--track)", transition: "background-color .15s ease-out" }}>
-        <span className="absolute rounded-full" style={{ top: 2, left: checked ? 16 : 2, width: 16, height: 16, background: "#fff", boxShadow: "var(--shadow-sm)", transition: "left .15s ease-out" }} />
+        <span className="absolute rounded-full" style={{ top: 2, left: 2, width: 16, height: 16, background: "#fff", boxShadow: "var(--shadow-sm)", transform: `translateX(${checked ? 14 : 0}px)`, transition: "transform .15s ease-out" }} />
       </span>
     </button>
   );

@@ -12,6 +12,7 @@ import { CONTRACTS, EXPLORER } from "@/config/contracts";
 import { fromWei } from "@/lib/units";
 import { priceOf, type LpEvent, type SwapRow } from "@/lib/db";
 import { useIsNarrow } from "@/hooks/useMediaQuery";
+import { useParam } from "@/hooks/useParam";
 import { Icon } from "@/components/ui/Icon";
 import { Skel } from "@/components/ui/Skeleton";
 import { WalletAvatar } from "@/components/ui/WalletAvatar";
@@ -490,8 +491,13 @@ function hookTag(t: SwapRow) {
   return { text: "Calm · free", ink: "var(--text-3)", bg: "var(--surface-2)" };
 }
 
+/** Rows drawn per page of history; more are added on request, so a long history never renders at once. */
+const HISTORY_PAGE = 50;
+
 function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; lpEvents: LpEvent[]; stats: ReturnType<typeof tradeStatsOf>; loading: boolean }) {
-  const [tab, setTab] = useState<"trades" | "liquidity" | "dca">("trades");
+  // in the URL (#/app?activity=dca), like every other view switch, so a shared link opens on it
+  const [tab, setTab] = useParam("activity", ["trades", "liquidity", "dca"] as const, "trades");
+  const [shown, setShown] = useState(HISTORY_PAGE);
   // DCA fills are trades too: the keeper sends them, so they are merged in from the DCA index
   const plans = useDcaOrders();
   const fills = useDcaFills(plans.data).data ?? [];
@@ -505,7 +511,9 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
     <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
       <tr>
         {cols.map((h, i) => (
-          <th key={h} scope="col" style={{ textAlign: right.includes(i) ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)", whiteSpace: "nowrap" }}>{h}</th>
+          <th key={h || i} scope="col" style={{ textAlign: right.includes(i) ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)", whiteSpace: "nowrap" }}>
+            {h || <span className="sr-only">Transaction</span>}
+          </th>
         ))}
       </tr>
     </thead>
@@ -530,7 +538,7 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
         )}
       </PanelHead>
 
-      <div className="overflow-auto flex-1" style={{ maxHeight: 420 }} tabIndex={0} aria-label={tab === "trades" ? "Your trades" : tab === "dca" ? "Your DCA plans" : "Your liquidity events"}>
+      <div className="overflow-auto flex-1" style={{ maxHeight: 420 }} tabIndex={0} role="region" aria-label={tab === "trades" ? "Your trades" : tab === "dca" ? "Your DCA plans" : "Your liquidity events"}>
         {tab === "dca" ? (
           <DcaOrders startLink />
         ) : loading ? (
@@ -543,7 +551,7 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
               <caption className="sr-only">Your trades, newest first</caption>
               {head(["Time", "Side", "Size · WETH", "Price", "Value", "Hook", ""], [2, 3, 4])}
               <tbody>
-                {history.map((row) => {
+                {history.slice(0, shown).map((row) => {
                   if (row.kind === "dca") {
                     const f = row.f;
                     const buy = f.side === "buy";
@@ -559,7 +567,7 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
                         <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(buy ? f.amountIn : f.amountOut, { dp: 2 })}</td>
                         <td style={cell}>
                           <span className="rounded-full px-2 py-0.5" style={{ fontWeight: 700, color: paid ? "var(--honey-ink)" : "var(--lav-ink)", background: paid ? "var(--warn-bg)" : "var(--lav-soft)" }}>
-                            DCA #{f.orderId.toString()} · {paid ? `paid ${(f.spreadBps / 100).toFixed(2)}%` : "free"}
+                            DCA #{f.orderId.toString()} · {paid ? `paid ${fmtPct(f.spreadBps / 10_000)}` : "free"}
                           </span>
                         </td>
                         <td style={{ ...cell, textAlign: "right" }}><TxLink hash={f.txHash} /></td>
@@ -584,6 +592,18 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
                   );
                 })}
               </tbody>
+              {history.length > shown && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={7} style={{ padding: "10px 14px", textAlign: "center" }}>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShown((n) => n + HISTORY_PAGE)}>
+                        Show {fmtNum(Math.min(HISTORY_PAGE, history.length - shown), 0)} more
+                        <span style={{ fontWeight: 600, color: "var(--text-3)" }}>· {fmtNum(history.length - shown, 0)} left</span>
+                      </button>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           )
         ) : lpEvents.length === 0 ? (
@@ -646,7 +666,7 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
         </a>
       </PanelHead>
       <div className="grid grid-cols-2 px-5 pt-4" style={{ gap: 14 }}>
-        <PoolStat label="Total value locked" value={s.loading ? <Skel /> : fmtUsd(tvl, { compact: true })} sub={`${fmtNum(r1, 2)} WETH · ${fmtUsd(r0, { compact: true }).replace("$", "")} USDC`} />
+        <PoolStat label="Total value locked" value={s.loading ? <Skel /> : fmtUsd(tvl, { compact: true })} sub={`${fmtNum(r1, 2)} WETH · ${compactFmt.format(r0)} USDC`} />
         <PoolStat label="24h volume" value={totals ? fmtUsd(totals.volume_24h, { compact: true }) : <Skel />} sub={`${fmtNum(totals?.swap_count ?? 0, 0)} swaps all time`} />
       </div>
       <div className="m-5 mt-4 rounded-xl p-3.5" style={{ background: "var(--green-bg)", border: "1px solid var(--green-border)" }}>

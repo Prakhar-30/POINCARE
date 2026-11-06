@@ -17,7 +17,7 @@ import {
   type Frequency,
   type Protection,
 } from "@/lib/poincare-sdk";
-import { fmtNum } from "@/lib/format";
+import { fmtNum, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { Chips, paramHint } from "@/components/ui/DcaTicket";
 
@@ -199,7 +199,7 @@ function EditPlan({ o, busy, onClose, onSave }: { o: DcaOrderWithNext; busy: boo
 
       <div className="field flex items-center gap-3" style={{ padding: "7px 10px", borderRadius: 12, background: "var(--surface)", borderColor: !check.ok && check.reason !== "invalid" && /slices/.test(check.reason) ? "var(--negative)" : undefined }}>
         <label htmlFor={`edit-count-${o.id}`} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", flex: 1 }}>Number of {noun} left</label>
-        <input ref={first} id={`edit-count-${o.id}`} value={count} inputMode="numeric" autoComplete="off" onChange={(e) => setCount(e.target.value.replace(/\D/g, "").slice(0, 5))}
+        <input ref={first} id={`edit-count-${o.id}`} name={`edit-count-${o.id}`} value={count} inputMode="numeric" autoComplete="off" onChange={(e) => setCount(e.target.value.replace(/\D/g, "").slice(0, 5))}
           className="text-right" style={{ width: 72, background: "transparent", border: "none", fontSize: 15, fontWeight: 800, color: "var(--text)" }} />
       </div>
 
@@ -281,13 +281,15 @@ function avgPrice(o: DcaOrderWithNext): number {
   return o.side === "buy" ? spent / got : got / spent;
 }
 
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "short" });
+
 function relative(unixSec: bigint): string {
   const s = Number(unixSec) - Math.floor(Date.now() / 1000);
-  if (s <= 0) return "now";
-  if (s < 90) return `in ${s}s`;
-  if (s < 5400) return `in ${Math.round(s / 60)} min`;
-  if (s < 129_600) return `in ${Math.round(s / 3600)} h`;
-  return `in ${Math.round(s / 86_400)} d`;
+  if (s <= 0) return rtf.format(0, "second");
+  if (s < 90) return rtf.format(s, "second");
+  if (s < 5400) return rtf.format(Math.round(s / 60), "minute");
+  if (s < 129_600) return rtf.format(Math.round(s / 3600), "hour");
+  return rtf.format(Math.round(s / 86_400), "day");
 }
 
 function nextText(o: DcaOrderWithNext): string {
@@ -301,7 +303,7 @@ function nextText(o: DcaOrderWithNext): string {
     case "not-started":
       return `Starts ${relative(n.nextSlotAt)}.`;
     case "spread-too-high":
-      return `Held: this side pays ${(n.spreadBps / 100).toFixed(2)}%, above your cap. Fills when it drops${o.catchUp ? "; later ones catch up" : ""}.`;
+      return `Held: this side pays ${fmtPct(n.spreadBps / 10_000)}, above your cap. Fills when it drops${o.catchUp ? "; later ones catch up" : ""}.`;
     case "trend-against":
       return "Held: a trend runs with this side. Continues when it ends.";
     case "below-limit":
