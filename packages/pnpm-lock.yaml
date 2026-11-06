@@ -8,6 +8,28 @@ importers:
 
   .: {}
 
+  api:
+    dependencies:
+      '@poincare/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      viem:
+        specifier: 2.53.1
+        version: 2.53.1(typescript@5.9.3)(zod@4.6.6)
+    devDependencies:
+      '@types/node':
+        specifier: 22.18.6
+        version: 22.18.6
+      tsup:
+        specifier: 8.5.1
+        version: 8.5.1(postcss@8.5.32)(typescript@5.9.3)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.12
+        version: 4.1.12(@types/node@22.18.6)(vite@8.3.6(@types/node@22.18.6)(esbuild@0.27.7))
+
   mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
