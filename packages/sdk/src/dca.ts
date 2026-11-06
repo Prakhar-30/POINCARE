@@ -27,7 +27,7 @@ export const DCA_STATUS_TEXT: Record<DcaStatus, string> = {
   ready: "The next slice can fill now.",
   unknown: "No such order.",
   cancelled: "The order was cancelled; its remaining budget was refunded.",
-  filled: "The order is complete.",
+  filled: "Nothing is left to fill: the order completed, or what was left was refunded (see refunded).",
   expired: "The deadline passed; the unfilled budget can be refunded to the owner.",
   "not-started": "The order has not reached its start time.",
   "waiting-for-slot": "This slot is already filled; the next slice opens at the next slot.",
