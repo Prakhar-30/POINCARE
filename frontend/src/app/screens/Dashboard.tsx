@@ -19,6 +19,7 @@ import { PanelHead } from "@/components/ui/Panel";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { EvidenceChart } from "@/components/ui/EvidenceChart";
 import { DcaOrders } from "@/components/ui/DcaOrders";
+import { useDcaFills, useDcaOrders, type DcaFill } from "@/hooks/useDca";
 
 /**
  * The Dashboard as an exchange account overview: who you are on the platform and what you hold
@@ -491,6 +492,15 @@ function hookTag(t: SwapRow) {
 
 function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; lpEvents: LpEvent[]; stats: ReturnType<typeof tradeStatsOf>; loading: boolean }) {
   const [tab, setTab] = useState<"trades" | "liquidity" | "dca">("trades");
+  // DCA fills are trades too: the keeper sends them, so they are merged in from the DCA index
+  const plans = useDcaOrders();
+  const fills = useDcaFills(plans.data).data ?? [];
+  const openPlans = (plans.data ?? []).filter((o) => !o.cancelled && o.remaining > 0n).length;
+  type Row = { kind: "swap"; ts: number; t: SwapRow } | { kind: "dca"; ts: number; f: DcaFill };
+  const history: Row[] = [
+    ...swaps.map((t) => ({ kind: "swap" as const, ts: t.ts ? Date.parse(t.ts) : 0, t })),
+    ...fills.map((f) => ({ kind: "dca" as const, ts: f.ts, f })),
+  ].sort((a, b) => b.ts - a.ts);
   const head = (cols: string[], right: number[]) => (
     <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
       <tr>
@@ -506,15 +516,16 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
     <section className="card flex flex-col" aria-labelledby="activity-title" style={{ padding: 0 }}>
       <PanelHead id="activity-title" title="Your activity">
         <div className="seg seg-sm" role="group" aria-label="Activity type" style={{ padding: 2, marginRight: "auto" }}>
-          <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "trades"} onClick={() => setTab("trades")}>Trades{swaps.length ? ` · ${swaps.length}` : ""}</button>
+          <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "trades"} onClick={() => setTab("trades")}>Trades{history.length ? ` · ${history.length}` : ""}</button>
           <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "liquidity"} onClick={() => setTab("liquidity")}>Liquidity{lpEvents.length ? ` · ${lpEvents.length}` : ""}</button>
-          <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "dca"} onClick={() => setTab("dca")}>DCA</button>
+          <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "dca"} onClick={() => setTab("dca")}>DCA{plans.data?.length ? ` · ${openPlans ? `${openPlans} live` : plans.data.length}` : ""}</button>
         </div>
-        {tab === "trades" && stats.count > 0 && (
+        {tab === "trades" && (stats.count > 0 || fills.length > 0) && (
           <div className="flex flex-wrap gap-x-5 gap-y-1" style={{ fontSize: 12, color: "var(--text-3)" }}>
             <span>Volume <b style={{ color: "var(--text)" }}>{fmtUsd(stats.volume, { compact: true })}</b></span>
             <span>Spread-free <b style={{ color: "var(--up-ink)" }}>{Math.round(stats.freeShare * 100)}%</b></span>
             <span>Steadying trades <b style={{ color: "var(--text)" }}>{stats.steadying}</b></span>
+            {fills.length > 0 && <span>DCA fills <b style={{ color: "var(--text)" }}>{fills.length}</b> · spread-free <b style={{ color: "var(--up-ink)" }}>{Math.round((fills.filter((f) => f.spreadBps === 0).length / fills.length) * 100)}%</b></span>}
           </div>
         )}
       </PanelHead>
@@ -525,14 +536,37 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
         ) : loading ? (
           <p style={{ padding: 24, fontSize: 13, color: "var(--muted)", textAlign: "center" }}>Loading your history…</p>
         ) : tab === "trades" ? (
-          swaps.length === 0 ? (
+          history.length === 0 ? (
             <Empty text="No trades from this wallet yet." cta="Make your first trade" to="trade" />
           ) : (
             <table className="w-full" style={{ borderCollapse: "collapse" }}>
               <caption className="sr-only">Your trades, newest first</caption>
               {head(["Time", "Side", "Size · WETH", "Price", "Value", "Hook", ""], [2, 3, 4])}
               <tbody>
-                {swaps.map((t) => {
+                {history.map((row) => {
+                  if (row.kind === "dca") {
+                    const f = row.f;
+                    const buy = f.side === "buy";
+                    const paid = f.spreadBps > 0;
+                    return (
+                      <tr key={`${f.txHash}:${f.logIndex}`} className="row-hover">
+                        <td style={{ ...cell, color: "var(--text-3)" }}>{stampFmt.format(new Date(f.ts))}</td>
+                        <td style={{ ...cell, fontWeight: 800, color: buy ? "var(--up-ink)" : "var(--down-ink)" }}>
+                          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: buy ? "var(--up)" : "var(--down)" }} />{buy ? "Buy" : "Sell"}</span>
+                        </td>
+                        <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(buy ? f.amountOut : f.amountIn, 4)}</td>
+                        <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(f.price, 2)}</td>
+                        <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(buy ? f.amountIn : f.amountOut, { dp: 2 })}</td>
+                        <td style={cell}>
+                          <span className="rounded-full px-2 py-0.5" style={{ fontWeight: 700, color: paid ? "var(--honey-ink)" : "var(--lav-ink)", background: paid ? "var(--warn-bg)" : "var(--lav-soft)" }}>
+                            DCA #{f.orderId.toString()} · {paid ? `paid ${(f.spreadBps / 100).toFixed(2)}%` : "free"}
+                          </span>
+                        </td>
+                        <td style={{ ...cell, textAlign: "right" }}><TxLink hash={f.txHash} /></td>
+                      </tr>
+                    );
+                  }
+                  const t = row.t;
                   const buy = t.side === "buy_weth";
                   const tag = hookTag(t);
                   return (

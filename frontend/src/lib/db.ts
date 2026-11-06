@@ -409,3 +409,65 @@ export function subscribeSwaps(cb: (row: SwapRow) => void): () => void {
     return () => {};
   }
 }
+
+// ---- DCA (indexed from PoincareDCA by the dca-keeper function, migration_009) ----------------
+
+const DCA = (CONTRACTS.dca || "").toLowerCase();
+
+export type DcaOrderDbRow = {
+  dca: string;
+  order_id: number;
+  owner: string;
+  recipient: string;
+  side: "buy" | "sell";
+  status: "open" | "completed" | "refunded" | "cancelled";
+  paused: boolean;
+  amount_in: string;
+  spent: string;
+  remaining: string;
+  refunded: string;
+  amount_out: string;
+  fills: number;
+  slices: number;
+  interval_sec: number;
+  start_time: string;
+  deadline: string;
+  max_spread_bps: number;
+  pause_on_trend: boolean;
+  catch_up: boolean;
+  updated_block: number;
+};
+
+export type DcaFillDbRow = {
+  order_id: number;
+  owner: string;
+  side: "buy" | "sell";
+  slot: number;
+  amount_in: string;
+  amount_out: string;
+  price: number;
+  spread_bps: number;
+  block_number: number;
+  ts: string;
+  tx_hash: string;
+  log_index: number;
+};
+
+/** An owner's DCA orders from the index, newest first. Null when the index is unreachable or not
+ *  set up, so callers fall back to the chain. */
+export async function fetchDcaOrders(owner: string): Promise<{ rows: DcaOrderDbRow[]; indexedTo: number } | null> {
+  if (!supabaseReady || !DCA) return null;
+  const { data, error } = await supabase.from("dca_orders").select("*").eq("dca", DCA).eq("owner", owner.toLowerCase()).order("order_id", { ascending: false }).limit(200);
+  if (error || !data) return null;
+  const rows = data as DcaOrderDbRow[];
+  return { rows, indexedTo: rows.reduce((m, r) => Math.max(m, Number(r.updated_block) || 0), 0) };
+}
+
+/** An owner's DCA fills from the index, newest first; null when the index is unreachable. */
+export async function fetchDcaFills(owner: string, limit = 200): Promise<DcaFillDbRow[] | null> {
+  if (!supabaseReady || !DCA) return null;
+  const { data, error } = await supabase.from("dca_fills").select("order_id,owner,side,slot,amount_in,amount_out,price,spread_bps,block_number,ts,tx_hash,log_index")
+    .eq("dca", DCA).eq("owner", owner.toLowerCase()).order("ts", { ascending: false }).limit(limit);
+  if (error || !data) return null;
+  return data as DcaFillDbRow[];
+}
