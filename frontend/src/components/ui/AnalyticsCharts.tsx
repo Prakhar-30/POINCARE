@@ -53,7 +53,7 @@ export function RegimeBar({ split }: { split: RegimeSplit }) {
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
         {seg.map((s) => (
-          <span key={s.k} className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>
+          <span key={s.k} className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
             <span style={{ width: 9, height: 9, borderRadius: 3, background: s.c, display: "inline-block" }} />
             {s.label}
             <b style={{ color: "var(--text-2)" }}>{Math.round((s.n / split.total) * 100)}%</b>
@@ -101,8 +101,8 @@ function Row({ label, sub, value, frac, color, ink }: { label: string; sub: stri
   return (
     <div>
       <div className="flex justify-between items-baseline mb-1" style={{ fontSize: 12 }}>
-        <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{label}</span>
-        <span className="font-display" style={{ color: ink, fontWeight: 800 }}>{value}</span>
+        <span style={{ color: "var(--text-2)", fontWeight: 600 }}>{label}</span>
+        <span className="font-display" style={{ color: ink, fontWeight: 650 }}>{value}</span>
       </div>
       <div style={{ height: 8, borderRadius: 4, background: "var(--track)", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${Math.max(2, frac * 100)}%`, background: color, borderRadius: 4 }} />
@@ -126,11 +126,11 @@ export function RiskMeter({ risk, dPct, dFloorPct }: { risk: RiskState; dPct: nu
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <span
           className="rounded-full px-3 py-1.5"
-          style={{ fontSize: 12, fontWeight: 800, color: toneInk, background: bg }}
+          style={{ fontSize: 12, fontWeight: 650, color: toneInk, background: bg }}
         >
           {risk.label}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
           evidence {Math.round(risk.progress * 100)}% of threshold
         </span>
       </div>
@@ -146,8 +146,8 @@ export function RiskMeter({ risk, dPct, dFloorPct }: { risk: RiskState; dPct: nu
 
       <div className="mt-3.5 rounded-md p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
         <div className="flex justify-between mb-1.5" style={{ fontSize: 12 }}>
-          <span style={{ color: "var(--text-3)", fontWeight: 700 }}>directional efficiency D</span>
-          <span style={{ fontWeight: 800, color: risk.gated ? "var(--down-ink)" : "var(--up-ink)" }}>
+          <span style={{ color: "var(--text-3)", fontWeight: 600 }}>directional efficiency D</span>
+          <span style={{ fontWeight: 650, color: risk.gated ? "var(--down-ink)" : "var(--up-ink)" }}>
             {fmtPct(dPct)} {risk.gated ? "· below floor" : "· above floor"}
           </span>
         </div>
@@ -228,19 +228,19 @@ export function ValueTimeline({
           <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
             <tr style={{ background: "var(--surface-2)" }}>
               {["Day", "Swaps", "Volume", "Kept for LPs"].map((h, i) => (
-                <th key={h} scope="col" style={{ textAlign: i ? "right" : "left", padding: "9px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{h}</th>
+                <th key={h} scope="col" style={{ textAlign: i ? "right" : "left", padding: "9px 14px", fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {[...days].reverse().map((d) => (
               <tr key={d.day} style={{ borderTop: "1px solid var(--divider)" }}>
-                <th scope="row" style={{ textAlign: "left", padding: "9px 14px", fontWeight: 700, color: "var(--text-2)" }}>
+                <th scope="row" style={{ textAlign: "left", padding: "9px 14px", fontWeight: 600, color: "var(--text-2)" }}>
                   {dayFmt.format(new Date(`${d.day}T00:00:00`))}
                 </th>
                 <td style={{ textAlign: "right", padding: "9px 14px", color: "var(--text-3)" }}>{d.swaps}</td>
-                <td style={{ textAlign: "right", padding: "9px 14px", color: "var(--text-2)", fontWeight: 700 }}>{fmtUsd(d.volume, { dp: 0 })}</td>
-                <td style={{ textAlign: "right", padding: "9px 14px", color: "var(--up-ink)", fontWeight: 800 }}>{fmtUsd(d.captured, { dp: 2 })}</td>
+                <td style={{ textAlign: "right", padding: "9px 14px", color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(d.volume, { dp: 0 })}</td>
+                <td style={{ textAlign: "right", padding: "9px 14px", color: "var(--up-ink)", fontWeight: 650 }}>{fmtUsd(d.captured, { dp: 2 })}</td>
               </tr>
             ))}
           </tbody>
@@ -324,13 +324,13 @@ export function ValueTimeline({
           ))}
           {ticks.map((i, k) =>
             rows[i]?.ts ? (
-              <text key={k} x={cx(i)} y={height - 4} fontSize="12" fontWeight="700" fill="var(--muted)"
+              <text key={k} x={cx(i)} y={height - 4} fontSize="12" fontWeight="600" fill="var(--muted)"
                 textAnchor={k === 0 ? "start" : k === ticks.length - 1 ? "end" : "middle"}>
                 {dayFmt.format(new Date(rows[i].ts!))}
               </text>
             ) : null,
           )}
-          <text x={W - padX} y={16} textAnchor="end" fontSize="13" fontWeight="800" fill="var(--up-ink)">
+          <text x={W - padX} y={16} textAnchor="end" fontSize="13" fontWeight="650" fill="var(--up-ink)">
             {fmtUsd(cum[n - 1], { dp: 2 })} kept
           </text>
           {idx !== null && (
@@ -348,7 +348,7 @@ export function ValueTimeline({
             <b style={{ color: "var(--text-2)" }}>{t.ts ? stampFmt.format(new Date(t.ts)) : `Swap ${idx! + 1}`}</b>
             {" · "}{t.side === "buy_weth" ? "Bought" : "Sold"} WETH, {fmtUsd(t.notional_usdc || 0, { dp: 0 })}
             {" · "}{regimeText(t)}
-            {" · "}<span style={{ color: "var(--up-ink)", fontWeight: 700 }}>{fmtUsd(cum[idx!], { dp: 2 })} kept so far</span>
+            {" · "}<span style={{ color: "var(--up-ink)", fontWeight: 600 }}>{fmtUsd(cum[idx!], { dp: 2 })} kept so far</span>
           </>
         ) : (
           <>
@@ -364,7 +364,7 @@ export function ValueTimeline({
 /** Legend for the timeline: what each mark means, kept next to the chart rather than inside it. */
 export function TimelineLegend() {
   const item = (swatch: ReactNode, label: string) => (
-    <span className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>
+    <span className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
       {swatch}
       {label}
     </span>
@@ -387,8 +387,8 @@ export function SplitBar({ title, slices, total }: { title: string; slices: Slic
   return (
     <div>
       <div className="flex justify-between items-baseline mb-1.5 gap-3" style={{ fontSize: 12 }}>
-        <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{title}</span>
-        <span className="font-display" style={{ color: "var(--text)", fontWeight: 800 }}>{sum > 0 ? total : "—"}</span>
+        <span style={{ color: "var(--text-2)", fontWeight: 600 }}>{title}</span>
+        <span className="font-display" style={{ color: "var(--text)", fontWeight: 650 }}>{sum > 0 ? total : "—"}</span>
       </div>
       {sum > 0 ? (
         <>
@@ -400,7 +400,7 @@ export function SplitBar({ title, slices, total }: { title: string; slices: Slic
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
             {slices.map((s) => (
-              <span key={s.label} className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>
+              <span key={s.label} className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
                 <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 3, background: s.color, display: "inline-block" }} />
                 {s.label}
                 <b style={{ color: "var(--text-2)" }}>{Math.round((s.value / sum) * 100)}%</b>
@@ -425,7 +425,7 @@ export function KappaHistogram({ buckets }: { buckets: Bucket[] }) {
     <div className="flex items-end gap-2" style={{ height: 120 }}>
       {buckets.map((b) => (
         <div key={b.label} className="flex flex-col items-center justify-end flex-1" style={{ height: "100%" }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: "var(--honey-ink)", marginBottom: 3 }}>
+          <span style={{ fontSize: 12, fontWeight: 650, color: "var(--honey-ink)", marginBottom: 3 }}>
             {b.n || ""}
           </span>
           <div
@@ -438,7 +438,7 @@ export function KappaHistogram({ buckets }: { buckets: Bucket[] }) {
               borderRadius: "4px 4px 0 0",
             }}
           />
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginTop: 5, textAlign: "center", lineHeight: 1.2 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginTop: 5, textAlign: "center", lineHeight: 1.2 }}>
             {b.label}
           </span>
         </div>

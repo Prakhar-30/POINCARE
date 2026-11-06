@@ -20,7 +20,7 @@ export const PAGES: DocPage[] = [
   {
     slug: "overview",
     group: "Get started",
-    title: "Build on Poincaré",
+    title: "Introduction",
     lede: "Read the pool's trend regime, quote exactly what the router will execute, and run spread-aware DCA orders: from TypeScript, from an AI agent, or over plain HTTP. No API keys and no oracle; everything comes from the live pool on Unichain Sepolia.",
     keywords: "intro sdk mcp api tools",
     body: () => (
@@ -343,10 +343,10 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
         ] as const).map(([a, b, c]) => [mono(a), b, c])} />
         <H2>Try asking</H2>
         <Ul>
-          <li>"Is the Poincaré pool trending right now, and which side pays?"</li>
-          <li>"Plan a DCA that buys 500 USDC of WETH over a day without ever paying the trend spread."</li>
-          <li>"Wait for the next trend onset, then tell me the spread."</li>
-          <li>"Pause my DCA order 4 and stretch what is left over the next 12 hours."</li>
+          <li>“Is the Poincaré pool trending right now, and which side pays?”</li>
+          <li>“Plan a DCA that buys 500 USDC of WETH over a day without ever paying the trend spread.”</li>
+          <li>“Wait for the next trend onset, then tell me the spread.”</li>
+          <li>“Pause my DCA order 4 and stretch what is left over the next 12 hours.”</li>
         </Ul>
       </>
     ),

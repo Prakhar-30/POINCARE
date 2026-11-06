@@ -4,7 +4,7 @@ TypeScript SDK for **Poincaré**, a Uniswap v4 hook whose pool charges a spread 
 **with** a confirmed trend. Read the trend regime, quote exactly what the router will execute, and run
 **spread-aware DCA** orders that wait the spread out and still finish on time.
 
-Live on Unichain Sepolia (testnet). Full docs: **https://www.poincaretrade.in/#/developers**
+Live on Unichain Sepolia (testnet). Full docs: **https://www.poincaretrade.in/#/docs**
 
 ```sh
 npm i @poincaretrade/sdk viem
@@ -31,9 +31,9 @@ await dca.dca.resume(id);
 Every write also exists unsigned under `dca.build.*` (`{ to, data, value, gas }`) for browser wallets,
 multisigs and agents. Prices are USDC per WETH; `buy` pays USDC for WETH, `sell` pays WETH for USDC.
 
-- [Quickstart](https://www.poincaretrade.in/#/developers/quickstart) ·
-  [SDK guide](https://www.poincaretrade.in/#/developers/sdk) ·
-  [Order lifecycle](https://www.poincaretrade.in/#/developers/order-lifecycle)
+- [Quickstart](https://www.poincaretrade.in/#/docs/quickstart) ·
+  [SDK guide](https://www.poincaretrade.in/#/docs/sdk) ·
+  [Order lifecycle](https://www.poincaretrade.in/#/docs/order-lifecycle)
 - Source: https://github.com/Prakhar-30/POINCARE/tree/main/packages/sdk
 
 **Status:** testnet research preview. PoincareDCA is unaudited periphery code; the hook and the Lens it

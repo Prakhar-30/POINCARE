@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
     return (
       <main role="alert" className="flex flex-col items-center justify-center text-center px-6" style={{ minHeight: "100vh", background: "var(--app-bg)" }}>
-        <h1 className="font-display" style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Something went wrong</h1>
+        <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600, color: "var(--text)" }}>Something went wrong</h1>
         <p className="mt-2 max-w-sm" style={{ fontSize: 15, lineHeight: 1.6, color: "var(--text-2)" }}>
           A component ran into an error. Your funds and the pool are untouched. Try reloading the page.
         </p>

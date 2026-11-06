@@ -56,7 +56,7 @@ export function AiNote({
           <span style={{ color: "var(--lav-ink)" }}>
             <Icon name={loading ? "spinner" : "spark"} size={15} aria-hidden="true" />
           </span>
-          <span className="font-display" style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+          <span className="font-display" style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
             {title}
           </span>
         </div>
@@ -66,7 +66,7 @@ export function AiNote({
             className="rounded-full px-2 py-0.5"
             style={{
               fontSize: 12,
-              fontWeight: 700,
+              fontWeight: 600,
               letterSpacing: ".3px",
               color: source === "model" ? "var(--lav-ink)" : "var(--text-3)",
               background: "var(--surface)",

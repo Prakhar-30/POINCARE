@@ -16,7 +16,7 @@ like any other user.
 | SDK | `packages/sdk` (`@poincaretrade/sdk`) | TypeScript: regime and trend-onset signals, quotes, DCA orders |
 | MCP server | `packages/mcp` (`@poincaretrade/mcp`) | Lets AI agents read the regime and run DCA orders |
 | App | Trade screen, Market / DCA switch + DCA tab | Create, watch, pause / resume / edit and cancel orders |
-| Docs | `/#/developers` on the site (`frontend/src/pages/Developers.tsx`) | The SDK, MCP server and HTTP API on one page |
+| Docs | `/#/docs` on the site (`frontend/src/pages/Docs.tsx`) | The SDK, MCP server and HTTP API on one page |
 
 **Live on Unichain Sepolia:** PoincareDCA [`0x1E2ad927D95F284fB588eAA3f56D031f92AAe50a`](https://sepolia.uniscan.xyz/address/0x1E2ad927D95F284fB588eAA3f56D031f92AAe50a)
 (block 67080020, source verified on Blockscout). Owner `0x49aB…52aC`, keeper `0x813E…Bcbb`. The SDK ships this

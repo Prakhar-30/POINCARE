@@ -3,7 +3,7 @@
 Three ways to build on Poincaré's trend detector and its spread-aware DCA orders. All of them read
 the live pool on Unichain Sepolia; none of them needs an API key. See [`../DCA.md`](../DCA.md) for
 the strategy, the contract rules and the deploy runbook. The same material, for integrators, is on
-the site at **[poincaretrade.in/#/developers](https://www.poincaretrade.in/#/developers)**.
+the site at **[poincaretrade.in/#/docs](https://www.poincaretrade.in/#/docs)**.
 
 | Package | For |
 |---|---|

@@ -59,7 +59,7 @@ export function TxSteps({ stepper, title }: { stepper: Stepper; title: string })
             style={{ width: 400, maxWidth: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 22, boxShadow: "var(--shadow-lg)", overflow: "hidden", outline: "none" }}
           >
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
-              <h2 id={titleId} className="font-display" style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
+              <h2 id={titleId} className="font-display" style={{ fontSize: 17, fontWeight: 600, color: "var(--text)" }}>
                 {heading}
               </h2>
               {closable && (
@@ -76,7 +76,7 @@ export function TxSteps({ stepper, title }: { stepper: Stepper; title: string })
                     <div className="flex items-center gap-3">
                       <StepIcon state={s.state} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: s.state === "pending" ? "var(--muted)" : "var(--text)" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: s.state === "pending" ? "var(--muted)" : "var(--text)" }}>
                           {s.label}
                           <span className="sr-only">
                             {s.state === "done" ? " — done" : s.state === "active" ? " — in progress" : s.state === "error" ? " — failed" : " — waiting"}

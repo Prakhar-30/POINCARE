@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { motion } from "framer-motion";
@@ -6,9 +7,14 @@ import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { MOD } from "./CommandMenu";
+import { MOD } from "@/lib/platform";
 
 export type Tab = "dashboard" | "trade" | "pool" | "analytics";
+
+/** Each section is a real link (#/app?tab=…), so Cmd/Ctrl-click and middle-click open it in a new
+ *  tab. A plain click still goes through setTab, which also scrolls back to the top. */
+const tabHref = (t: Tab) => ({ search: t === "dashboard" ? "" : `?tab=${t}` });
+const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -38,9 +44,10 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
       }}
     >
       <Link to="/" className="shrink-0 rounded-xl" aria-label="Poincaré home">
-        <div className="flex items-center gap-3">
-          <Mark size={34} decorative />
-          <span className="font-display text-text hidden lg:block" style={{ fontWeight: 700, fontSize: 19, letterSpacing: ".5px" }}>
+        <div className="flex items-center gap-2.5">
+          <Mark size={30} decorative />
+          {/* the wordmark as the landing page and docs set it */}
+          <span className="hidden lg:block" style={{ fontWeight: 600, fontSize: 18, letterSpacing: "-0.03em", color: "var(--lx-ink)" }}>
             Poincaré
           </span>
         </div>
@@ -48,34 +55,35 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
 
       {!mobile && (
         <nav aria-label="App sections" className="shrink-0">
-          <ul className="flex gap-1 rounded-2xl p-1" style={{ background: "var(--nav-pill)" }}>
+          {/* no tray: the active section is a lavender-tint pill, as in the docs' top bar */}
+          <ul className="flex gap-1">
             {TABS.map((t, i) => {
               const active = t.id === tab;
               return (
                 <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setTab(t.id)}
+                  <Link
+                    to={tabHref(t.id)}
+                    onClick={(e) => { if (plainClick(e)) { e.preventDefault(); setTab(t.id); } }}
                     aria-current={active ? "page" : undefined}
                     aria-label={t.label}
                     aria-keyshortcuts={String(i + 1)}
                     title={`${t.label} (${i + 1})`}
-                    className="nav-tab relative flex items-center gap-2 rounded-xl px-3 lg:px-3.5 text-[13px] font-bold"
-                    style={{ minHeight: 40, color: active ? "var(--lav-ink)" : "var(--text-3)" }}
+                    className="nav-tab relative flex items-center gap-2 rounded-full px-3 lg:px-3.5"
+                    style={{ minHeight: 38, fontSize: 14, fontWeight: 550, letterSpacing: "-0.01em", color: active ? "var(--lx-ink)" : "var(--text-3)" }}
                   >
                     {active && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 rounded-xl"
-                        style={{ background: "var(--surface)", boxShadow: "var(--shadow-sm)" }}
+                        className="absolute inset-0 rounded-full"
+                        style={{ background: "var(--lav-soft)" }}
                         transition={{ type: "spring", stiffness: 420, damping: 34 }}
                       />
                     )}
                     <span className="relative z-10 flex items-center gap-2">
                       <Icon name={t.icon} size={16} aria-hidden="true" />
-                      <span className="hidden lg:block">{t.label}</span>
+                      <span className="hidden lg:block" aria-hidden="true">{t.label}</span>
                     </span>
-                  </button>
+                  </Link>
                 </li>
               );
             })}
@@ -118,9 +126,9 @@ export function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void 
           const active = t.id === tab;
           return (
             <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => setTab(t.id)}
+              <Link
+                to={tabHref(t.id)}
+                onClick={(e) => { if (plainClick(e)) { e.preventDefault(); setTab(t.id); } }}
                 aria-current={active ? "page" : undefined}
                 className="bottom-nav-item"
               >
@@ -136,7 +144,7 @@ export function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void 
                   <Icon name={t.icon} size={20} aria-hidden="true" className="relative" />
                 </span>
                 {t.label}
-              </button>
+              </Link>
             </li>
           );
         })}

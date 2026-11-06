@@ -1,5 +1,5 @@
 /* ============================================================================
-   Poincaré design tokens: soft finance palette, set in Space Grotesk (display) + Inter (text) + JetBrains Mono.
+   Poincaré design tokens: soft finance palette, set in Inter (display and text) + JetBrains Mono.
    Ported from the "Poincare Soft" study and extended with a proper elevation,
    radius and motion scale so the UI reads crafted, not templated.
    Light is default; [data-theme="dark"] overrides.

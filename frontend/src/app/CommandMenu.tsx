@@ -8,8 +8,7 @@ import { TABS, type Tab } from "./TopNav";
 
 const README = "https://github.com/Prakhar-30/POINCARE#readme";
 
-/** The platform's modifier, for the hint text only: ⌘ on Apple devices, Ctrl elsewhere. */
-export const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+export { MOD } from "@/lib/platform";
 
 type Command = { id: string; label: string; icon: IconName; hint?: string; run: () => void };
 
@@ -38,7 +37,7 @@ export function CommandMenu({ setTab, open, setOpen }: { setTab: (t: Tab) => voi
       id: "dca", label: "Start a spread-aware DCA plan", icon: "layers",
       run: () => { navigate({ pathname: "/app", search: "?tab=trade&mode=dca" }); window.scrollTo({ top: 0 }); },
     },
-    { id: "developers", label: "Developer docs: SDK, MCP, API", icon: "spark", run: () => navigate("/developers") },
+    { id: "developers", label: "Developer docs: SDK, MCP, API", icon: "spark", run: () => navigate("/docs") },
     { id: "theme", label: `Switch to ${theme === "dark" ? "light" : "dark"} theme`, icon: theme === "dark" ? "sun" : "moon", run: toggle },
     {
       id: "copy-hook", label: "Copy hook address", icon: "copy",
@@ -118,7 +117,7 @@ export function CommandMenu({ setTab, open, setOpen }: { setTab: (t: Tab) => voi
             <li key={c.id} id={`cmd-${c.id}`} role="option" aria-selected={i === sel}
               onMouseMove={() => setSel(i)} onClick={() => run(c)}
               className="mx-2 flex items-center gap-3 rounded-xl px-3 cursor-pointer"
-              style={{ minHeight: 44, fontSize: 14, fontWeight: 700, color: i === sel ? "var(--lav-ink)" : "var(--text-2)", background: i === sel ? "var(--lav-soft)" : undefined }}>
+              style={{ minHeight: 44, fontSize: 14, fontWeight: 600, color: i === sel ? "var(--lav-ink)" : "var(--text-2)", background: i === sel ? "var(--lav-soft)" : undefined }}>
               <Icon name={c.icon} size={16} aria-hidden="true" />
               <span className="flex-1">{c.label}</span>
               {c.hint && <kbd className="kbd">{c.hint}</kbd>}

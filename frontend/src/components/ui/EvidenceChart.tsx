@@ -98,7 +98,7 @@ export function EvidenceChart({
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
           CUSUM evidence · per sampled block
         </span>
-        <span className="flex items-center gap-3 flex-wrap" style={{ fontSize: 12, fontWeight: 700 }}>
+        <span className="flex items-center gap-3 flex-wrap" style={{ fontSize: 12, fontWeight: 600 }}>
           <span style={{ color: "var(--up-ink)" }}>▬ up</span>
           <span style={{ color: "var(--down-ink)" }}>▬ down</span>
           <span style={{ color: "var(--honey-ink)" }}>┅ threshold h</span>
