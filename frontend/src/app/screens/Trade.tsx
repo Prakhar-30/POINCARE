@@ -19,6 +19,10 @@ import { PoolChart } from "@/components/ui/PoolChart";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { CurveDepth, depthOf } from "@/components/ui/CurveDepth";
 import { useIsNarrow, useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useParam } from "@/hooks/useParam";
+import { Seg } from "@/components/ui/Panel";
+import { DcaTicket } from "@/components/ui/DcaTicket";
+import { DcaOrders } from "@/components/ui/DcaOrders";
 
 /**
  * The Trade screen as an exchange terminal: ticker bar, chart, book, ticket - the layout every
@@ -139,6 +143,7 @@ export function Trade() {
 
   // ---- the ticket ----
   const { side, setSide, amt, setAmt: setAmtRaw } = useTradeParams();
+  const [mode, setMode] = useParam("mode", ["market", "dca"] as const, "market");
   // The book level the ticket was filled from; any manual edit of the order clears it.
   const [bookSel, setBookSel] = useState<{ side: Side; idx: number } | null>(null);
   const setAmt = (v: string) => {
@@ -230,7 +235,7 @@ export function Trade() {
   }
 
   // ---- book / trades panel ----
-  const [panel, setPanel] = useState<"book" | "trades">("book");
+  const [panel, setPanel] = useState<"book" | "trades" | "dca">("book");
   const [step, setStep] = useState<(typeof BOOK_STEPS)[number]>(BOOK_STEPS[0]);
   const rowsPerSide = narrow ? 6 : Math.max(4, Math.min(12, Math.floor((panelBox.h - 240) / 2 / 24)));
   const book = useMemo(
@@ -256,6 +261,13 @@ export function Trade() {
   const ticket = (
     <section className="card min-w-0 flex flex-col" aria-labelledby="ticket-title" style={narrow ? undefined : { height: "100%" }}>
       <h2 id="ticket-title" className="sr-only">Order form</h2>
+      <div className="px-4 pt-3">
+        <Seg label="Order type" value={mode} onChange={setMode} className="w-full"
+          options={[{ id: "market", label: "Market" }, { id: "dca", label: <>DCA <span style={{ fontWeight: 600, opacity: 0.75 }}>· spread-aware</span></> }]} />
+      </div>
+      {mode === "dca" ? (
+        <DcaTicket s={s} side={side} onSide={setSide} payBal={payBal} onCreated={() => setPanel("dca")} />
+      ) : (
       <form onSubmit={onSubmit} noValidate className="flex flex-col flex-1 min-h-0">
         {/* Everything above the button scrolls if it must; the button never moves. */}
         <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ gap: 9, padding: "16px 16px 10px" }}>
@@ -403,6 +415,7 @@ export function Trade() {
         )}
         </div>
       </form>
+      )}
     </section>
   );
 
@@ -413,8 +426,9 @@ export function Trade() {
         <div className="seg seg-sm" role="group" aria-label="Panel" style={{ padding: 2 }}>
           <button type="button" className="seg-item" aria-pressed={panel === "book"} onClick={() => setPanel("book")}>Book</button>
           <button type="button" className="seg-item" aria-pressed={panel === "trades"} onClick={() => setPanel("trades")}>Trades</button>
+          <button type="button" className="seg-item" aria-pressed={panel === "dca"} onClick={() => setPanel("dca")}>DCA</button>
         </div>
-        {panel === "book" ? (
+        {panel === "dca" ? null : panel === "book" ? (
           <div className="flex gap-1" role="group" aria-label="Price step">
             {BOOK_STEPS.map((st) => (
               <button key={st} type="button" aria-pressed={step === st} onClick={() => { setStep(st); setBookSel(null); }} className="rounded-md"
@@ -435,7 +449,9 @@ export function Trade() {
         )}
       </div>
       <div ref={panelRef} className="flex-1 min-h-0 overflow-hidden">
-        {panel === "book" ? (
+        {panel === "dca" ? (
+          <DcaOrders maxHeight={narrow ? 420 : Math.max(160, panelBox.h)} />
+        ) : panel === "book" ? (
           <CurveDepth book={book} spreadBuy={s.spreadZeroForOne} spreadSell={s.spreadOneForZero} onPick={pickLevel} selected={bookSel} />
         ) : (
           <Tape bare fill={!narrow} title="Trades" rows={listRows.slice(0, visible)} onLoadMore={onTapeLoadMore}

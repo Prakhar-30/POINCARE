@@ -23,6 +23,9 @@ type Deployment = {
   weth: string;
   /** Block the hook was deployed at; the floor for on-chain log paging. */
   deployBlock: bigint;
+  /** PoincareDCA periphery (deployments/<chain>-dca.json). Empty until deployed: the DCA UI then
+   *  shows itself as not live yet. VITE_POINCARE_DCA_ADDRESS overrides it for local testing. */
+  dca: string;
 };
 
 export const DEPLOYMENTS: Record<number, Deployment> = {
@@ -39,6 +42,7 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
     usdc: "0x1b4034D6C443Eff3D2e9051A08147eF9eD8EBc70",
     weth: "0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449",
     deployBlock: 66190311n,
+    dca: "",
   },
   // Additional chains slot in here once a deployment exists (entry shape above);
   // Monad testnet was evaluated and dropped for now: no canonical Uniswap v4 there.
@@ -69,8 +73,11 @@ export function setActiveChain(chainId: number) {
 const DEPLOYMENT = DEPLOYMENTS[ACTIVE_CHAIN_ID];
 export const CHAIN_NAME = DEPLOYMENT.name;
 
+const dcaOverride = (import.meta.env.VITE_POINCARE_DCA_ADDRESS as string | undefined)?.trim() ?? "";
+
 export const CONTRACTS = {
   ...DEPLOYMENT,
+  dca: /^0x[0-9a-fA-F]{40}$/.test(dcaOverride) ? dcaOverride : DEPLOYMENT.dca,
   currency0: DEPLOYMENT.usdc,
   currency1: DEPLOYMENT.weth,
   fee: 0x800000, // DYNAMIC_FEE_FLAG
@@ -79,6 +86,7 @@ export const CONTRACTS = {
 
 export const hasLens = CONTRACTS.lens.length === 42;
 export const hasFaucet = CONTRACTS.faucet.length === 42;
+export const hasDca = CONTRACTS.dca.length === 42;
 
 /** PoolKey tuple for router/manager calls: (currency0, currency1, fee, tickSpacing, hooks). */
 export const POOL_KEY = {

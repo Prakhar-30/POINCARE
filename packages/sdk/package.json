@@ -20,6 +20,7 @@
   "scripts": {
     "gen:abi": "node scripts/gen-abi.mjs",
     "build": "tsup",
+    "sync:frontend": "tsup && node scripts/sync-frontend.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:live": "vitest run --mode live test/live.test.ts"
