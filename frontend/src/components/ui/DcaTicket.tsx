@@ -23,6 +23,7 @@ import { fmtNum, fmtPct } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
+import { track } from "@/lib/telemetry";
 
 /**
  * The DCA ticket, in the shape exchanges taught users: set up -> review -> confirm.
@@ -143,6 +144,7 @@ export function DcaTicket({
     if (!hasDca || busy || setupBlocked) return;
     const id = await create(input);
     if (id !== undefined) {
+      track("dca_plan_created", { side, kind, slices: plan.ok ? plan.p.slices : undefined, protection });
       setStep("setup");
       onCreated?.();
     }

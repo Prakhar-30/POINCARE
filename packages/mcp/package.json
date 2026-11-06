@@ -1,8 +1,8 @@
 {
   "name": "@poincaretrade/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for the Poincaré hook: lets AI agents read the trend regime and create and manage spread-aware DCA orders.",
-  "license": "BUSL-1.1",
+  "license": "MIT",
   "author": "Prakhar Srivastava",
   "homepage": "https://www.poincaretrade.in/#/docs",
   "repository": {
@@ -32,6 +32,7 @@
   "types": "./dist/server.d.ts",
   "files": [
     "dist",
+    "skills",
     "README.md",
     "LICENSE"
   ],

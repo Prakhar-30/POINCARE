@@ -96,7 +96,7 @@ function orderView(o: DcaOrder) {
 export function createServer(opts: ServerOptions): McpServer {
   const { poincare, signer } = opts;
   const now = opts.now ?? (() => Math.floor(Date.now() / 1000));
-  const server = new McpServer({ name: "poincare", version: "0.1.0" });
+  const server = new McpServer({ name: "poincare", version: "0.1.1" });
 
   type RunResult =
     | { sent: false; transactions: TxRequest[]; note: string }

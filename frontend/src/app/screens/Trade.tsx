@@ -21,6 +21,7 @@ import { CurveDepth, depthOf } from "@/components/ui/CurveDepth";
 import { useIsNarrow, useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useParam } from "@/hooks/useParam";
 import { DcaTicket, type DcaPrefill } from "@/components/ui/DcaTicket";
+import { track } from "@/lib/telemetry";
 import { DcaOrders } from "@/components/ui/DcaOrders";
 
 /**
@@ -231,6 +232,7 @@ export function Trade() {
               : `${verb} WETH`;
 
   async function onTrade() {
+    track("swap_submitted", { side });
     await swap({ amountIn: amt, zeroForOne, minOutWei, quote: q });
     bal.refetch();
     setTimeout(reset, 2500);
