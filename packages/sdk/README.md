@@ -37,5 +37,4 @@ multisigs and agents. Prices are USDC per WETH; `buy` pays USDC for WETH, `sell`
 - Source: https://github.com/Prakhar-30/POINCARE/tree/main/packages/sdk
 
 **Status:** testnet research preview. PoincareDCA is unaudited periphery code; the hook and the Lens it
-reads were reviewed. Licensed under the Business Source License 1.1 (see LICENSE): production use needs a
-commercial license from the licensor.
+reads were reviewed. MIT licensed (see LICENSE).

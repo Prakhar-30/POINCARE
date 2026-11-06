@@ -17,6 +17,7 @@
     "boring-avatars": "2.0.4",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
+    "posthog-js": "^1.447.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",

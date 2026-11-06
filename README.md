@@ -873,7 +873,7 @@ scratch.
 
 ## 13. License
 
-Poincare is licensed under the **Business Source License 1.1** (`BUSL-1.1`) — see [LICENSE](./LICENSE).
-Production/commercial use of the hook, detector, curve, or any derivative requires a commercial
-license from the Licensor until the Change Date (2030-07-19), after which the code converts to MIT.
-Review, testing, and security research are permitted. Licensing contact: srivastavaprakhar3010@gmail.com.
+Poincare is licensed under the **MIT License**: see [LICENSE](./LICENSE). It was previously licensed
+under the Business Source License 1.1. The contracts deployed and verified before the switch carry a
+`BUSL-1.1` SPDX header in their explorer-verified source; the only difference from this repository is
+that header line, and the code is identical. Third-party code under `lib/` keeps its own licenses.

@@ -14,6 +14,7 @@ import { CommandMenu } from "./CommandMenu";
 import { AnnouncementMarquee } from "@/components/ui/AnnouncementMarquee";
 import { WrongNetworkBanner } from "@/components/ui/WrongNetworkBanner";
 import { useFlushPendingRecords, useWalletIdentity } from "@/hooks/useBackend";
+import { track } from "@/lib/telemetry";
 
 /** The config layer binds to one chain per page load; when the wallet lands on another
  *  live chain, persist that choice and reload so every module-level capture follows. */
@@ -24,6 +25,20 @@ function useChainSync() {
       setActiveChain(chain.id);
     }
   }, [chain?.id]);
+}
+
+/** One `wallet_connected` event per session: the chain id only, never the address. */
+function useConnectedEvent() {
+  const { isConnected, chain } = useAccount();
+  useEffect(() => {
+    if (!isConnected) return;
+    try {
+      if (sessionStorage.getItem("poincare-connected-tracked")) return;
+      sessionStorage.setItem("poincare-connected-tracked", "1");
+    } catch { /* storage blocked: still record it once for this page */ }
+    track("wallet_connected", { chain_id: chain?.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
 }
 
 /** The open tab lives in the URL (#/app?tab=trade) so refresh, Back/Forward and shared links all
@@ -49,6 +64,7 @@ export function AppShell() {
   useWalletIdentity();
   useFlushPendingRecords();
   useChainSync();
+  useConnectedEvent();
 
   if (!isConnected) return <WalletGate />;
 

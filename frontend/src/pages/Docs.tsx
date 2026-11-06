@@ -4,6 +4,7 @@ import { Mark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useModal } from "@/hooks/useModal";
+import { track } from "@/lib/telemetry";
 import { MOD, scrollBehavior } from "@/lib/platform";
 import { GROUPS, PAGES, REPO, API_BASE, pageBySlug, type DocPage } from "./devdocs/pages";
 import { CodeTabs } from "./devdocs/ui";
@@ -348,6 +349,7 @@ function PageActions({ page, stacked }: { page: DocPage; stacked?: boolean }) {
     const text = `# ${page.title}\n\n${page.lede}\n\n${body?.innerText ?? ""}\n\nSource: https://www.poincaretrade.in/#/docs/${page.slug}\n`;
     try {
       await navigator.clipboard.writeText(text);
+      track("docs_copied_for_llms", { page: page.slug });
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch { /* clipboard blocked: the page stays selectable */ }
@@ -424,18 +426,18 @@ function SectionTitle({ id, children, aside }: { id: string; children: ReactNode
 function DocsHome({ titleRef }: { titleRef: RefObject<HTMLHeadingElement> }) {
   const guides: { to: string; title: string; body: string; icon: IconName; tint: keyof typeof TINTS; wide?: boolean }[] = [
     { to: "regime", title: "Read the regime", body: "Is there a confirmed trend, and which side pays", icon: "wave", tint: "lav", wide: true },
-    { to: "dca-orders", title: "Run spread-aware DCA", body: "Recurring buys that never pay the trend spread", icon: "layers", tint: "honey", wide: true },
+    { to: "dca-guide", title: "Run spread-aware DCA", body: "Step by step, with the app, SDK, API or Claude", icon: "layers", tint: "honey", wide: true },
     { to: "quickstart", title: "Quote a swap", body: "To the wei of what the router executes", icon: "swap", tint: "green" },
-    { to: "mcp", title: "Give an agent tools", body: "15 MCP tools for Claude and any client", icon: "spark", tint: "lav" },
-    { to: "keeper", title: "Run a keeper", body: "Fill due slices and index every event", icon: "gauge", tint: "plain" },
+    { to: "claude", title: "Use Poincaré from Claude", body: "The MCP server plus the Poincaré skill", icon: "spark", tint: "lav" },
+    { to: "lp-strategy", title: "A regime-aware LP strategy", body: "An example bot, no new contract", icon: "pool", tint: "plain" },
   ];
   const useCases: { icon: IconName; title: string; body: string; links: { to: string; label: string }[] }[] = [
     { icon: "swap", title: "For trading apps and bots", body: "Trade with the regime in view", links: [
       { to: "regime", label: "Read the regime" }, { to: "sdk", label: "Quote a swap" }, { to: "order-lifecycle", label: "Manage an order" }] },
     { icon: "spark", title: "For AI agents", body: "Let an agent read and act", links: [
-      { to: "mcp", label: "Install the MCP server" }, { to: "dca-orders", label: "Plan a DCA order" }, { to: "safety", label: "Delegate safely" }] },
+      { to: "claude", label: "Add the Claude skill" }, { to: "dca-guide", label: "Plan a DCA order" }, { to: "safety", label: "Delegate safely" }] },
     { icon: "chart", title: "For data and protocol builders", body: "Build on the detector's signal", links: [
-      { to: "http-api", label: "Call the HTTP API" }, { to: "keeper", label: "Query indexed fills" }, { to: "contracts", label: "Contracts and events" }] },
+      { to: "http-api", label: "Call the HTTP API" }, { to: "lp-strategy", label: "Build an LP strategy" }, { to: "keeper", label: "Query indexed fills" }] },
   ];
   const methods: { to: string; icon: IconName; title: string; body: string }[] = [
     { to: "sdk", icon: "layers", title: "TypeScript SDK", body: "@poincaretrade/sdk, viem-based" },

@@ -19,6 +19,7 @@ import { LiquidityDepth, DepthLegend } from "@/components/ui/LiquidityDepth";
 import { PanelHead, SourceTag, Seg } from "@/components/ui/Panel";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
+import { track } from "@/lib/telemetry";
 import { useIsMobile, useIsNarrow } from "@/hooks/useMediaQuery";
 
 /**
@@ -427,6 +428,7 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
   const disabled = busy || u <= 0 || w <= 0 || insufficient;
 
   async function onAdd() {
+    track("liquidity_added");
     await lp.add({ usdc, weth, valueUsdc });
     bal.refetch();
     setTimeout(lp.reset, 2500);
@@ -482,6 +484,7 @@ function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>;
   async function onRemove() {
     // Burn in raw 18-dec units; the 100% branch avoids float drift leaving dust.
     const shares = pct >= 100 ? parseUnits(pos.shares.toFixed(18), 18) : parseUnits(sharesToBurn.toFixed(18), 18);
+    track("liquidity_removed");
     await lp.remove({ shares, valueUsdc, amount0: out0, amount1: out1 });
     pos.refetch();
     setTimeout(lp.reset, 2500);

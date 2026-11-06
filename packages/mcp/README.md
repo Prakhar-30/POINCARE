@@ -40,4 +40,4 @@ claude mcp add poincare -- npx -y @poincaretrade/mcp
 Try: *"Is the Poincaré pool trending right now, and which side pays?"* or *"Plan a DCA that buys 500 USDC
 of WETH over a day without ever paying the trend spread."*
 
-**Status:** testnet research preview. Licensed under the Business Source License 1.1 (see LICENSE).
+**Status:** testnet research preview. MIT licensed (see LICENSE).
