@@ -187,9 +187,15 @@ describe("DCA plan and unsigned transactions", () => {
   it("cancel and close-expired", async () => {
     const c = await (await post("/dca/tx/cancel", { id: 7 })).json();
     expect(decodeFunctionData({ abi: dcaAbi, data: c.transactions[0].data as Hex }).functionName).toBe("cancel");
-    const e = await (await post("/dca/tx/close-expired", { id: 7 })).json();
-    expect(decodeFunctionData({ abi: dcaAbi, data: e.transactions[0].data as Hex }).functionName).toBe("closeExpired");
     expect((await post("/dca/tx/cancel", { id: 0 })).status).toBe(400);
+    expect((await post("/dca/tx/cancel", { id: 99 })).status).toBe(404);
+    // the order's deadline is NOW + 4h: refunding it now would revert on chain, so say so up front
+    const early = await post("/dca/tx/close-expired", { id: 7 });
+    expect(early.status).toBe(409);
+    expect((await early.json()).error).toContain("has not expired");
+    const later = createApiHandler({ poincare, now: () => NOW + 4 * 3600 + 1 });
+    const e = await (await later(new Request(`${BASE}/dca/tx/close-expired`, { method: "POST", body: JSON.stringify({ id: 7 }) }))).json();
+    expect(decodeFunctionData({ abi: dcaAbi, data: e.transactions[0].data as Hex }).functionName).toBe("closeExpired");
   });
 
   it("pause / resume, with 409 when already in that state", async () => {
@@ -214,7 +220,7 @@ describe("DCA plan and unsigned transactions", () => {
 
   it("503 with a clear message when the DCA address is not configured", async () => {
     const bare = createApiHandler({ poincare: { ...poincare, dca: { ...poincare.dca, build: { ...poincare.dca.build, cancel: (id: bigint) => buildCancelTx({ ...UNICHAIN_SEPOLIA, dca: undefined }, id) } } } as PoincareClient });
-    const r = await bare(new Request(`${BASE}/dca/tx/cancel`, { method: "POST", body: JSON.stringify({ id: 1 }) }));
+    const r = await bare(new Request(`${BASE}/dca/tx/cancel`, { method: "POST", body: JSON.stringify({ id: 7 }) }));
     expect(r.status).toBe(503);
     expect((await r.json()).error).toContain("POINCARE_DCA_ADDRESS");
   });

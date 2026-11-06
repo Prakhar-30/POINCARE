@@ -374,25 +374,39 @@ export function createServer(opts: ServerOptions): McpServer {
       if (p.status !== "ready") throw new Error(`not fillable now: ${p.status}. ${DCA_STATUS_TEXT[p.status]}`);
     },
   );
-  orderAction("dca_cancel_order", "Cancel a DCA order", "Cancel your order and refund its unfilled budget. Only the owner can.", (id) => poincare.dca.build.cancel(id), true);
+  /** An open order; when sending an owner-only action, it must belong to the configured key. */
+  const openOrder = async (id: bigint) => {
+    const o = await poincare.dca.order(id);
+    if (!o) throw new Error(`no DCA order #${id}`);
+    if (o.cancelled || o.remaining === 0n) throw new Error(`DCA order #${id} is closed`);
+    return o;
+  };
+  const ownedOpen = async (id: bigint, send: boolean) => {
+    const o = await openOrder(id);
+    if (send && signer && o.owner.toLowerCase() !== signer.address.toLowerCase()) {
+      throw new Error(`DCA order #${id} belongs to ${o.owner}, not the configured key`);
+    }
+    return o;
+  };
+
+  orderAction(
+    "dca_cancel_order",
+    "Cancel a DCA order",
+    "Cancel your order and refund its unfilled budget. Only the owner can.",
+    (id) => poincare.dca.build.cancel(id),
+    true,
+    async (id, send) => void (await ownedOpen(id, send)),
+  );
   orderAction(
     "dca_close_expired",
     "Refund an expired order",
     "After the deadline, return an order's unfilled budget to its owner. Anyone may send this; the refund always goes to the owner.",
     (id) => poincare.dca.build.closeExpired(id),
     false,
+    async (id) => {
+      if (BigInt(now()) <= (await openOrder(id)).deadline) throw new Error(`DCA order #${id} has not expired yet`);
+    },
   );
-
-  /** Owner-only actions: when sending, refuse early if the configured key does not own the order. */
-  const ownedOpen = async (id: bigint, send: boolean) => {
-    const o = await poincare.dca.order(id);
-    if (!o) throw new Error(`no DCA order #${id}`);
-    if (o.cancelled || o.remaining === 0n) throw new Error(`DCA order #${id} is closed`);
-    if (send && signer && o.owner.toLowerCase() !== signer.address.toLowerCase()) {
-      throw new Error(`DCA order #${id} belongs to ${o.owner}, not the configured key`);
-    }
-    return o;
-  };
 
   orderAction(
     "dca_pause_order",

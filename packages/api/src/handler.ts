@@ -104,8 +104,17 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
       if (p.status !== "ready") throw new HttpError(409, `not fillable now: ${p.status}. ${DCA_STATUS_TEXT[p.status]}`);
       return { transactions: [poincare.dca.build.execute(id)] };
     }],
-    ["POST", /^\/dca\/tx\/cancel$/, async (_m, _u, body) => ({ transactions: [poincare.dca.build.cancel(idParam(body?.id))] })],
-    ["POST", /^\/dca\/tx\/close-expired$/, async (_m, _u, body) => ({ transactions: [poincare.dca.build.closeExpired(idParam(body?.id))] })],
+    ["POST", /^\/dca\/tx\/cancel$/, async (_m, _u, body) => {
+      const id = idParam(body?.id);
+      await openOrder(id);
+      return { transactions: [poincare.dca.build.cancel(id)] };
+    }],
+    ["POST", /^\/dca\/tx\/close-expired$/, async (_m, _u, body) => {
+      const id = idParam(body?.id);
+      const o = await openOrder(id);
+      if (BigInt(now()) <= o.deadline) throw new HttpError(409, `order #${id} has not expired yet (deadline ${o.deadline})`);
+      return { transactions: [poincare.dca.build.closeExpired(id)] };
+    }],
     ["POST", /^\/dca\/tx\/pause$/, async (_m, _u, body) => {
       const id = idParam(body?.id);
       const o = await openOrder(id);

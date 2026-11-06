@@ -223,6 +223,16 @@ describe("order tools", () => {
     const tx = (r.structuredContent!.transactions as TxRequest[])[0];
     expect(decodeFunctionData({ abi: dcaAbi, data: tx.data })).toMatchObject({ functionName: "cancel", args: [7n] });
   });
+
+  it("refuses a refund before the deadline and anything on an unknown order", async () => {
+    const c = await connect();
+    const early = await call(c, "dca_close_expired", { id: 7 });
+    expect(early.isError).toBe(true);
+    expect(early.content[0].text).toContain("has not expired");
+    const unknown = await call(c, "dca_cancel_order", { id: 99 });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.content[0].text).toContain("no DCA order");
+  });
 });
 
 describe("pause / resume / edit", () => {
