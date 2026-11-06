@@ -59,9 +59,13 @@ export const PAGES: DocPage[] = [
     body: () => (
       <>
         <H2>Set up</H2>
-        <P>The packages are not on npm yet; they live in {mono("packages/")} of the <A href={REPO}>repository</A>. The HTTP API needs nothing at all.</P>
-        <CodeBlock lang="sh" code={`git clone ${REPO}.git && cd POINCARE/packages
-pnpm install && pnpm check    # builds, type-checks and tests sdk, mcp and api`} />
+        <P>The SDK and the MCP server are on npm under {mono("@poincare")}; the HTTP API needs nothing at all.</P>
+        <CodeTabs tabs={[
+          { label: "SDK", lang: "sh", code: "npm i @poincare/sdk viem" },
+          { label: "MCP", lang: "sh", code: "claude mcp add poincare -- npx -y @poincare/mcp" },
+          { label: "From source", lang: "sh", code: `git clone ${REPO}.git && cd POINCARE/packages
+pnpm install && pnpm check    # builds, type-checks and tests sdk, mcp and api` },
+        ]} />
         <H2>Try it</H2>
         <Steps>{[
           <div key="1">
@@ -234,6 +238,9 @@ const txs = await poincare.dca.build.create(owner, input);   // [approve, create
     keywords: "typescript viem client createPoincareClient recurringOrder twapOrder watchRegime",
     body: () => (
       <>
+        <H2>Install</H2>
+        <CodeBlock lang="sh" code="npm i @poincare/sdk viem" />
+        <P>viem 2 is a peer dependency. The package is ESM-only and ships its own types.</P>
         <H2>Create a client</H2>
         <CodeBlock lang="ts" code={`import { createPoincareClient } from "@poincare/sdk";
 
@@ -304,13 +311,12 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
       <>
         <H2>Install</H2>
         <CodeTabs tabs={[
-          { label: "Claude Code", lang: "sh", code: `pnpm --dir packages/mcp build
-claude mcp add poincare -- node /absolute/path/to/packages/mcp/dist/index.js` },
+          { label: "Claude Code", lang: "sh", code: "claude mcp add poincare -- npx -y @poincare/mcp" },
           { label: "Claude Desktop", lang: "json", code: `{
   "mcpServers": {
     "poincare": {
-      "command": "node",
-      "args": ["/absolute/path/to/packages/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@poincare/mcp"],
       "env": { "POINCARE_RPC_URL": "https://sepolia.unichain.org" }
     }
   }

@@ -16,6 +16,20 @@ pnpm install          # in this folder
 pnpm check            # build + typecheck + test all three
 ```
 
+### Publishing to npm
+
+`@poincare/sdk` and `@poincare/mcp` are publishable (`@poincare/api` stays private: it ships as Supabase
+edge functions). Use **pnpm** to publish, so the MCP server's `workspace:*` dependency on the SDK becomes
+the real version:
+
+```sh
+npm login                       # an account that owns the "poincare" npm org
+pnpm pack:npm                   # optional dry run: tarballs in ../.npm-pack
+pnpm publish:npm                # builds, type-checks and tests each package first (prepublishOnly)
+```
+
+Bump `version` in both package.json files for later releases (the MCP server's SDK dependency follows).
+
 Orientation everywhere: prices are **USDC per WETH**, and "up" means the chart goes up. `buy`
 pays USDC for WETH; `sell` pays WETH for USDC.
 
@@ -62,12 +76,12 @@ mirror of the contract's slice rules), `build*Tx` (unsigned, with explicit gas),
 
 ## MCP server
 
-Build once (`pnpm --dir mcp build`), then add it to your client.
+From npm (or, from this repo, `node /abs/path/to/packages/mcp/dist/index.js` after `pnpm --dir mcp build`):
 
 **Claude Code**
 
 ```sh
-claude mcp add poincare -- node /abs/path/to/packages/mcp/dist/index.js
+claude mcp add poincare -- npx -y @poincare/mcp
 ```
 
 **Claude Desktop / any MCP client** (`mcpServers` in the client's config):
@@ -76,8 +90,8 @@ claude mcp add poincare -- node /abs/path/to/packages/mcp/dist/index.js
 {
   "mcpServers": {
     "poincare": {
-      "command": "node",
-      "args": ["/abs/path/to/packages/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@poincare/mcp"],
       "env": {}
     }
   }

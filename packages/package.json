@@ -7,6 +7,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "check": "pnpm -r build && pnpm -r typecheck && pnpm -r test"
+    "check": "pnpm -r build && pnpm -r typecheck && pnpm -r test",
+    "publish:npm": "pnpm --filter @poincare/sdk --filter @poincare/mcp publish --access public",
+    "pack:npm": "pnpm --filter @poincare/sdk --filter @poincare/mcp pack --pack-destination ../.npm-pack"
   }
 }
