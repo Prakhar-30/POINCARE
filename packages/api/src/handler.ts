@@ -2,10 +2,13 @@ import {
   DCA_STATUS_TEXT,
   DcaNotDeployedError,
   DcaParamError,
+  type DcaEditInput,
   type DcaOrder,
   type DcaOrderInput,
   type PoincareClient,
   type Side,
+  buildEditParams,
+  buildEditTx,
   buildOrderParams,
   minPriceWadToLimit,
   planSlice,
@@ -30,6 +33,8 @@ import { HttpError, json } from "./json.js";
  *   POST /dca/plan                       validate an order and preview its first fill
  *   POST /dca/tx/create                  unsigned approve + createOrder ({ owner, ...order })
  *   POST /dca/tx/execute|cancel|close-expired   unsigned tx ({ id })
+ *   POST /dca/tx/pause|resume            unsigned tx ({ id }); 409 if already in that state
+ *   POST /dca/tx/edit                    unsigned editOrder ({ id, slices?, intervalSec?, ... })
  */
 export function createApiHandler(opts: { poincare: PoincareClient; now?: () => number; basePath?: string }) {
   const { poincare } = opts;
@@ -80,10 +85,10 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
       const first = planSlice(
         {
           id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side: input.side,
-          zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false,
+          zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
           maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps, slices: p.slices, interval: p.interval,
           filled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n, amountIn: p.amountIn,
-          remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad,
+          remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0,
         },
         { now: BigInt(t), spreadBps: wadToBpsUp(input.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell), trendWithSide: r.withTrendSide === input.side },
       );
@@ -101,7 +106,31 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
     }],
     ["POST", /^\/dca\/tx\/cancel$/, async (_m, _u, body) => ({ transactions: [poincare.dca.build.cancel(idParam(body?.id))] })],
     ["POST", /^\/dca\/tx\/close-expired$/, async (_m, _u, body) => ({ transactions: [poincare.dca.build.closeExpired(idParam(body?.id))] })],
+    ["POST", /^\/dca\/tx\/pause$/, async (_m, _u, body) => {
+      const id = idParam(body?.id);
+      const o = await openOrder(id);
+      if (o.paused) throw new HttpError(409, `order #${id} is already paused`);
+      return { transactions: [poincare.dca.build.pause(id)] };
+    }],
+    ["POST", /^\/dca\/tx\/resume$/, async (_m, _u, body) => {
+      const id = idParam(body?.id);
+      const o = await openOrder(id);
+      if (!o.paused) throw new HttpError(409, `order #${id} is not paused`);
+      return { transactions: [poincare.dca.build.resume(id)] };
+    }],
+    ["POST", /^\/dca\/tx\/edit$/, async (_m, _u, body) => {
+      const id = idParam(body?.id);
+      const o = await openOrder(id);
+      return { transactions: [buildEditTx(poincare.deployment, id, buildEditParams(o, editInput(body), now()))] };
+    }],
   ];
+
+  async function openOrder(id: bigint): Promise<DcaOrder> {
+    const o = await poincare.dca.order(id);
+    if (!o) throw new HttpError(404, `no DCA order #${id}`);
+    if (o.cancelled || o.remaining === 0n) throw new HttpError(409, `order #${id} is closed`);
+    return o;
+  }
 
   return async function handle(req: Request): Promise<Response> {
     if (req.method === "OPTIONS") return new Response("ok", { headers: { ...corsOnly() } });
@@ -203,6 +232,26 @@ const optBool = (v: unknown, name: string): boolean | undefined => {
   if (typeof v === "boolean") return v;
   throw new HttpError(400, `${name} must be true or false`);
 };
+
+/** Request body -> DcaEditInput. Omitted fields keep the order's current value. */
+function editInput(body: any): DcaEditInput {
+  const lp = body?.limitPrice;
+  if (lp !== undefined && lp !== null && !(typeof lp === "string" && DECIMAL.test(lp))) {
+    throw new HttpError(400, "limitPrice must be a decimal string (USDC per WETH), or null to remove it");
+  }
+  return {
+    slices: optInt(body.slices, "slices"),
+    interval: optInt(body.intervalSec, "intervalSec"),
+    startTime: optInt(body.startTime, "startTime"),
+    deadline: optInt(body.deadline, "deadline"),
+    duration: optInt(body.durationSec, "durationSec"),
+    maxSpreadBps: optInt(body.maxSpreadBps, "maxSpreadBps"),
+    pauseOnTrend: optBool(body.pauseOnTrend, "pauseOnTrend"),
+    catchUp: optBool(body.catchUp, "catchUp"),
+    maxSlippageBps: optInt(body.maxSlippageBps, "maxSlippageBps"),
+    limitPrice: lp,
+  };
+}
 
 /** Request body -> DcaOrderInput, with strict types (the SDK then validates like the contract). */
 function orderInput(body: any): DcaOrderInput {

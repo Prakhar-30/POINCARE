@@ -44,14 +44,14 @@ function fakeChain(statusById: Record<string, number>, opts: { keeper?: boolean 
 
 describe("runKeeper", () => {
   it("fills ready orders, refunds expired ones, and only counts held ones", async () => {
-    const c = fakeChain({ "1": 0, "2": 7, "3": 8, "4": 4, "5": 0 });
+    const c = fakeChain({ "1": 0, "2": 7, "3": 8, "4": 4, "5": 0, "6": 10 });
     const run = await runKeeper({ ...c, deployment: dep });
     expect(c.sent.map((s) => [s.fn, s.id])).toEqual([["executeSlice", 1n], ["closeExpired", 4n], ["executeSlice", 5n]]);
     expect(c.sent.every((s) => s.gas > 0n)).toBe(true); // explicit gas, no estimation
     expect(run.executed.map((e) => e.id)).toEqual([1n, 5n]);
     expect(run.refunded.map((e) => e.id)).toEqual([4n]);
-    expect(run.held).toEqual({ "spread-too-high": 1, "trend-against": 1 });
-    expect(run.checked).toBe(5);
+    expect(run.held).toEqual({ "spread-too-high": 1, "trend-against": 1, paused: 1 }); // a paused order is never sent
+    expect(run.checked).toBe(6);
     expect(run.errors).toEqual([]);
   });
 

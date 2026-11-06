@@ -3,6 +3,8 @@ import {
   buildApproveTx,
   buildCancelTx,
   buildCloseExpiredTx,
+  buildPauseTx,
+  buildResumeTx,
   buildCreateOrderTx,
   buildExecuteSliceTx,
   buildOrderParams,
@@ -38,7 +40,7 @@ const order: DcaOrder = {
   id: 7n, owner: OWNER, recipient: OWNER, side: "buy", zeroForOne: true, pauseOnTrend: true, catchUp: true,
   cancelled: false, maxSpreadBps: 0, maxSlippageBps: 50, slices: 4, interval: 3600, filled: 2,
   startTime: BigInt(NOW), deadline: BigInt(NOW + 4 * 3600), lastSlotPlusOne: 2n, amountIn: 1000n * W,
-  remaining: 500n * W, amountOut: W / 5n, minPriceWad: 0n,
+  remaining: 500n * W, amountOut: W / 5n, minPriceWad: 0n, paused: false, scheduleBudget: 1000n * W, scheduleFilled: 2,
 };
 
 let preview: SlicePreview;
@@ -64,6 +66,8 @@ const poincare = {
       execute: (id: bigint) => buildExecuteSliceTx(dep, id),
       cancel: (id: bigint) => buildCancelTx(dep, id),
       closeExpired: (id: bigint) => buildCloseExpiredTx(dep, id),
+      pause: (id: bigint) => buildPauseTx(dep, id),
+      resume: (id: bigint) => buildResumeTx(dep, id),
     },
   },
 } as unknown as PoincareClient;
@@ -186,6 +190,26 @@ describe("DCA plan and unsigned transactions", () => {
     const e = await (await post("/dca/tx/close-expired", { id: 7 })).json();
     expect(decodeFunctionData({ abi: dcaAbi, data: e.transactions[0].data as Hex }).functionName).toBe("closeExpired");
     expect((await post("/dca/tx/cancel", { id: 0 })).status).toBe(400);
+  });
+
+  it("pause / resume, with 409 when already in that state", async () => {
+    const p = await (await post("/dca/tx/pause", { id: 7 })).json();
+    expect(decodeFunctionData({ abi: dcaAbi, data: p.transactions[0].data as Hex })).toMatchObject({ functionName: "pause", args: [7n] });
+    const r = await post("/dca/tx/resume", { id: 7 });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toContain("not paused");
+    expect((await post("/dca/tx/pause", { id: 99 })).status).toBe(404);
+  });
+
+  it("edit returns editOrder for the remaining budget, 400 with the contract's reason when invalid", async () => {
+    const e = await (await post("/dca/tx/edit", { id: 7, slices: 5, intervalSec: 1800, maxSpreadBps: 25 })).json();
+    const d = decodeFunctionData({ abi: dcaAbi, data: e.transactions[0].data as Hex });
+    expect(d.functionName).toBe("editOrder");
+    expect(d.args[1]).toMatchObject({ slices: 5, interval: 1800, maxSpreadBps: 25, pauseOnTrend: true, deadline: BigInt(NOW + 5 * 1800) });
+    const bad = await post("/dca/tx/edit", { id: 7, intervalSec: 30 });
+    expect(bad.status).toBe(400);
+    expect((await bad.json()).reason).toBe("interval");
+    expect((await post("/dca/tx/edit", { id: 7, limitPrice: 2000 })).status).toBe(400);
   });
 
   it("503 with a clear message when the DCA address is not configured", async () => {

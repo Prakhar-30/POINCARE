@@ -225,10 +225,10 @@ export function createServer(opts: ServerOptions): McpServer {
         const first = planSlice(
           {
             id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side: args.side,
-            zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false,
+            zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
             maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps, slices: p.slices, interval: p.interval,
             filled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n, amountIn: p.amountIn,
-            remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad,
+            remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0,
           },
           { now: BigInt(t), spreadBps: wadToBpsUp(sideSpread), trendWithSide: r.withTrendSide === args.side },
         );
@@ -346,7 +346,7 @@ export function createServer(opts: ServerOptions): McpServer {
     description: string,
     build: (id: bigint) => TxRequest,
     destructive: boolean,
-    precheck?: (id: bigint) => Promise<void>,
+    precheck?: (id: bigint, send: boolean) => Promise<void>,
   ) =>
     server.registerTool(
       name,
@@ -354,7 +354,7 @@ export function createServer(opts: ServerOptions): McpServer {
       async ({ id, send }) => {
         try {
           const n = BigInt(id);
-          if (precheck) await precheck(n);
+          if (precheck) await precheck(n, Boolean(send));
           const res = await run([build(n)], send);
           return ok({ orderId: n, sent: res.sent, transactions: res.transactions, ...(res.sent ? {} : { note: res.note }) });
         } catch (e) {
@@ -381,6 +381,82 @@ export function createServer(opts: ServerOptions): McpServer {
     "After the deadline, return an order's unfilled budget to its owner. Anyone may send this; the refund always goes to the owner.",
     (id) => poincare.dca.build.closeExpired(id),
     false,
+  );
+
+  /** Owner-only actions: when sending, refuse early if the configured key does not own the order. */
+  const ownedOpen = async (id: bigint, send: boolean) => {
+    const o = await poincare.dca.order(id);
+    if (!o) throw new Error(`no DCA order #${id}`);
+    if (o.cancelled || o.remaining === 0n) throw new Error(`DCA order #${id} is closed`);
+    if (send && signer && o.owner.toLowerCase() !== signer.address.toLowerCase()) {
+      throw new Error(`DCA order #${id} belongs to ${o.owner}, not the configured key`);
+    }
+    return o;
+  };
+
+  orderAction(
+    "dca_pause_order",
+    "Pause a DCA order",
+    "Hold your order: no buy fills until you resume it. It can still be cancelled, and with catch-up the buys it misses are made up after resuming. Owner only.",
+    (id) => poincare.dca.build.pause(id),
+    false,
+    async (id, send) => {
+      if ((await ownedOpen(id, send)).paused) throw new Error(`DCA order #${id} is already paused`);
+    },
+  );
+  orderAction(
+    "dca_resume_order",
+    "Resume a DCA order",
+    "Let a paused order fill again. Owner only.",
+    (id) => poincare.dca.build.resume(id),
+    false,
+    async (id, send) => {
+      if (!(await ownedOpen(id, send)).paused) throw new Error(`DCA order #${id} is not paused`);
+    },
+  );
+
+  server.registerTool(
+    "dca_edit_order",
+    {
+      title: "Edit a DCA order",
+      description:
+        "Re-plan an open order's REMAINING budget from now: a new number of buys and interval, and optionally new protection, slippage, limit and end time. Side, recipient and budget cannot change; a paused order stays paused. Validates like the contract. Owner only.",
+      inputSchema: {
+        id: orderId,
+        slices: z.number().int().min(1).max(10_000).optional().describe("Buys to spread the remaining budget over"),
+        intervalSec: z.number().int().min(60).optional().describe("Seconds between buys"),
+        durationSec: z.number().int().min(60).optional().describe("Alternative end: the new schedule's window in seconds"),
+        deadline: z.number().int().optional().describe("Unix seconds; default one spare interval after the last new buy"),
+        maxSpreadBps: z.number().int().min(0).max(10_000).optional(),
+        pauseOnTrend: z.boolean().optional(),
+        catchUp: z.boolean().optional(),
+        maxSlippageBps: z.number().int().min(0).max(10_000).optional(),
+        limitPrice: z.union([z.string().regex(/^\d+(\.\d+)?$/), z.literal("none")]).optional().describe("USDC per WETH, or \"none\" to remove the limit"),
+        send: sendFlag,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async (a) => {
+      try {
+        const id = BigInt(a.id);
+        await ownedOpen(id, Boolean(a.send));
+        const tx = await poincare.dca.build.edit(id, {
+          slices: a.slices,
+          interval: a.intervalSec,
+          duration: a.durationSec,
+          deadline: a.deadline,
+          maxSpreadBps: a.maxSpreadBps,
+          pauseOnTrend: a.pauseOnTrend,
+          catchUp: a.catchUp,
+          maxSlippageBps: a.maxSlippageBps,
+          limitPrice: a.limitPrice === "none" ? null : a.limitPrice,
+        });
+        const res = await run([tx], a.send);
+        return ok({ orderId: id, sent: res.sent, transactions: res.transactions, ...(res.sent ? {} : { note: res.note }) });
+      } catch (e) {
+        return fail(e);
+      }
+    },
   );
 
   return server;

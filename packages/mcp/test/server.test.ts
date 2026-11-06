@@ -5,6 +5,10 @@ import {
   buildApproveTx,
   buildCancelTx,
   buildCloseExpiredTx,
+  buildEditParams,
+  buildEditTx,
+  buildPauseTx,
+  buildResumeTx,
   buildCreateOrderTx,
   buildExecuteSliceTx,
   buildOrderParams,
@@ -12,6 +16,7 @@ import {
   erc20Abi,
   toRegime,
   withDca,
+  type DcaEditInput,
   type DcaOrder,
   type PoincareClient,
   type SlicePreview,
@@ -44,7 +49,7 @@ const order: DcaOrder = {
   id: 7n, owner: OWNER, recipient: OWNER, side: "sell", zeroForOne: false, pauseOnTrend: false, catchUp: true,
   cancelled: false, maxSpreadBps: 0, maxSlippageBps: 50, slices: 4, interval: 3600, filled: 1,
   startTime: BigInt(NOW), deadline: BigInt(NOW + 4 * 3600), lastSlotPlusOne: 1n, amountIn: 2n * W,
-  remaining: (3n * W) / 2n, amountOut: 1150n * W, minPriceWad: 0n,
+  remaining: (3n * W) / 2n, amountOut: 1150n * W, minPriceWad: 0n, paused: false, scheduleBudget: 2n * W, scheduleFilled: 1,
 };
 
 let preview: SlicePreview;
@@ -69,6 +74,9 @@ const fake = {
       execute: (id: bigint) => buildExecuteSliceTx(dep, id),
       cancel: (id: bigint) => buildCancelTx(dep, id),
       closeExpired: (id: bigint) => buildCloseExpiredTx(dep, id),
+      pause: (id: bigint) => buildPauseTx(dep, id),
+      resume: (id: bigint) => buildResumeTx(dep, id),
+      edit: async (id: bigint, input: DcaEditInput) => buildEditTx(dep, id, buildEditParams(order, input, NOW)),
     },
   },
 } as unknown as PoincareClient;
@@ -107,8 +115,8 @@ describe("tool surface", () => {
     const { tools } = await c.listTools();
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(Object.keys(byName).sort()).toEqual([
-      "dca_cancel_order", "dca_close_expired", "dca_create_order", "dca_execute_slice", "dca_get_order",
-      "dca_list_orders", "dca_plan_order", "dca_preview_slice", "get_regime", "get_regime_history", "quote", "wait_for_regime_change",
+      "dca_cancel_order", "dca_close_expired", "dca_create_order", "dca_edit_order", "dca_execute_slice", "dca_get_order",
+      "dca_list_orders", "dca_pause_order", "dca_plan_order", "dca_preview_slice", "dca_resume_order", "get_regime", "get_regime_history", "quote", "wait_for_regime_change",
     ]);
     for (const n of ["get_regime", "get_regime_history", "quote", "dca_plan_order", "dca_get_order", "dca_list_orders", "dca_preview_slice", "wait_for_regime_change"]) {
       expect(byName[n].annotations?.readOnlyHint, n).toBe(true);
@@ -214,6 +222,36 @@ describe("order tools", () => {
     const r = await call(await connect(), "dca_cancel_order", { id: 7 });
     const tx = (r.structuredContent!.transactions as TxRequest[])[0];
     expect(decodeFunctionData({ abi: dcaAbi, data: tx.data })).toMatchObject({ functionName: "cancel", args: [7n] });
+  });
+});
+
+describe("pause / resume / edit", () => {
+  it("pause builds pause(id); resume refuses an order that is not paused", async () => {
+    const c = await connect();
+    const p = await call(c, "dca_pause_order", { id: 7 });
+    expect(decodeFunctionData({ abi: dcaAbi, data: (p.structuredContent!.transactions as TxRequest[])[0].data })).toMatchObject({ functionName: "pause", args: [7n] });
+    const r = await call(c, "dca_resume_order", { id: 7 });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("not paused");
+  });
+
+  it("edit re-plans the remaining budget and validates like the contract", async () => {
+    const c = await connect();
+    const r = await call(c, "dca_edit_order", { id: 7, slices: 6, intervalSec: 900, pauseOnTrend: true, limitPrice: "none" });
+    expect(r.isError).toBeFalsy();
+    const d = decodeFunctionData({ abi: dcaAbi, data: (r.structuredContent!.transactions as TxRequest[])[0].data });
+    expect(d.functionName).toBe("editOrder");
+    expect(d.args[1]).toMatchObject({ slices: 6, interval: 900, pauseOnTrend: true, minPriceWad: 0n, deadline: BigInt(NOW + 6 * 900) });
+    const bad = await call(c, "dca_edit_order", { id: 7, slices: 4, deadline: NOW + 60 });
+    expect(bad.isError).toBe(true);
+    expect(bad.content[0].text).toContain("deadline");
+  });
+
+  it("refuses to send for an order the configured key does not own", async () => {
+    const stranger: Signer = { address: "0x00000000000000000000000000000000000000Ee", send: async () => createdReceipt() };
+    const r = await call(await connect(stranger), "dca_pause_order", { id: 7, send: true });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("not the configured key");
   });
 });
 
