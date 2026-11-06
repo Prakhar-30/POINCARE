@@ -18,6 +18,7 @@ import { WalletAvatar } from "@/components/ui/WalletAvatar";
 import { PanelHead } from "@/components/ui/Panel";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { EvidenceChart } from "@/components/ui/EvidenceChart";
+import { DcaOrders } from "@/components/ui/DcaOrders";
 
 /**
  * The Dashboard as an exchange account overview: who you are on the platform and what you hold
@@ -251,6 +252,9 @@ function AccountBar({
           </Link>
           <Link to={{ search: "?tab=pool" }} onClick={goTop} className="btn btn-secondary btn-sm">
             <Icon name="plus" size={14} aria-hidden="true" /> Add liquidity
+          </Link>
+          <Link to={{ search: "?tab=trade&mode=dca" }} onClick={goTop} className="btn btn-secondary btn-sm" title="Recurring buys and TWAP that skip the trend spread">
+            <Icon name="layers" size={14} aria-hidden="true" /> DCA
           </Link>
         </div>
       </div>
@@ -486,7 +490,7 @@ function hookTag(t: SwapRow) {
 }
 
 function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; lpEvents: LpEvent[]; stats: ReturnType<typeof tradeStatsOf>; loading: boolean }) {
-  const [tab, setTab] = useState<"trades" | "liquidity">("trades");
+  const [tab, setTab] = useState<"trades" | "liquidity" | "dca">("trades");
   const head = (cols: string[], right: number[]) => (
     <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
       <tr>
@@ -504,6 +508,7 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
         <div className="seg seg-sm" role="group" aria-label="Activity type" style={{ padding: 2, marginRight: "auto" }}>
           <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "trades"} onClick={() => setTab("trades")}>Trades{swaps.length ? ` · ${swaps.length}` : ""}</button>
           <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "liquidity"} onClick={() => setTab("liquidity")}>Liquidity{lpEvents.length ? ` · ${lpEvents.length}` : ""}</button>
+          <button type="button" className="seg-item" style={{ whiteSpace: "nowrap" }} aria-pressed={tab === "dca"} onClick={() => setTab("dca")}>DCA</button>
         </div>
         {tab === "trades" && stats.count > 0 && (
           <div className="flex flex-wrap gap-x-5 gap-y-1" style={{ fontSize: 12, color: "var(--text-3)" }}>
@@ -514,8 +519,10 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
         )}
       </PanelHead>
 
-      <div className="overflow-auto flex-1" style={{ maxHeight: 420 }} tabIndex={0} aria-label={tab === "trades" ? "Your trades" : "Your liquidity events"}>
-        {loading ? (
+      <div className="overflow-auto flex-1" style={{ maxHeight: 420 }} tabIndex={0} aria-label={tab === "trades" ? "Your trades" : tab === "dca" ? "Your DCA plans" : "Your liquidity events"}>
+        {tab === "dca" ? (
+          <DcaOrders startLink />
+        ) : loading ? (
           <p style={{ padding: 24, fontSize: 13, color: "var(--muted)", textAlign: "center" }}>Loading your history…</p>
         ) : tab === "trades" ? (
           swaps.length === 0 ? (

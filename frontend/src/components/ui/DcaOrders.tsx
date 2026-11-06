@@ -1,22 +1,31 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { hasDca } from "@/config/contracts";
 import { useDcaActions, useDcaOrders, type DcaOrderWithNext } from "@/hooks/useDca";
 import { formatAmount, progressOf, type DcaStatus } from "@/lib/poincare-sdk";
 import { fmtNum } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 
-/** The connected wallet's DCA orders: progress, the contract's verdict on the next fill, cancel / refund. */
-export function DcaOrders({ maxHeight }: { maxHeight?: number }) {
+/** The connected wallet's DCA plans: progress, average price, the contract's verdict on the next
+ *  buy, cancel / refund. `startLink` adds a way into the DCA ticket (used off the Trade screen). */
+export function DcaOrders({ maxHeight, startLink }: { maxHeight?: number; startLink?: boolean }) {
   const q = useDcaOrders();
   const { cancel, refund, busy } = useDcaActions();
+  const start = startLink ? (
+    <Link to={{ search: "?tab=trade&mode=dca" }} onClick={() => window.scrollTo({ top: 0 })} className="btn btn-soft btn-sm" style={{ marginTop: 10 }}>
+      <Icon name="layers" size={14} aria-hidden="true" /> Start a DCA plan
+    </Link>
+  ) : null;
 
   if (!hasDca) {
-    return <Empty>DCA goes live once its contract is deployed on this network.</Empty>;
+    return <Empty action={start}>DCA goes live once its contract is deployed on this network. You can already plan one on the Trade screen.</Empty>;
   }
-  if (q.isLoading) return <Empty>Loading your DCA orders…</Empty>;
-  if (q.isError) return <Empty>Couldn't read your orders. Retrying…</Empty>;
+  if (q.isLoading) return <Empty>Loading your DCA plans…</Empty>;
+  if (q.isError) return <Empty>Couldn't read your plans. Retrying…</Empty>;
   const orders = q.data ?? [];
-  if (!orders.length) return <Empty>No DCA orders yet. Switch the ticket to DCA to start one.</Empty>;
+  if (!orders.length) {
+    return <Empty action={start}>No DCA plans yet. Buy or sell on a schedule, and skip the trend spread while you do.</Empty>;
+  }
 
   return (
     <ul className="overflow-y-auto" style={{ maxHeight }} aria-label="Your DCA orders">
@@ -59,6 +68,7 @@ function OrderRow({ o, busy, onCancel, onRefund }: { o: DcaOrderWithNext; busy: 
         <span>
           {o.filled}/{o.slices} fills · <b style={{ color: "var(--text-2)" }}>{fmtNum(Number(formatAmount(o.remaining)), dp(inSym))} {inSym}</b> left
           {o.amountOut > 0n && <> · got {fmtNum(Number(formatAmount(o.amountOut)), dp(outSym))} {outSym}</>}
+          {avgPrice(o) > 0 && <> · avg {fmtNum(avgPrice(o), 2)}</>}
         </span>
         <span className="flex items-center gap-2">
           {status === "expired" && o.remaining > 0n && (
@@ -104,6 +114,14 @@ const STATUS_TONE: Record<DcaStatus, { ink: string; bg: string }> = {
   "below-limit": { ink: "var(--honey-ink)", bg: "var(--warn-bg)" },
 };
 
+/** Average executed price, USDC per WETH, over the buys so far (what exchanges show per plan). */
+function avgPrice(o: DcaOrderWithNext): number {
+  const spent = Number(formatAmount(o.amountIn - o.remaining));
+  const got = Number(formatAmount(o.amountOut));
+  if (!(spent > 0) || !(got > 0)) return 0;
+  return o.side === "buy" ? spent / got : got / spent;
+}
+
 function relative(unixSec: bigint): string {
   const s = Number(unixSec) - Math.floor(Date.now() / 1000);
   if (s <= 0) return "now";
@@ -133,6 +151,11 @@ function nextText(o: DcaOrderWithNext): string {
   }
 }
 
-function Empty({ children }: { children: ReactNode }) {
-  return <p style={{ padding: "26px 18px", fontSize: 13, color: "var(--text-3)", textAlign: "center", lineHeight: 1.5 }}>{children}</p>;
+function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center" style={{ padding: "26px 18px", textAlign: "center" }}>
+      <p style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.5, maxWidth: 360 }}>{children}</p>
+      {action}
+    </div>
+  );
 }

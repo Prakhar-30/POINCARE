@@ -34,6 +34,10 @@ export function CommandMenu({ setTab, open, setOpen }: { setTab: (t: Tab) => voi
 
   const commands = useMemo<Command[]>(() => [
     ...TABS.map((t, i) => ({ id: `go-${t.id}`, label: `Go to ${t.label}`, icon: t.icon, hint: String(i + 1), run: () => setTab(t.id) })),
+    {
+      id: "dca", label: "Start a spread-aware DCA plan", icon: "layers",
+      run: () => { navigate({ pathname: "/app", search: "?tab=trade&mode=dca" }); window.scrollTo({ top: 0 }); },
+    },
     { id: "theme", label: `Switch to ${theme === "dark" ? "light" : "dark"} theme`, icon: theme === "dark" ? "sun" : "moon", run: toggle },
     {
       id: "copy-hook", label: "Copy hook address", icon: "copy",
