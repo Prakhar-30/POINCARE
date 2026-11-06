@@ -1779,8 +1779,8 @@ var UNICHAIN_SEPOLIA = {
   weth: getAddress("0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449"),
   deployBlock: 66190311n,
   /** deployments/unichain-sepolia-dca.json */
-  dca: getAddress("0x6aB9242503200f6f45102a730AF7b4510D2823dD"),
-  dcaDeployBlock: 67078887n
+  dca: getAddress("0x1E2ad927D95F284fB588eAA3f56D031f92AAe50a"),
+  dcaDeployBlock: 67080020n
 };
 function withDca(dep, dca, dcaDeployBlock) {
   return { ...dep, dca: getAddress(dca), dcaDeployBlock };
