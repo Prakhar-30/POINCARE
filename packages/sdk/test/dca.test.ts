@@ -3,6 +3,7 @@ import {
   DCA_STATUS,
   DcaParamError,
   type DcaOrder,
+  buildEditParams,
   buildOrderParams,
   limitToMinPriceWad,
   minPriceWadToLimit,
@@ -41,7 +42,11 @@ function order(over: Partial<DcaOrder> = {}): DcaOrder {
     remaining: 4n * E,
     amountOut: 0n,
     minPriceWad: 0n,
+    paused: false,
     ...over,
+    // a fresh order's schedule is the whole order unless a test says otherwise
+    scheduleBudget: over.scheduleBudget ?? over.amountIn ?? 4n * E,
+    scheduleFilled: over.scheduleFilled ?? over.filled ?? 0,
   };
 }
 
@@ -49,9 +54,10 @@ describe("status codes", () => {
   it("follow PoincareDCA.Status order", () => {
     expect(DCA_STATUS).toEqual([
       "ready", "unknown", "cancelled", "filled", "expired", "not-started",
-      "waiting-for-slot", "spread-too-high", "trend-against", "below-limit",
+      "waiting-for-slot", "spread-too-high", "trend-against", "below-limit", "paused",
     ]);
     expect(statusOf(7)).toBe("spread-too-high");
+    expect(statusOf(10)).toBe("paused");
     expect(statusOf(99)).toBe("unknown");
   });
 });
@@ -167,5 +173,42 @@ describe("planSlice (mirrors PoincareDCA._preview)", () => {
 
   it("progress", () => {
     expect(progressOf(order({ remaining: 1n * E }))).toBe(0.75);
+  });
+
+  it("a paused order holds, after the closed/expired checks (as on chain)", () => {
+    expect(planSlice(order({ paused: true }), ctx).status).toBe("paused");
+    expect(planSlice(order({ paused: true }), { ...ctx, now: NOW + 3n * BigInt(H) + 1n }).status).toBe("expired");
+    expect(planSlice(order({ paused: true, cancelled: true }), ctx).status).toBe("cancelled");
+  });
+
+  it("after an edit, slices are shares of the re-planned remainder", () => {
+    // 4 deposited, 1 filled, then edited to 6 buys of what was left
+    const o = order({ filled: 1, remaining: 3n * E, scheduleBudget: 3n * E, scheduleFilled: 0, slices: 6, deadline: NOW + 6n * BigInt(H) });
+    expect(planSlice(o, ctx).amountIn).toBe(E / 2n);
+  });
+});
+
+describe("buildEditParams (mirrors PoincareDCA.editOrder)", () => {
+  const live = order({ filled: 1, remaining: 3n * E, lastSlotPlusOne: 1n });
+
+  it("keeps what is not edited and re-anchors at now", () => {
+    const p = buildEditParams(live, { slices: 6 }, NOW);
+    expect(p).toMatchObject({ slices: 6, interval: H, startTime: 0n, maxSpreadBps: 10_000, catchUp: false });
+    expect(p.deadline).toBe(NOW + 6n * BigInt(H));
+  });
+
+  it("limit price: set, keep, remove", () => {
+    expect(buildEditParams(live, { limitPrice: "2000" }, NOW).minPriceWad).toBe((WAD * WAD) / (2000n * WAD));
+    const limited = order({ ...live, minPriceWad: 7n });
+    expect(buildEditParams(limited, {}, NOW).minPriceWad).toBe(7n);
+    expect(buildEditParams(limited, { limitPrice: null }, NOW).minPriceWad).toBe(0n);
+  });
+
+  it("validates against the remaining budget, with the contract's reasons", () => {
+    const reason = (f: () => unknown) => { try { f(); return "ok"; } catch (e) { return (e as DcaParamError).reason; } };
+    expect(reason(() => buildEditParams(order({ remaining: 3n }), { slices: 4 }, NOW))).toBe("amountIn below slices");
+    expect(reason(() => buildEditParams(live, { interval: 30 }, NOW))).toBe("interval");
+    expect(reason(() => buildEditParams(live, { slices: 4, deadline: NOW + 60n }, NOW))).toBe("deadline");
+    expect(reason(() => buildEditParams(order({ cancelled: true }), {}, NOW))).toBe("closed");
   });
 });

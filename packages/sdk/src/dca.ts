@@ -19,6 +19,7 @@ export const DCA_STATUS = [
   "spread-too-high",
   "trend-against",
   "below-limit",
+  "paused",
 ] as const;
 export type DcaStatus = (typeof DCA_STATUS)[number];
 
@@ -33,6 +34,7 @@ export const DCA_STATUS_TEXT: Record<DcaStatus, string> = {
   "spread-too-high": "The trend spread on this order's side is above its cap; the slice is held.",
   "trend-against": "A trend runs with this order's side (the side the pool charges); the order is paused until it ends.",
   "below-limit": "The pool price is worse than the order's limit price.",
+  paused: "The owner paused the order; no slice fills until it is resumed.",
 };
 
 export const statusOf = (code: number): DcaStatus => DCA_STATUS[code] ?? "unknown";
@@ -170,15 +172,23 @@ export type DcaOrder = {
   pauseOnTrend: boolean;
   catchUp: boolean;
   cancelled: boolean;
+  paused: boolean;
   maxSpreadBps: number;
   maxSlippageBps: number;
+  /** Planned fills of the CURRENT schedule. */
   slices: number;
   interval: number;
+  /** Fills over the order's life. */
   filled: number;
+  /** Fills in the current schedule (resets when the order is edited). */
+  scheduleFilled: number;
   startTime: bigint;
   deadline: bigint;
   lastSlotPlusOne: bigint;
+  /** Total deposited; never changes. */
   amountIn: bigint;
+  /** What the current schedule spreads (amountIn, then the remainder at each edit). */
+  scheduleBudget: bigint;
   remaining: bigint;
   amountOut: bigint;
   minPriceWad: bigint;
@@ -198,16 +208,86 @@ export function slotInfo(o: Pick<DcaOrder, "startTime" | "interval" | "deadline"
 }
 
 /** PoincareDCA._sliceAmount. */
-export function sliceAmount(o: Pick<DcaOrder, "amountIn" | "remaining" | "slices" | "filled" | "catchUp">, slot: bigint, lastSlot: bigint): bigint {
-  const base = o.amountIn / BigInt(o.slices);
+export function sliceAmount(o: Pick<DcaOrder, "scheduleBudget" | "remaining" | "slices" | "scheduleFilled" | "catchUp">, slot: bigint, lastSlot: bigint): bigint {
+  const base = o.scheduleBudget / BigInt(o.slices);
   let amt = base;
   if (o.catchUp) {
     const slotsLeft = lastSlot - slot + 1n;
     const even = (o.remaining + slotsLeft - 1n) / slotsLeft;
     if (even > amt) amt = even;
   }
-  if (o.filled + 1 >= o.slices || amt > o.remaining) amt = o.remaining;
+  if (o.scheduleFilled + 1 >= o.slices || amt > o.remaining) amt = o.remaining;
   return amt;
+}
+
+/** What PoincareDCA.editOrder takes: a new schedule and rules for the REMAINING budget. */
+export type DcaEditParams = {
+  slices: number;
+  interval: number;
+  startTime: bigint;
+  deadline: bigint;
+  maxSpreadBps: number;
+  pauseOnTrend: boolean;
+  catchUp: boolean;
+  maxSlippageBps: number;
+  minPriceWad: bigint;
+};
+
+/** Human-friendly edit. Anything omitted keeps the order's current value. */
+export type DcaEditInput = {
+  slices?: number;
+  interval?: number;
+  startTime?: number | bigint;
+  deadline?: number | bigint;
+  /** Alternative to `deadline`: seconds from the new start. */
+  duration?: number;
+  maxSpreadBps?: number;
+  pauseOnTrend?: boolean;
+  catchUp?: boolean;
+  maxSlippageBps?: number;
+  /** USDC per WETH; `null` removes the limit. */
+  limitPrice?: string | number | null;
+};
+
+/**
+ * Edit params validated exactly like PoincareDCA.editOrder: the remaining budget is re-planned
+ * from the new start. The deadline defaults to one spare slot after the last new slice.
+ */
+export function buildEditParams(o: DcaOrder, input: DcaEditInput, nowSec: number | bigint = Math.floor(Date.now() / 1000)): DcaEditParams {
+  const now = BigInt(nowSec);
+  if (o.cancelled || o.remaining === 0n) throw new DcaParamError("closed", "the order is no longer open");
+  const slices = input.slices ?? o.slices;
+  const interval = input.interval ?? o.interval;
+  const startTime = input.startTime === undefined ? 0n : BigInt(input.startTime);
+  const start = startTime === 0n ? now : startTime;
+  const deadline =
+    input.deadline !== undefined
+      ? BigInt(input.deadline)
+      : input.duration !== undefined
+        ? start + BigInt(Math.max(0, Math.trunc(input.duration)))
+        : start + BigInt(Math.max(0, slices)) * BigInt(interval);
+  const p: DcaEditParams = {
+    slices,
+    interval,
+    startTime,
+    deadline,
+    maxSpreadBps: input.maxSpreadBps ?? o.maxSpreadBps,
+    pauseOnTrend: input.pauseOnTrend ?? o.pauseOnTrend,
+    catchUp: input.catchUp ?? o.catchUp,
+    maxSlippageBps: input.maxSlippageBps ?? o.maxSlippageBps,
+    minPriceWad:
+      input.limitPrice === undefined ? o.minPriceWad : input.limitPrice === null ? 0n : limitToMinPriceWad(o.side, input.limitPrice),
+  };
+  // same schedule rules as createOrder, with the remaining budget as the budget
+  validateOrderParams(
+    {
+      zeroForOne: o.zeroForOne, amountIn: o.remaining, slices: p.slices, interval: p.interval, startTime: p.startTime,
+      deadline: p.deadline, maxSpreadBps: p.maxSpreadBps, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp,
+      maxSlippageBps: p.maxSlippageBps, minPriceWad: p.minPriceWad, recipient: o.recipient,
+    },
+    now,
+  );
+  return p;
 }
 
 export type SlicePlan = {
@@ -232,6 +312,7 @@ export function planSlice(
   if (o.cancelled) return done("cancelled");
   if (o.remaining === 0n) return done("filled");
   if (ctx.now > o.deadline) return done("expired");
+  if (o.paused) return done("paused");
   if (ctx.now < o.startTime) return { ...done("not-started"), nextSlotAt: o.startTime };
 
   const { slot, lastSlot, nextSlotAt } = slotInfo(o, ctx.now);

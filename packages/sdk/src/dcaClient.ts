@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { dcaAbi } from "./abi/dca.js";
 import { erc20Abi } from "./abi/erc20.js";
-import { type DcaOrder, type DcaOrderParams, type DcaStatus, statusOf, toDcaOrder } from "./dca.js";
+import { type DcaEditParams, type DcaOrder, type DcaOrderParams, type DcaStatus, statusOf, toDcaOrder } from "./dca.js";
 import { type PoincareDeployment, requireDca } from "./deployments.js";
 import type { Side } from "./regime.js";
 
@@ -26,6 +26,9 @@ export const DCA_GAS = {
   executeSlice: 1_500_000n,
   cancel: 200_000n,
   closeExpired: 200_000n,
+  pause: 80_000n,
+  resume: 80_000n,
+  editOrder: 150_000n,
 } as const;
 
 /** An unsigned transaction: send it from any wallet. */
@@ -131,7 +134,7 @@ export function buildCreateOrderTx(dep: PoincareDeployment, p: DcaOrderParams): 
   };
 }
 
-const simple = (fn: "executeSlice" | "cancel" | "closeExpired", label: string) => (dep: PoincareDeployment, id: bigint): TxRequest => ({
+const simple = (fn: "executeSlice" | "cancel" | "closeExpired" | "pause" | "resume", label: string) => (dep: PoincareDeployment, id: bigint): TxRequest => ({
   to: requireDca(dep),
   data: encodeFunctionData({ abi: dcaAbi, functionName: fn, args: [id] }),
   value: 0n,
@@ -143,6 +146,28 @@ const simple = (fn: "executeSlice" | "cancel" | "closeExpired", label: string) =
 export const buildExecuteSliceTx = simple("executeSlice", "Fill a slice of");
 /** Cancel and refund. Only the order's owner may send it. */
 export const buildCancelTx = simple("cancel", "Cancel");
+/** Hold the order. Only the order's owner may send it. */
+export const buildPauseTx = simple("pause", "Pause");
+/** Let a paused order fill again. Only the order's owner may send it. */
+export const buildResumeTx = simple("resume", "Resume");
+
+/** Re-plan the remaining budget (build the params with buildEditParams). Owner only. */
+export function buildEditTx(dep: PoincareDeployment, id: bigint, p: DcaEditParams): TxRequest {
+  return {
+    to: requireDca(dep),
+    data: encodeFunctionData({
+      abi: dcaAbi,
+      functionName: "editOrder",
+      args: [id, {
+        slices: p.slices, interval: p.interval, startTime: p.startTime, deadline: p.deadline, maxSpreadBps: p.maxSpreadBps,
+        pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, maxSlippageBps: p.maxSlippageBps, minPriceWad: p.minPriceWad,
+      }],
+    }),
+    value: 0n,
+    gas: DCA_GAS.editOrder,
+    description: `Edit DCA order #${id} (${p.slices} slices)`,
+  };
+}
 /** After the deadline, refund the unfilled budget to the owner. Anyone may send it. */
 export const buildCloseExpiredTx = simple("closeExpired", "Refund expired");
 

@@ -1,6 +1,6 @@
 import { createPublicClient, http, type Address, type PublicClient, type WalletClient } from "viem";
 import { unichainSepolia } from "viem/chains";
-import { type DcaOrderInput, buildOrderParams } from "./dca.js";
+import { type DcaEditInput, type DcaOrderInput, buildEditParams, buildOrderParams } from "./dca.js";
 import * as dca from "./dcaClient.js";
 import { type PoincareDeployment, UNICHAIN_SEPOLIA } from "./deployments.js";
 import { quoteExactInput } from "./quote.js";
@@ -65,6 +65,14 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
         execute: (id: bigint) => dca.buildExecuteSliceTx(deployment, id),
         cancel: (id: bigint) => dca.buildCancelTx(deployment, id),
         closeExpired: (id: bigint) => dca.buildCloseExpiredTx(deployment, id),
+        pause: (id: bigint) => dca.buildPauseTx(deployment, id),
+        resume: (id: bigint) => dca.buildResumeTx(deployment, id),
+        /** Reads the order, validates the edit like the contract, builds editOrder. */
+        edit: async (id: bigint, input: DcaEditInput) => {
+          const o = await dca.getOrder(publicClient, deployment, id);
+          if (!o) throw new Error(`no DCA order #${id}`);
+          return dca.buildEditTx(deployment, id, buildEditParams(o, input));
+        },
       },
 
       /** Approve (exact amount, if needed) and create; resolves to the new order id. */
@@ -78,6 +86,13 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
       execute: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildExecuteSliceTx(deployment, id)),
       cancel: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildCancelTx(deployment, id)),
       closeExpired: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildCloseExpiredTx(deployment, id)),
+      pause: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildPauseTx(deployment, id)),
+      resume: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildResumeTx(deployment, id)),
+      edit: async (id: bigint, input: DcaEditInput) => {
+        const o = await dca.getOrder(publicClient, deployment, id);
+        if (!o) throw new Error(`no DCA order #${id}`);
+        return dca.sendTx(needWallet(), publicClient, dca.buildEditTx(deployment, id, buildEditParams(o, input)));
+      },
     },
   };
 }

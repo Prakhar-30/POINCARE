@@ -210,6 +210,71 @@ export const dcaAbi = [
   },
   {
     "type": "function",
+    "name": "editOrder",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct PoincareDCA.EditParams",
+        "components": [
+          {
+            "name": "slices",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "interval",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "startTime",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "maxSpreadBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "pauseOnTrend",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "catchUp",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "maxSlippageBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "minPriceWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeSlice",
     "inputs": [
       {
@@ -274,6 +339,11 @@ export const dcaAbi = [
             "internalType": "bool"
           },
           {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
             "name": "maxSpreadBps",
             "type": "uint16",
             "internalType": "uint16"
@@ -299,6 +369,11 @@ export const dcaAbi = [
             "internalType": "uint32"
           },
           {
+            "name": "scheduleFilled",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
             "name": "startTime",
             "type": "uint64",
             "internalType": "uint64"
@@ -315,6 +390,11 @@ export const dcaAbi = [
           },
           {
             "name": "amountIn",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "scheduleBudget",
             "type": "uint128",
             "internalType": "uint128"
           },
@@ -467,6 +547,19 @@ export const dcaAbi = [
   },
   {
     "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pendingOwner",
     "inputs": [],
     "outputs": [
@@ -508,6 +601,19 @@ export const dcaAbi = [
     "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "resume",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -676,6 +782,43 @@ export const dcaAbi = [
   },
   {
     "type": "event",
+    "name": "OrderEdited",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "slices",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "interval",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "startTime",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "deadline",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OrderExpired",
     "inputs": [
       {
@@ -707,6 +850,32 @@ export const dcaAbi = [
         "name": "amountOut",
         "type": "uint256",
         "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrderPaused",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrderResumed",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -820,6 +989,11 @@ export const dcaAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "AlreadyInState",
+    "inputs": []
   },
   {
     "type": "error",
