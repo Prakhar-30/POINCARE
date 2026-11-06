@@ -38,6 +38,7 @@ export function CommandMenu({ setTab, open, setOpen }: { setTab: (t: Tab) => voi
       id: "dca", label: "Start a spread-aware DCA plan", icon: "layers",
       run: () => { navigate({ pathname: "/app", search: "?tab=trade&mode=dca" }); window.scrollTo({ top: 0 }); },
     },
+    { id: "developers", label: "Developer docs: SDK, MCP, API", icon: "spark", run: () => navigate("/developers") },
     { id: "theme", label: `Switch to ${theme === "dark" ? "light" : "dark"} theme`, icon: theme === "dark" ? "sun" : "moon", run: toggle },
     {
       id: "copy-hook", label: "Copy hook address", icon: "copy",

@@ -652,6 +652,7 @@ function Footer() {
         ])}
         {col("Research", [
           { label: "README & backtests", href: README },
+          { label: "Developers: SDK, MCP, API", to: "/developers" },
           { label: "Source code", href: REPO },
         ])}
         {col("Network", [
