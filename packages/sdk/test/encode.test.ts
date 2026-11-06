@@ -46,7 +46,7 @@ describe("transaction builders", () => {
 
   it("refuses to build DCA transactions where the contract is not deployed", () => {
     expect(() => buildCancelTx({ ...UNICHAIN_SEPOLIA, dca: undefined }, 1n)).toThrow(DcaNotDeployedError);
-    expect(UNICHAIN_SEPOLIA.dca).toBe("0x412C6d6a8566A013b2a3552BBE2a1beEF89fE78A"); // shipped default
+    expect(UNICHAIN_SEPOLIA.dca).toBe("0x6aB9242503200f6f45102a730AF7b4510D2823dD"); // shipped default
   });
 });
 

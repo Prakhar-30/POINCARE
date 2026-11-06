@@ -42,7 +42,7 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
     usdc: "0x1b4034D6C443Eff3D2e9051A08147eF9eD8EBc70",
     weth: "0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449",
     deployBlock: 66190311n,
-    dca: "0x412C6d6a8566A013b2a3552BBE2a1beEF89fE78A",
+    dca: "0x6aB9242503200f6f45102a730AF7b4510D2823dD",
   },
   // Additional chains slot in here once a deployment exists (entry shape above);
   // Monad testnet was evaluated and dropped for now: no canonical Uniswap v4 there.
