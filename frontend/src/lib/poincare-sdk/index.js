@@ -2284,8 +2284,17 @@ async function previewSlice(client, dep, id) {
     nextSlotAt: p.nextSlotAt
   };
 }
-async function allowanceFor(client, dep, owner, side) {
-  return client.readContract({ address: inputToken(dep, side), abi: erc20Abi, functionName: "allowance", args: [owner, requireDca(dep)] });
+async function allowanceFor(client, dep, owner, side, atBlock) {
+  const read = (blockNumber) => client.readContract({ address: inputToken(dep, side), abi: erc20Abi, functionName: "allowance", args: [owner, requireDca(dep)], blockNumber });
+  if (atBlock === void 0) return read();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await read(atBlock);
+    } catch (e) {
+      if (attempt >= 10) throw e;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
 }
 function buildApproveTx(dep, side, amount) {
   return {
@@ -2357,9 +2366,9 @@ function buildEditTx(dep, id, p) {
   };
 }
 var buildCloseExpiredTx = simple("closeExpired", "Refund expired");
-async function planCreateOrder(client, dep, owner, p) {
+async function planCreateOrder(client, dep, owner, p, opts = {}) {
   const side = p.zeroForOne ? "buy" : "sell";
-  const allowance = await allowanceFor(client, dep, owner, side);
+  const allowance = await allowanceFor(client, dep, owner, side, opts.atBlock);
   return [...allowance < p.amountIn ? [buildApproveTx(dep, side, p.amountIn)] : [], buildCreateOrderTx(dep, p)];
 }
 var TxRevertedError = class extends Error {
@@ -2403,6 +2412,12 @@ function createPoincareClient(opts = {}) {
     if (!wallet) throw new Error("this call sends a transaction: pass walletClient to createPoincareClient");
     return wallet;
   };
+  let lastBlock;
+  const send = async (tx) => {
+    const r = await sendTx(needWallet(), publicClient, tx);
+    if (lastBlock === void 0 || r.blockNumber > lastBlock) lastBlock = r.blockNumber;
+    return r;
+  };
   const owner = () => {
     const a = needWallet().account?.address;
     if (!a) throw new Error("the wallet client has no account");
@@ -2442,21 +2457,20 @@ function createPoincareClient(opts = {}) {
       },
       /** Approve (exact amount, if needed) and create; resolves to the new order id. */
       create: async (input) => {
-        const w = needWallet();
-        const txs = await planCreateOrder(publicClient, deployment, owner(), buildOrderParams(input));
+        const txs = await planCreateOrder(publicClient, deployment, owner(), buildOrderParams(input), { atBlock: lastBlock });
         let receipt;
-        for (const tx of txs) receipt = await sendTx(w, publicClient, tx);
+        for (const tx of txs) receipt = await send(tx);
         return orderIdFromReceipt(deployment, receipt);
       },
-      execute: (id) => sendTx(needWallet(), publicClient, buildExecuteSliceTx(deployment, id)),
-      cancel: (id) => sendTx(needWallet(), publicClient, buildCancelTx(deployment, id)),
-      closeExpired: (id) => sendTx(needWallet(), publicClient, buildCloseExpiredTx(deployment, id)),
-      pause: (id) => sendTx(needWallet(), publicClient, buildPauseTx(deployment, id)),
-      resume: (id) => sendTx(needWallet(), publicClient, buildResumeTx(deployment, id)),
+      execute: (id) => send(buildExecuteSliceTx(deployment, id)),
+      cancel: (id) => send(buildCancelTx(deployment, id)),
+      closeExpired: (id) => send(buildCloseExpiredTx(deployment, id)),
+      pause: (id) => send(buildPauseTx(deployment, id)),
+      resume: (id) => send(buildResumeTx(deployment, id)),
       edit: async (id, input) => {
         const o = await getOrder(publicClient, deployment, id);
         if (!o) throw new Error(`no DCA order #${id}`);
-        return sendTx(needWallet(), publicClient, buildEditTx(deployment, id, buildEditParams(o, input)));
+        return send(buildEditTx(deployment, id, buildEditParams(o, input)));
       }
     }
   };

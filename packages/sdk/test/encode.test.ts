@@ -79,3 +79,20 @@ describe("pause / resume / edit builders", () => {
     expect(edit.gas).toBe(150_000n);
   });
 });
+
+describe("allowance reads after a transaction", () => {
+  it("pins to the given block and retries a replica that does not have it yet", async () => {
+    const { allowanceFor } = await import("../src/dcaClient.js");
+    const seen: (bigint | undefined)[] = [];
+    let calls = 0;
+    const client = {
+      readContract: async ({ blockNumber }: { blockNumber?: bigint }) => {
+        seen.push(blockNumber);
+        if (++calls < 3) throw new Error("header not found"); // a lagging replica
+        return 7n;
+      },
+    } as unknown as Parameters<typeof allowanceFor>[0];
+    expect(await allowanceFor(client, dep, "0x00000000000000000000000000000000000000a1", "sell", 123n)).toBe(7n);
+    expect(seen).toEqual([123n, 123n, 123n]);
+  });
+});

@@ -88,8 +88,24 @@ export async function previewSlice(client: PublicClient, dep: PoincareDeployment
   };
 }
 
-export async function allowanceFor(client: PublicClient, dep: PoincareDeployment, owner: Address, side: Side): Promise<bigint> {
-  return client.readContract({ address: inputToken(dep, side), abi: erc20Abi, functionName: "allowance", args: [owner, requireDca(dep)] });
+/**
+ * The owner's allowance to the DCA contract. Pass `atBlock` (the block of the owner's latest
+ * transaction) right after a transaction: public RPCs balance reads across replicas, and a lagging
+ * one answers from old state, e.g. an allowance the previous createOrder already spent. Reading at
+ * an explicit block makes such a replica fail instead, and the read is retried until one has it.
+ */
+export async function allowanceFor(client: PublicClient, dep: PoincareDeployment, owner: Address, side: Side, atBlock?: bigint): Promise<bigint> {
+  const read = (blockNumber?: bigint) =>
+    client.readContract({ address: inputToken(dep, side), abi: erc20Abi, functionName: "allowance", args: [owner, requireDca(dep)], blockNumber });
+  if (atBlock === undefined) return read();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await read(atBlock);
+    } catch (e) {
+      if (attempt >= 10) throw e;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -171,15 +187,17 @@ export function buildEditTx(dep: PoincareDeployment, id: bigint, p: DcaEditParam
 /** After the deadline, refund the unfilled budget to the owner. Anyone may send it. */
 export const buildCloseExpiredTx = simple("closeExpired", "Refund expired");
 
-/** Everything a wallet must sign to open this order: an approval if needed, then the order. */
+/** Everything a wallet must sign to open this order: an approval if needed, then the order.
+ *  `atBlock`: see allowanceFor (pass it when the owner transacted moments ago). */
 export async function planCreateOrder(
   client: PublicClient,
   dep: PoincareDeployment,
   owner: Address,
   p: DcaOrderParams,
+  opts: { atBlock?: bigint } = {},
 ): Promise<TxRequest[]> {
   const side: Side = p.zeroForOne ? "buy" : "sell";
-  const allowance = await allowanceFor(client, dep, owner, side);
+  const allowance = await allowanceFor(client, dep, owner, side, opts.atBlock);
   return [...(allowance < p.amountIn ? [buildApproveTx(dep, side, p.amountIn)] : []), buildCreateOrderTx(dep, p)];
 }
 

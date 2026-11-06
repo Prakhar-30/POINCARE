@@ -1915,7 +1915,13 @@ declare function getOrdersOf(client: PublicClient, dep: PoincareDeployment, owne
 declare function getOpenOrderIds(client: PublicClient, dep: PoincareDeployment, pageSize?: bigint): Promise<bigint[]>;
 /** The contract's own verdict on the next slice (spread, trend, limit, schedule). */
 declare function previewSlice(client: PublicClient, dep: PoincareDeployment, id: bigint): Promise<SlicePreview>;
-declare function allowanceFor(client: PublicClient, dep: PoincareDeployment, owner: Address, side: Side): Promise<bigint>;
+/**
+ * The owner's allowance to the DCA contract. Pass `atBlock` (the block of the owner's latest
+ * transaction) right after a transaction: public RPCs balance reads across replicas, and a lagging
+ * one answers from old state, e.g. an allowance the previous createOrder already spent. Reading at
+ * an explicit block makes such a replica fail instead, and the read is retried until one has it.
+ */
+declare function allowanceFor(client: PublicClient, dep: PoincareDeployment, owner: Address, side: Side, atBlock?: bigint): Promise<bigint>;
 /** Approve exactly the order budget (never an unlimited allowance). */
 declare function buildApproveTx(dep: PoincareDeployment, side: Side, amount: bigint): TxRequest;
 declare function buildCreateOrderTx(dep: PoincareDeployment, p: DcaOrderParams): TxRequest;
@@ -1931,8 +1937,11 @@ declare const buildResumeTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
 declare function buildEditTx(dep: PoincareDeployment, id: bigint, p: DcaEditParams): TxRequest;
 /** After the deadline, refund the unfilled budget to the owner. Anyone may send it. */
 declare const buildCloseExpiredTx: (dep: PoincareDeployment, id: bigint) => TxRequest;
-/** Everything a wallet must sign to open this order: an approval if needed, then the order. */
-declare function planCreateOrder(client: PublicClient, dep: PoincareDeployment, owner: Address, p: DcaOrderParams): Promise<TxRequest[]>;
+/** Everything a wallet must sign to open this order: an approval if needed, then the order.
+ *  `atBlock`: see allowanceFor (pass it when the owner transacted moments ago). */
+declare function planCreateOrder(client: PublicClient, dep: PoincareDeployment, owner: Address, p: DcaOrderParams, opts?: {
+    atBlock?: bigint;
+}): Promise<TxRequest[]>;
 declare class TxRevertedError extends Error {
     readonly hash: Hash;
     constructor(hash: Hash);
@@ -2325,7 +2334,7 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
         }>;
         getTransactionConfirmations: (args: viem.GetTransactionConfirmationsParameters<viem.Chain | undefined>) => Promise<viem.GetTransactionConfirmationsReturnType>;
         getTransactionCount: (args: viem.GetTransactionCountParameters) => Promise<viem.GetTransactionCountReturnType>;
-        getTransactionReceipt: (args: viem.GetTransactionReceiptParameters) => Promise<viem.TransactionReceipt>;
+        getTransactionReceipt: (args: viem.GetTransactionReceiptParameters) => Promise<TransactionReceipt>;
         multicall: <const contracts extends readonly unknown[], allowFailure extends boolean = true>(args: viem.MulticallParameters<contracts, allowFailure>) => Promise<viem.MulticallReturnType<contracts, allowFailure>>;
         prepareTransactionRequest: <const request extends viem.PrepareTransactionRequestRequest<viem.Chain | undefined, chainOverride>, chainOverride extends viem.Chain | undefined = undefined, accountOverride extends viem.Account | Address | undefined = undefined>(args: viem.PrepareTransactionRequestParameters<viem.Chain | undefined, viem.Account | undefined, chainOverride, accountOverride, request>) => Promise<viem.UnionRequiredBy<Extract<viem.UnionOmit<viem.ExtractChainFormatterParameters<viem.DeriveChain<viem.Chain | undefined, chainOverride>, "transactionRequest", viem.TransactionRequest>, "from"> & (viem.DeriveChain<viem.Chain | undefined, chainOverride> extends infer T_1 ? T_1 extends viem.DeriveChain<viem.Chain | undefined, chainOverride> ? T_1 extends viem.Chain ? {
             chain: T_1;
@@ -3710,7 +3719,7 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
         } extends infer T ? { [K in keyof T]: T[K]; } : never>;
         readContract: <const abi extends viem.Abi | readonly unknown[], functionName extends viem.ContractFunctionName<abi, "pure" | "view">, const args extends viem.ContractFunctionArgs<abi, "pure" | "view", functionName>>(args: viem.ReadContractParameters<abi, functionName, args>) => Promise<viem.ReadContractReturnType<abi, functionName, args>>;
         sendRawTransaction: (args: viem.SendRawTransactionParameters) => Promise<viem.SendRawTransactionReturnType>;
-        sendRawTransactionSync: (args: viem.SendRawTransactionSyncParameters) => Promise<viem.TransactionReceipt>;
+        sendRawTransactionSync: (args: viem.SendRawTransactionSyncParameters) => Promise<TransactionReceipt>;
         simulate: <const calls extends readonly unknown[]>(args: viem.SimulateBlocksParameters<calls>) => Promise<viem.SimulateBlocksReturnType<calls>>;
         simulateBlocks: <const calls extends readonly unknown[]>(args: viem.SimulateBlocksParameters<calls>) => Promise<viem.SimulateBlocksReturnType<calls>>;
         simulateCalls: <const calls extends readonly unknown[]>(args: viem.SimulateCallsParameters<calls>) => Promise<viem.SimulateCallsReturnType<calls>>;
@@ -3720,7 +3729,7 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
         verifySiweMessage: (args: VerifySiweMessageParameters) => Promise<VerifySiweMessageReturnType>;
         verifyTypedData: (args: viem.VerifyTypedDataActionParameters) => Promise<viem.VerifyTypedDataActionReturnType>;
         uninstallFilter: (args: viem.UninstallFilterParameters) => Promise<viem.UninstallFilterReturnType>;
-        waitForTransactionReceipt: (args: viem.WaitForTransactionReceiptParameters<viem.Chain | undefined>) => Promise<viem.TransactionReceipt>;
+        waitForTransactionReceipt: (args: viem.WaitForTransactionReceiptParameters<viem.Chain | undefined>) => Promise<TransactionReceipt>;
         watchBlockNumber: (args: viem.WatchBlockNumberParameters) => viem.WatchBlockNumberReturnType;
         watchBlocks: <includeTransactions extends boolean = false, blockTag extends viem.BlockTag = "latest">(args: viem.WatchBlocksParameters<viem.Transport, viem.Chain | undefined, includeTransactions, blockTag>) => viem.WatchBlocksReturnType;
         watchContractEvent: <const abi extends viem.Abi | readonly unknown[], eventName extends viem.ContractEventName<abi>, strict extends boolean | undefined = undefined>(args: viem.WatchContractEventParameters<abi, eventName, strict, viem.Transport>) => viem.WatchContractEventReturnType;
@@ -3771,12 +3780,12 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
         };
         /** Approve (exact amount, if needed) and create; resolves to the new order id. */
         create: (input: DcaOrderInput) => Promise<bigint>;
-        execute: (id: bigint) => Promise<viem.TransactionReceipt>;
-        cancel: (id: bigint) => Promise<viem.TransactionReceipt>;
-        closeExpired: (id: bigint) => Promise<viem.TransactionReceipt>;
-        pause: (id: bigint) => Promise<viem.TransactionReceipt>;
-        resume: (id: bigint) => Promise<viem.TransactionReceipt>;
-        edit: (id: bigint, input: DcaEditInput) => Promise<viem.TransactionReceipt>;
+        execute: (id: bigint) => Promise<TransactionReceipt>;
+        cancel: (id: bigint) => Promise<TransactionReceipt>;
+        closeExpired: (id: bigint) => Promise<TransactionReceipt>;
+        pause: (id: bigint) => Promise<TransactionReceipt>;
+        resume: (id: bigint) => Promise<TransactionReceipt>;
+        edit: (id: bigint, input: DcaEditInput) => Promise<TransactionReceipt>;
     };
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;

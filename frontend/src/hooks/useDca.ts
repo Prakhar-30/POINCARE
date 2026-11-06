@@ -78,6 +78,9 @@ export function useDcaActions() {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  // Block of the latest mined DCA transaction: the next allowance read is pinned to it, so a lagging
+  // public-RPC replica cannot report an allowance the previous order already spent.
+  const lastBlock = useRef<bigint | undefined>(undefined);
 
   async function send(tx: TxRequest) {
     const hash = await walletClient!.sendTransaction({
@@ -89,7 +92,9 @@ export function useDcaActions() {
       gas: tx.gas,
       nonce: await nextNonce(publicClient!, address!),
     });
-    return waitForSuccess(publicClient!, hash);
+    const receipt = await waitForSuccess(publicClient!, hash);
+    if (lastBlock.current === undefined || receipt.blockNumber > lastBlock.current) lastBlock.current = receipt.blockNumber;
+    return receipt;
   }
 
   async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
@@ -112,7 +117,7 @@ export function useDcaActions() {
       const params = buildOrderParams(input);
       const inSym = input.side === "buy" ? "USDC" : "WETH";
       const amount = `${fmtNum(Number(formatAmount(params.amountIn)), inSym === "WETH" ? 4 : 2)} ${inSym}`;
-      const needApprove = (await allowanceFor(publicClient!, dep, address!, input.side)) < params.amountIn;
+      const needApprove = (await allowanceFor(publicClient!, dep, address!, input.side, lastBlock.current)) < params.amountIn;
       stepper.begin([
         ...(needApprove ? [{ key: "approve", label: `Approve ${amount} for the DCA contract` }] : []),
         { key: "create", label: `Escrow ${amount} · ${params.slices} slices` },

@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Address, type PublicClient, type WalletClient } from "viem";
+import { createPublicClient, http, type Address, type PublicClient, type TransactionReceipt, type WalletClient } from "viem";
 import { unichainSepolia } from "viem/chains";
 import { type DcaEditInput, type DcaOrderInput, buildEditParams, buildOrderParams } from "./dca.js";
 import * as dca from "./dcaClient.js";
@@ -32,6 +32,14 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
   const needWallet = (): WalletClient => {
     if (!wallet) throw new Error("this call sends a transaction: pass walletClient to createPoincareClient");
     return wallet;
+  };
+  // Block of this client's latest mined transaction: reads that decide the next transaction are
+  // pinned to it, so a lagging RPC replica cannot answer from before it (see allowanceFor).
+  let lastBlock: bigint | undefined;
+  const send = async (tx: dca.TxRequest): Promise<TransactionReceipt> => {
+    const r = await dca.sendTx(needWallet(), publicClient, tx);
+    if (lastBlock === undefined || r.blockNumber > lastBlock) lastBlock = r.blockNumber;
+    return r;
   };
   const owner = (): Address => {
     const a = needWallet().account?.address;
@@ -77,21 +85,20 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
 
       /** Approve (exact amount, if needed) and create; resolves to the new order id. */
       create: async (input: DcaOrderInput): Promise<bigint> => {
-        const w = needWallet();
-        const txs = await dca.planCreateOrder(publicClient, deployment, owner(), buildOrderParams(input));
+        const txs = await dca.planCreateOrder(publicClient, deployment, owner(), buildOrderParams(input), { atBlock: lastBlock });
         let receipt;
-        for (const tx of txs) receipt = await dca.sendTx(w, publicClient, tx);
+        for (const tx of txs) receipt = await send(tx);
         return dca.orderIdFromReceipt(deployment, receipt!);
       },
-      execute: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildExecuteSliceTx(deployment, id)),
-      cancel: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildCancelTx(deployment, id)),
-      closeExpired: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildCloseExpiredTx(deployment, id)),
-      pause: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildPauseTx(deployment, id)),
-      resume: (id: bigint) => dca.sendTx(needWallet(), publicClient, dca.buildResumeTx(deployment, id)),
+      execute: (id: bigint) => send(dca.buildExecuteSliceTx(deployment, id)),
+      cancel: (id: bigint) => send(dca.buildCancelTx(deployment, id)),
+      closeExpired: (id: bigint) => send(dca.buildCloseExpiredTx(deployment, id)),
+      pause: (id: bigint) => send(dca.buildPauseTx(deployment, id)),
+      resume: (id: bigint) => send(dca.buildResumeTx(deployment, id)),
       edit: async (id: bigint, input: DcaEditInput) => {
         const o = await dca.getOrder(publicClient, deployment, id);
         if (!o) throw new Error(`no DCA order #${id}`);
-        return dca.sendTx(needWallet(), publicClient, dca.buildEditTx(deployment, id, buildEditParams(o, input)));
+        return send(dca.buildEditTx(deployment, id, buildEditParams(o, input)));
       },
     },
   };
