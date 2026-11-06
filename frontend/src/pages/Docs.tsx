@@ -6,7 +6,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { useModal } from "@/hooks/useModal";
 import { track } from "@/lib/telemetry";
 import { MOD, scrollBehavior } from "@/lib/platform";
-import { GROUPS, PAGES, REPO, API_BASE, pageBySlug, type DocPage } from "./devdocs/pages";
+import { GROUPS, PAGES, REPO, API_BASE, SKILL_INSTALL, pageBySlug, type DocPage } from "./devdocs/pages";
 import { CodeTabs } from "./devdocs/ui";
 
 /**
@@ -428,7 +428,7 @@ function DocsHome({ titleRef }: { titleRef: RefObject<HTMLHeadingElement> }) {
     { to: "regime", title: "Read the regime", body: "Is there a confirmed trend, and which side pays", icon: "wave", tint: "lav", wide: true },
     { to: "dca-guide", title: "Run spread-aware DCA", body: "Step by step, with the app, SDK, API or Claude", icon: "layers", tint: "honey", wide: true },
     { to: "quickstart", title: "Quote a swap", body: "To the wei of what the router executes", icon: "swap", tint: "green" },
-    { to: "claude", title: "Use Poincaré from Claude", body: "The MCP server plus the Poincaré skill", icon: "spark", tint: "lav" },
+    { to: "claude", title: "Use Poincaré from Claude", body: "Paste one prompt; Claude sets itself up", icon: "spark", tint: "lav" },
     { to: "lp-strategy", title: "A regime-aware LP strategy", body: "An example bot, no new contract", icon: "pool", tint: "plain" },
   ];
   const useCases: { icon: IconName; title: string; body: string; links: { to: string; label: string }[] }[] = [
@@ -473,6 +473,8 @@ function DocsHome({ titleRef }: { titleRef: RefObject<HTMLHeadingElement> }) {
           <CodeTabs tabs={[
             { label: "SDK", lang: "sh", code: "npm i @poincaretrade/sdk viem" },
             { label: "MCP", lang: "sh", code: "claude mcp add poincare -- npx -y @poincaretrade/mcp" },
+            { label: "Claude", lang: "sh", code: `claude mcp add poincare -- npx -y @poincaretrade/mcp
+${SKILL_INSTALL}` },
             { label: "HTTP", lang: "sh", code: `curl ${API_BASE}/regime` },
           ]} />
         </div>

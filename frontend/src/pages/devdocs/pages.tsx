@@ -4,7 +4,32 @@ import { Icon } from "@/components/ui/Icon";
 import { A, B, Callout, CardGrid, Code, CodeBlock, CodeTabs, DocLink, H2, P, Steps, Table, Ul } from "./ui";
 import { DcaFlowIllustration, DcaTimelineIllustration, LpStrategyIllustration } from "./illustrations";
 
-const SKILL_INSTALL = "npx skills add https://github.com/Prakhar-30/POINCARE --skill poincare";
+/** One command that installs the Poincaré skill for Claude (and other agents the skills CLI supports). */
+export const SKILL_INSTALL = "npx skills add https://github.com/Prakhar-30/POINCARE --skill poincare";
+const MCP_INSTALL = "claude mcp add poincare -- npx -y @poincaretrade/mcp";
+
+/** Paste-ready prompts for Claude Code: set up (install the MCP server and the skill), then try it. */
+export const DEMO_SETUP_PROMPT = `Set up Poincaré for me (a Uniswap v4 hook on Unichain Sepolia, testnet).
+
+1. Add its MCP server:
+   ${MCP_INSTALL}
+2. Install its Claude skill:
+   ${SKILL_INSTALL}
+3. Confirm both are installed (claude mcp list, and the poincare skill folder),
+   then tell me to restart Claude Code so the new MCP tools load.
+
+Do not create any order or send any transaction.`;
+
+export const DEMO_TRY_PROMPT = `Using the Poincaré MCP tools and the poincare skill:
+
+1. Is the Poincaré WETH/USDC pool trending right now? Which side pays the
+   trend spread, and how much?
+2. Quote a buy of 500 USDC of WETH.
+3. Plan, but do not create, a DCA that buys 500 USDC of WETH hourly for
+   24 hours and never pays the trend spread. Show what its first fill would
+   do right now.
+
+Everything stays unsigned: do not send anything.`;
 
 /**
  * The developer docs, one entry per page. Every name, default and route here mirrors packages/
@@ -66,6 +91,8 @@ export const PAGES: DocPage[] = [
         <CodeTabs tabs={[
           { label: "SDK", lang: "sh", code: "npm i @poincaretrade/sdk viem" },
           { label: "MCP", lang: "sh", code: "claude mcp add poincare -- npx -y @poincaretrade/mcp" },
+          { label: "Claude skill", lang: "sh", code: `${SKILL_INSTALL}
+# teaches Claude to use the MCP tools well; add the MCP server too` },
           { label: "From source", lang: "sh", code: `git clone ${REPO}.git && cd POINCARE/packages
 pnpm install && pnpm check    # builds, type-checks and tests sdk, mcp and api` },
         ]} />
@@ -218,6 +245,15 @@ curl -X POST ${API_BASE}/dca/tx/edit   -H 'content-type: application/json' -d '{
     keywords: "claude skill mcp agent claude code desktop install prompt",
     body: () => (
       <>
+        <H2>Quick start: paste this into Claude Code</H2>
+        <P>
+          Two prompts. The first has Claude install the MCP server and the skill for you. Claude Code loads a newly added MCP
+          server on its next start, so restart it (or reconnect from <Code>/mcp</Code>), then paste the second.
+        </P>
+        <CodeBlock lang="text" title="Prompt 1 · set up" code={DEMO_SETUP_PROMPT} />
+        <CodeBlock lang="text" title="Prompt 2 · try it (after the restart)" code={DEMO_TRY_PROMPT} />
+        <Callout kind="note" title="Claude Desktop">Desktop cannot run the install commands for you: add the server to its config by hand (step 1 below), install the skill from a terminal (step 2), restart Desktop, then use Prompt 2.</Callout>
+        <P>Prefer to set it up yourself? The two steps below are all the prompt does.</P>
         <H2>1. Add the MCP server</H2>
         <CodeTabs tabs={[
           { label: "Claude Code", lang: "sh", code: "claude mcp add poincare -- npx -y @poincaretrade/mcp" },
@@ -231,7 +267,7 @@ curl -X POST ${API_BASE}/dca/tx/edit   -H 'content-type: application/json' -d '{
         <H2>2. Add the Poincaré skill</H2>
         <P>
           A skill is a short playbook Claude loads when a request matches it. The Poincaré skill covers orientation (USDC per
-          WETH, buy vs sell), mapping a request like "hourly for a day" to an order, the status glossary, error reasons, and
+          WETH, buy vs sell), mapping a request like “hourly for a day” to an order, the status glossary, error reasons, and
           the safety rules: unsigned by default, confirm before cancelling, never ask for a key in chat.
         </P>
         <CodeTabs tabs={[
@@ -581,6 +617,16 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
   }
 }` },
         ]} />
+        <H2>Add the Claude skill</H2>
+        <P>
+          The server gives Claude the tools; the Poincaré skill teaches it how to use them: which tool to call first, how to
+          read the regime, how to map “hourly for a day” to an order, and to stop and ask before anything is sent.
+        </P>
+        <CodeBlock lang="sh" code={SKILL_INSTALL} />
+        <P>
+          A ready-to-paste demo prompt that installs both and takes Claude through the regime, a quote and a DCA plan is on{" "}
+          <DocLink to="claude">Use Poincaré from Claude</DocLink>, along with installing the skill from the npm package.
+        </P>
         <H2>Configuration</H2>
         <Table head={["Variable", "Meaning"]} rows={[
           [mono("POINCARE_RPC_URL"), "RPC endpoint (default: the public Unichain Sepolia RPC)"],
