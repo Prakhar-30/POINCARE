@@ -49,7 +49,7 @@ const order: DcaOrder = {
   id: 7n, owner: OWNER, recipient: OWNER, side: "sell", zeroForOne: false, pauseOnTrend: false, catchUp: true,
   cancelled: false, maxSpreadBps: 0, maxSlippageBps: 50, slices: 4, interval: 3600, filled: 1,
   startTime: BigInt(NOW), deadline: BigInt(NOW + 4 * 3600), lastSlotPlusOne: 1n, amountIn: 2n * W,
-  remaining: (3n * W) / 2n, amountOut: 1150n * W, minPriceWad: 0n, paused: false, scheduleBudget: 2n * W, scheduleFilled: 1,
+  remaining: (3n * W) / 2n, amountOut: 1150n * W, minPriceWad: 0n, paused: false, refunded: 0n, scheduleBudget: 2n * W, scheduleFilled: 1,
 };
 
 let preview: SlicePreview;

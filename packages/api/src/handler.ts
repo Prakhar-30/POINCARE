@@ -13,6 +13,7 @@ import {
   minPriceWadToLimit,
   planSlice,
   progressOf,
+  spentOf,
   trendOnsets,
   wadToBpsUp,
 } from "@poincare/sdk";
@@ -88,7 +89,7 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
           zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
           maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps, slices: p.slices, interval: p.interval,
           filled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n, amountIn: p.amountIn,
-          remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0,
+          remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0, refunded: 0n,
         },
         { now: BigInt(t), spreadBps: wadToBpsUp(input.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell), trendWithSide: r.withTrendSide === input.side },
       );
@@ -193,6 +194,7 @@ function summarize(r: Awaited<ReturnType<PoincareClient["regime"]>>): string {
 function view(o: DcaOrder) {
   return {
     ...o,
+    spent: spentOf(o),
     progress: progressOf(o),
     limitPrice: minPriceWadToLimit(o.side, o.minPriceWad),
     tokenIn: o.side === "buy" ? "USDC" : "WETH",

@@ -127,6 +127,7 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         uint128 scheduleBudget; // what the current schedule spreads (amountIn, then `remaining` at each edit)
         uint128 remaining;
         uint128 amountOut; //     cumulative output delivered to the recipient
+        uint128 refunded; //      returned to the owner on cancel / expiry (spent = amountIn - remaining - refunded)
         uint256 minPriceWad;
     }
 
@@ -456,6 +457,7 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
 
     function _close(uint256 id, Order storage o) internal returns (uint256 refunded) {
         refunded = o.remaining;
+        o.refunded = uint128(refunded);
         o.remaining = 0;
         _removeOpen(id);
         (o.zeroForOne ? token0 : token1).safeTransfer(o.owner, refunded);

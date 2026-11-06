@@ -11,6 +11,7 @@ import {
   progressOf,
   sliceAmount,
   slotInfo,
+  spentOf,
   statusOf,
   validateOrderParams,
 } from "../src/dca.js";
@@ -43,6 +44,7 @@ function order(over: Partial<DcaOrder> = {}): DcaOrder {
     amountOut: 0n,
     minPriceWad: 0n,
     paused: false,
+    refunded: 0n,
     ...over,
     // a fresh order's schedule is the whole order unless a test says otherwise
     scheduleBudget: over.scheduleBudget ?? over.amountIn ?? 4n * E,
@@ -182,8 +184,12 @@ describe("planSlice (mirrors PoincareDCA._preview)", () => {
     expect(p.minOut).toBe(quote * 99n / 100n); // slippage floor above the loose limit
   });
 
-  it("progress", () => {
+  it("progress counts only what was swapped", () => {
     expect(progressOf(order({ remaining: 1n * E }))).toBe(0.75);
+    // 3 swapped, 1 refunded at the deadline: 75% done, not 100%
+    const ended = order({ remaining: 0n, refunded: 1n * E });
+    expect(spentOf(ended)).toBe(3n * E);
+    expect(progressOf(ended)).toBe(0.75);
   });
 
   it("a paused order holds, after the closed/expired checks (as on chain)", () => {

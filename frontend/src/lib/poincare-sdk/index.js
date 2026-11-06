@@ -1076,6 +1076,11 @@ var dcaAbi = [
             "internalType": "uint128"
           },
           {
+            "name": "refunded",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
             "name": "minPriceWad",
             "type": "uint256",
             "internalType": "uint256"
@@ -2162,7 +2167,8 @@ function planSlice(o, ctx) {
   plan.minOut = limitOut > slipOut ? limitOut : slipOut;
   return plan;
 }
-var progressOf = (o) => o.amountIn === 0n ? 0 : Number((o.amountIn - o.remaining) * 10000n / o.amountIn) / 1e4;
+var spentOf = (o) => o.amountIn - o.remaining - o.refunded;
+var progressOf = (o) => o.amountIn === 0n ? 0 : Number(spentOf(o) * 10000n / o.amountIn) / 1e4;
 
 // src/plans.ts
 var FREQUENCIES = {
@@ -2534,6 +2540,7 @@ export {
   sideToZeroForOne,
   sliceAmount,
   slotInfo,
+  spentOf,
   statusOf,
   toAmount,
   toDcaOrder,

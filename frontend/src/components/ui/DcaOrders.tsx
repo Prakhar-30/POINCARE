@@ -11,6 +11,7 @@ import {
   buildEditParams,
   formatAmount,
   progressOf,
+  spentOf,
   type DcaEditInput,
   type DcaStatus,
   type Frequency,
@@ -64,7 +65,10 @@ function OrderRow({ o, actions }: { o: DcaOrderWithNext; actions: Actions }) {
   const status = o.next.status;
   const open = !o.cancelled && o.remaining > 0n;
   const live = open && status !== "expired";
-  const tone = STATUS_TONE[status];
+  // An order closed by a refund reads "filled" on chain (nothing left); say what happened instead.
+  const refundedEnd = !o.cancelled && o.remaining === 0n && o.refunded > 0n;
+  const tone = refundedEnd ? STATUS_TONE.expired : STATUS_TONE[status];
+  const label = refundedEnd ? "Refunded" : STATUS_LABEL[status];
   // fills before the latest edit + the current schedule = the plan as it stands now
   const planned = o.filled - o.scheduleFilled + o.slices;
   const left = `${fmtNum(Number(formatAmount(o.remaining)), dp(inSym))} ${inSym}`;
@@ -80,7 +84,7 @@ function OrderRow({ o, actions }: { o: DcaOrderWithNext; actions: Actions }) {
           </span>
         </span>
         <span className="rounded-full px-2 py-0.5 shrink-0" style={{ fontSize: 11, fontWeight: 800, color: tone.ink, background: tone.bg }}>
-          {STATUS_LABEL[status]}
+          {label}
         </span>
       </div>
 
@@ -90,7 +94,11 @@ function OrderRow({ o, actions }: { o: DcaOrderWithNext; actions: Actions }) {
       </div>
 
       <div className="mt-1.5" style={{ fontSize: 12, color: "var(--text-3)" }}>
-        {o.filled}/{planned} {noun} · <b style={{ color: "var(--text-2)" }}>{left}</b> left
+        {o.filled}/{planned} {noun} · {open
+          ? <><b style={{ color: "var(--text-2)" }}>{left}</b> left</>
+          : o.refunded > 0n
+            ? <><b style={{ color: "var(--text-2)" }}>{fmtNum(Number(formatAmount(o.refunded)), dp(inSym))} {inSym}</b> refunded</>
+            : <>all {fmtNum(Number(formatAmount(o.amountIn)), dp(inSym))} {inSym} {o.side === "buy" ? "spent" : "sold"}</>}
         {o.amountOut > 0n && <> · got {fmtNum(Number(formatAmount(o.amountOut)), dp(outSym))} {outSym}</>}
         {avgPrice(o) > 0 && <> · avg {fmtNum(avgPrice(o), 2)}</>}
       </div>
@@ -267,7 +275,7 @@ const STATUS_TONE: Record<DcaStatus, { ink: string; bg: string }> = {
 
 /** Average executed price, USDC per WETH, over the fills so far (what exchanges show per plan). */
 function avgPrice(o: DcaOrderWithNext): number {
-  const spent = Number(formatAmount(o.amountIn - o.remaining));
+  const spent = Number(formatAmount(spentOf(o)));
   const got = Number(formatAmount(o.amountOut));
   if (!(spent > 0) || !(got > 0)) return 0;
   return o.side === "buy" ? spent / got : got / spent;

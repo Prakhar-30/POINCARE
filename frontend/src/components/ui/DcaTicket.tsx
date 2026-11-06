@@ -362,7 +362,7 @@ function firstBuy(p: DcaOrderParams, side: Side, now: number, spreadBps: number,
       id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side, zeroForOne: p.zeroForOne,
       pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false, maxSpreadBps: p.maxSpreadBps, maxSlippageBps: p.maxSlippageBps,
       slices: p.slices, interval: p.interval, filled: 0, scheduleFilled: 0, startTime: start, deadline: p.deadline, lastSlotPlusOne: 0n,
-      amountIn: p.amountIn, scheduleBudget: p.amountIn, remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad,
+      amountIn: p.amountIn, scheduleBudget: p.amountIn, remaining: p.amountIn, amountOut: 0n, refunded: 0n, minPriceWad: p.minPriceWad,
     },
     { now: BigInt(now), spreadBps, trendWithSide },
   ).status;

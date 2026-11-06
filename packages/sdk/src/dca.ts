@@ -191,6 +191,8 @@ export type DcaOrder = {
   scheduleBudget: bigint;
   remaining: bigint;
   amountOut: bigint;
+  /** Returned to the owner on cancel or expiry. */
+  refunded: bigint;
   minPriceWad: bigint;
 };
 
@@ -334,5 +336,9 @@ export function planSlice(
 }
 
 /** Fraction of the budget filled so far (0..1). */
-export const progressOf = (o: Pick<DcaOrder, "amountIn" | "remaining">): number =>
-  o.amountIn === 0n ? 0 : Number(((o.amountIn - o.remaining) * 10_000n) / o.amountIn) / 10_000;
+/** Input actually swapped so far: the budget minus what is left and what was refunded. */
+export const spentOf = (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">): bigint => o.amountIn - o.remaining - o.refunded;
+
+/** Share of the budget actually swapped, 0..1 (a refunded order stops short of 1). */
+export const progressOf = (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">): number =>
+  o.amountIn === 0n ? 0 : Number((spentOf(o) * 10_000n) / o.amountIn) / 10_000;

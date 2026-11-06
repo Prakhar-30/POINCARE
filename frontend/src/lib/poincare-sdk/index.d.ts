@@ -840,6 +840,10 @@ declare const dcaAbi: readonly [{
             readonly type: "uint128";
             readonly internalType: "uint128";
         }, {
+            readonly name: "refunded";
+            readonly type: "uint128";
+            readonly internalType: "uint128";
+        }, {
             readonly name: "minPriceWad";
             readonly type: "uint256";
             readonly internalType: "uint256";
@@ -1739,6 +1743,8 @@ type DcaOrder = {
     scheduleBudget: bigint;
     remaining: bigint;
     amountOut: bigint;
+    /** Returned to the owner on cancel or expiry. */
+    refunded: bigint;
     minPriceWad: bigint;
 };
 declare function toDcaOrder(id: bigint, o: Omit<DcaOrder, "id" | "side">): DcaOrder;
@@ -1801,7 +1807,10 @@ declare function planSlice(o: DcaOrder, ctx: {
     quoteOut?: bigint;
 }): SlicePlan;
 /** Fraction of the budget filled so far (0..1). */
-declare const progressOf: (o: Pick<DcaOrder, "amountIn" | "remaining">) => number;
+/** Input actually swapped so far: the budget minus what is left and what was refunded. */
+declare const spentOf: (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">) => bigint;
+/** Share of the budget actually swapped, 0..1 (a refunded order stops short of 1). */
+declare const progressOf: (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">) => number;
 
 /**
  * Exchange-style plan builders. Centralised exchanges describe DCA in two ways, and users arrive
@@ -3790,4 +3799,4 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;
 
-export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
+export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, spentOf, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };

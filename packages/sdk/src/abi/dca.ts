@@ -409,6 +409,11 @@ export const dcaAbi = [
             "internalType": "uint128"
           },
           {
+            "name": "refunded",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
             "name": "minPriceWad",
             "type": "uint256",
             "internalType": "uint256"

@@ -466,6 +466,9 @@ contract PoincareDCATest is PoincareTestBase {
         assertEq(dca.cancel(id), 3 ether);
         assertEq(_t0().balanceOf(user), before + 3 ether);
         assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Cancelled));
+        PoincareDCA.Order memory o = dca.getOrder(id);
+        assertEq(o.refunded, 3 ether, "the refund is on record");
+        assertEq(o.amountIn - o.remaining - o.refunded, 1 ether, "so what was spent is too");
 
         vm.prank(user);
         vm.expectRevert(PoincareDCA.OrderClosed.selector);
@@ -599,6 +602,7 @@ contract PoincareDCATest is PoincareTestBase {
         vm.prank(stranger);
         assertEq(dca.closeExpired(id), 2 ether);
         assertEq(_t0().balanceOf(user), before + 2 ether);
+        assertEq(dca.getOrder(id).refunded, 2 ether, "an expiry refund is on record too");
     }
 
     function test_edit_replansTheRemainingBudget() public {
@@ -702,6 +706,7 @@ contract PoincareDCATest is PoincareTestBase {
             refunded = dca.closeExpired(id);
         }
         assertEq(filledIn + refunded, amountIn, "budget conserved through pauses and edits");
+        assertEq(dca.getOrder(id).refunded, refunded, "the order records its refund");
         assertEq(_t0().balanceOf(user), balBefore - filledIn, "owner paid exactly what filled");
         assertEq(_t0().balanceOf(address(dca)), 0, "nothing stranded");
     }
@@ -733,6 +738,8 @@ contract PoincareDCATest is PoincareTestBase {
             refunded = dca.closeExpired(id);
         }
         assertEq(filledIn + refunded, amountIn, "budget conserved");
+        PoincareDCA.Order memory fo = dca.getOrder(id);
+        assertEq(fo.amountIn - fo.remaining - fo.refunded, filledIn, "spent is derivable from the order alone");
         assertEq(_t0().balanceOf(user), balBefore - filledIn, "owner paid exactly what was filled");
         assertEq(_t0().balanceOf(address(dca)), 0, "nothing stranded");
         if (catchUp && (skipMask >> (n - 1)) & 1 == 0) assertEq(refunded, 0, "catch-up finishes when the last slot runs");

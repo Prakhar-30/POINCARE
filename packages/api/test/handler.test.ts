@@ -40,7 +40,7 @@ const order: DcaOrder = {
   id: 7n, owner: OWNER, recipient: OWNER, side: "buy", zeroForOne: true, pauseOnTrend: true, catchUp: true,
   cancelled: false, maxSpreadBps: 0, maxSlippageBps: 50, slices: 4, interval: 3600, filled: 2,
   startTime: BigInt(NOW), deadline: BigInt(NOW + 4 * 3600), lastSlotPlusOne: 2n, amountIn: 1000n * W,
-  remaining: 500n * W, amountOut: W / 5n, minPriceWad: 0n, paused: false, scheduleBudget: 1000n * W, scheduleFilled: 2,
+  remaining: 500n * W, amountOut: W / 5n, minPriceWad: 0n, paused: false, refunded: 0n, scheduleBudget: 1000n * W, scheduleFilled: 2,
 };
 
 let preview: SlicePreview;
