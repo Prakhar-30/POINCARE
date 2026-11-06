@@ -457,7 +457,214 @@ contract PoincareDCATest is PoincareTestBase {
         assertTrue(ids[0] != 2 && ids[1] != 2, "cancelled order left the open set");
     }
 
+    // ------------------------------------------------------------------ pause / resume / edit
+
+    function _edit(uint32 slices, uint32 interval, uint64 deadline) internal pure returns (PoincareDCA.EditParams memory e) {
+        e.slices = slices;
+        e.interval = interval;
+        e.startTime = 0;
+        e.deadline = deadline;
+        e.maxSpreadBps = 10_000;
+        e.pauseOnTrend = false;
+        e.catchUp = true;
+        e.maxSlippageBps = 100;
+        e.minPriceWad = 0;
+    }
+
+    function test_pause_holdsEveryFill_resumeRestores() public {
+        uint256 id = _create(_params(true, 4 ether, 4));
+        vm.prank(user);
+        dca.pause(id);
+        assertTrue(dca.getOrder(id).paused);
+        assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Paused));
+
+        vm.prank(keeper);
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.NotExecutable.selector, PoincareDCA.Status.Paused));
+        dca.executeSlice(id);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.NotExecutable.selector, PoincareDCA.Status.Paused));
+        dca.executeSlice(id);
+
+        vm.prank(user);
+        dca.resume(id);
+        assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Ready));
+        _exec(id);
+        assertEq(dca.getOrder(id).filled, 1);
+    }
+
+    function test_pause_thenCatchUpMakesUpTheMissedSlots() public {
+        PoincareDCA.OrderParams memory p = _params(true, 4 ether, 4);
+        p.deadline = uint64(block.timestamp + 3 * H);
+        p.catchUp = true;
+        uint256 id = _create(p);
+        _exec(id); // slot 0
+
+        vm.prank(user);
+        dca.pause(id);
+        vm.warp(block.timestamp + 2 * H); // slots 1 and 2 pass while paused
+        vm.roll(block.number + 1);
+        vm.prank(user);
+        dca.resume(id);
+
+        assertEq(dca.canExecute(id).amountIn, 1.5 ether, "3 ether over the 2 slots left");
+        _exec(id);
+        vm.warp(block.timestamp + H);
+        vm.roll(block.number + 1);
+        _exec(id);
+        assertEq(dca.getOrder(id).remaining, 0, "completed despite the pause");
+    }
+
+    function test_pause_resume_edit_ownerOnly() public {
+        uint256 id = _create(_params(true, 4 ether, 4));
+        for (uint256 i = 0; i < 2; i++) {
+            address who = i == 0 ? stranger : keeper;
+            vm.startPrank(who);
+            vm.expectRevert(PoincareDCA.NotAuthorized.selector);
+            dca.pause(id);
+            vm.expectRevert(PoincareDCA.NotAuthorized.selector);
+            dca.resume(id);
+            vm.expectRevert(PoincareDCA.NotAuthorized.selector);
+            dca.editOrder(id, _edit(2, H, uint64(block.timestamp + 2 * H)));
+            vm.stopPrank();
+        }
+        // the contract owner (keeper admin) has no say over a user's order either
+        vm.expectRevert(PoincareDCA.NotAuthorized.selector);
+        dca.pause(id);
+    }
+
+    function test_pause_resume_rejectRepeatsAndClosedOrders() public {
+        uint256 id = _create(_params(true, 2 ether, 2));
+        vm.startPrank(user);
+        vm.expectRevert(PoincareDCA.AlreadyInState.selector);
+        dca.resume(id);
+        dca.pause(id);
+        vm.expectRevert(PoincareDCA.AlreadyInState.selector);
+        dca.pause(id);
+        dca.cancel(id); // cancelling a paused order still refunds
+        vm.expectRevert(PoincareDCA.OrderClosed.selector);
+        dca.resume(id);
+        vm.expectRevert(PoincareDCA.OrderClosed.selector);
+        dca.editOrder(id, _edit(2, H, uint64(block.timestamp + 2 * H)));
+        vm.stopPrank();
+        assertEq(_t0().balanceOf(address(dca)), 0);
+    }
+
+    function test_pausedOrder_stillRefundsAfterDeadline() public {
+        uint256 id = _create(_params(true, 2 ether, 2));
+        vm.prank(user);
+        dca.pause(id);
+        vm.warp(uint256(dca.getOrder(id).deadline) + 1);
+        assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Expired), "expiry outranks pause");
+        uint256 before = _t0().balanceOf(user);
+        vm.prank(stranger);
+        assertEq(dca.closeExpired(id), 2 ether);
+        assertEq(_t0().balanceOf(user), before + 2 ether);
+    }
+
+    function test_edit_replansTheRemainingBudget() public {
+        uint256 id = _create(_params(true, 4 ether, 4));
+        _exec(id); // 1 ether filled, 3 left
+
+        PoincareDCA.EditParams memory e = _edit(6, 2 * H, uint64(block.timestamp + 6 * 2 * H));
+        e.maxSpreadBps = 25;
+        e.pauseOnTrend = true;
+        vm.prank(user);
+        dca.editOrder(id, e);
+
+        PoincareDCA.Order memory o = dca.getOrder(id);
+        assertEq(o.amountIn, 4 ether, "deposit total unchanged");
+        assertEq(o.scheduleBudget, 3 ether, "new schedule spreads what was left");
+        assertEq(o.remaining, 3 ether);
+        assertEq(o.slices, 6);
+        assertEq(o.interval, 2 * H);
+        assertEq(o.startTime, block.timestamp, "re-anchored at the edit");
+        assertEq(o.filled, 1, "lifetime fills kept");
+        assertEq(o.scheduleFilled, 0);
+        assertEq(o.maxSpreadBps, 25);
+        assertTrue(o.pauseOnTrend);
+
+        PoincareDCA.Preview memory pv = dca.canExecute(id);
+        assertEq(uint8(pv.status), uint8(PoincareDCA.Status.Ready), "first slot of the new schedule is open");
+        assertEq(pv.amountIn, 0.5 ether, "3 ether over 6 buys");
+        _exec(id);
+        assertEq(dca.getOrder(id).remaining, 2.5 ether);
+    }
+
+    function test_edit_keepsPausedAndValidatesLikeCreate() public {
+        uint256 id = _create(_params(true, 4 ether, 4));
+        vm.startPrank(user);
+        dca.pause(id);
+        dca.editOrder(id, _edit(2, H, uint64(block.timestamp + 2 * H)));
+        assertTrue(dca.getOrder(id).paused, "edit does not unpause");
+
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "slices"));
+        dca.editOrder(id, _edit(0, H, uint64(block.timestamp + 2 * H)));
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "interval"));
+        dca.editOrder(id, _edit(2, 59, uint64(block.timestamp + 2 * H)));
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "deadline"));
+        dca.editOrder(id, _edit(4, H, uint64(block.timestamp + H)));
+        PoincareDCA.EditParams memory bad = _edit(2, H, uint64(block.timestamp + 2 * H));
+        bad.maxSpreadBps = 10_001;
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "bps"));
+        dca.editOrder(id, bad);
+        bad = _edit(2, H, uint64(block.timestamp + 2 * H));
+        bad.startTime = uint64(block.timestamp - 1);
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "startTime"));
+        dca.editOrder(id, bad);
+        vm.stopPrank();
+    }
+
+    function test_edit_cannotSpreadBelowOneUnitPerSlice() public {
+        uint256 id = _create(_params(true, 10, 2)); // 10 wei budget
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "amountIn below slices"));
+        dca.editOrder(id, _edit(11, H, uint64(block.timestamp + 11 * H)));
+    }
+
     // ------------------------------------------------------------------ conservation
+
+    /// @dev With pauses and an edit thrown in, the budget is still filled or refunded exactly.
+    function testFuzz_pauseAndEditConserveBudget(uint96 amount, uint8 slices, uint16 pauseMask, uint8 editAt, uint8 newSlices) public {
+        uint128 amountIn = uint128(bound(amount, 1e12, 5 ether));
+        uint32 n = uint32(bound(slices, 2, 8));
+        uint256 id = _create(_params(true, amountIn, n));
+        uint256 balBefore = _t0().balanceOf(user) + amountIn;
+        uint256 editSlot = bound(editAt, 0, n - 1);
+        uint256 filledIn;
+
+        for (uint256 s = 0; s < n + 4; s++) {
+            PoincareDCA.Order memory o = dca.getOrder(id);
+            if (o.remaining == 0 || block.timestamp > o.deadline) break;
+            if (s == editSlot) {
+                uint32 m = uint32(bound(newSlices, 1, 6));
+                if (o.remaining >= m) {
+                    vm.prank(user);
+                    dca.editOrder(id, _edit(m, H, uint64(block.timestamp + uint256(m) * H)));
+                }
+            }
+            bool wantPaused = (pauseMask >> s) & 1 == 1;
+            if (wantPaused != dca.getOrder(id).paused) {
+                vm.prank(user);
+                if (wantPaused) dca.pause(id);
+                else dca.resume(id);
+            }
+            if (dca.canExecute(id).status == PoincareDCA.Status.Ready) {
+                uint256 rem = dca.getOrder(id).remaining;
+                _exec(id);
+                filledIn += rem - dca.getOrder(id).remaining;
+            }
+            _next();
+        }
+        PoincareDCA.Order memory fin = dca.getOrder(id);
+        uint256 refunded;
+        if (fin.remaining > 0) {
+            if (block.timestamp <= fin.deadline) vm.warp(uint256(fin.deadline) + 1);
+            refunded = dca.closeExpired(id);
+        }
+        assertEq(filledIn + refunded, amountIn, "budget conserved through pauses and edits");
+        assertEq(_t0().balanceOf(user), balBefore - filledIn, "owner paid exactly what filled");
+        assertEq(_t0().balanceOf(address(dca)), 0, "nothing stranded");
+    }
 
     /// @dev Whatever happens to an order, every unit of the budget is either swapped (and its
     ///      output delivered) or refunded; the contract never keeps a remainder.

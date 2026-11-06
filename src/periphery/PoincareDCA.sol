@@ -39,6 +39,10 @@ import {Cusum} from "../libraries/Cusum.sol";
 ///         admin withdrawal, the contract owner can only manage the keeper allowlist, and only
 ///         an order's owner can cancel it (expired orders refund to their owner, never to the
 ///         caller). Unaudited periphery code; the hook and Lens it reads were reviewed.
+///
+///         Managing a running order (owner only): `pause` / `resume` hold and release it, and
+///         `editOrder` re-plans the REMAINING budget over a new schedule and rules. Neither can
+///         change who receives fills or move any funds.
 contract PoincareDCA is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -69,7 +73,8 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         WaitingForSlot, // this slot already filled; next slot not open yet
         SpreadTooHigh, // spread on the order's side above maxSpreadBps
         TrendAgainst, //  pauseOnTrend and the trend runs with the order's side
-        BelowLimit //     the quote is below the order's limit price
+        BelowLimit, //    the quote is below the order's limit price
+        Paused //         the owner paused the order (appended: earlier codes keep their values)
     }
 
     struct OrderParams {
@@ -87,6 +92,20 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         address recipient; //    receives every fill; 0 = the owner
     }
 
+    /// @notice What `editOrder` may change: the schedule and the rules. Side, recipient and budget
+    ///         are fixed for the order's life; the remaining budget is re-planned from the edit.
+    struct EditParams {
+        uint32 slices; //        fills to spread the REMAINING budget over
+        uint32 interval;
+        uint64 startTime; //     0 = now
+        uint64 deadline;
+        uint16 maxSpreadBps;
+        bool pauseOnTrend;
+        bool catchUp;
+        uint16 maxSlippageBps;
+        uint256 minPriceWad;
+    }
+
     struct Order {
         address owner;
         address recipient;
@@ -94,17 +113,20 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         bool pauseOnTrend;
         bool catchUp;
         bool cancelled;
+        bool paused;
         uint16 maxSpreadBps;
         uint16 maxSlippageBps;
-        uint32 slices;
+        uint32 slices; //         planned fills of the CURRENT schedule
         uint32 interval;
-        uint32 filled; //        fills so far
+        uint32 filled; //         fills over the order's life
+        uint32 scheduleFilled; // fills in the current schedule (resets on edit)
         uint64 startTime;
         uint64 deadline;
-        uint64 lastSlotPlusOne; // slot index + 1 of the latest fill; 0 = none yet
-        uint128 amountIn;
+        uint64 lastSlotPlusOne; // slot index + 1 of the latest fill in this schedule; 0 = none yet
+        uint128 amountIn; //      total deposited (never changes)
+        uint128 scheduleBudget; // what the current schedule spreads (amountIn, then `remaining` at each edit)
         uint128 remaining;
-        uint128 amountOut; //    cumulative output delivered to the recipient
+        uint128 amountOut; //     cumulative output delivered to the recipient
         uint256 minPriceWad;
     }
 
@@ -134,6 +156,9 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
     event OrderCancelled(uint256 indexed id, uint256 refunded);
     event OrderExpired(uint256 indexed id, uint256 refunded);
     event OrderFilled(uint256 indexed id, uint256 amountOut);
+    event OrderPaused(uint256 indexed id);
+    event OrderResumed(uint256 indexed id);
+    event OrderEdited(uint256 indexed id, uint32 slices, uint32 interval, uint64 startTime, uint64 deadline);
 
     error InvalidParams(string reason);
     error NotExecutable(Status status);
@@ -141,6 +166,7 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
     error UnknownOrder();
     error OrderClosed();
     error NotExpired();
+    error AlreadyInState();
 
     constructor(PoincareLens _lens, IUniswapV4Router04 _router, address initialOwner) Ownable(initialOwner) {
         lens = _lens;
@@ -191,6 +217,7 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         o.startTime = start;
         o.deadline = p.deadline;
         o.amountIn = p.amountIn;
+        o.scheduleBudget = p.amountIn;
         o.remaining = p.amountIn;
         o.minPriceWad = p.minPriceWad;
 
@@ -213,6 +240,7 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         // effects before the external swap
         o.remaining -= uint128(pv.amountIn);
         o.filled += 1;
+        o.scheduleFilled += 1;
         o.lastSlotPlusOne = pv.slot + 1;
         bool done = o.remaining == 0;
         if (done) _removeOpen(id);
@@ -250,6 +278,47 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         refunded = _close(id, o);
         o.cancelled = true;
         emit OrderCancelled(id, refunded);
+    }
+
+    /// @notice Hold an order: no slice fills until it is resumed. Order owner only. Cancelling and
+    ///         the post-deadline refund still work while paused.
+    function pause(uint256 id) external {
+        Order storage o = _ownedOpen(id);
+        if (o.paused) revert AlreadyInState();
+        o.paused = true;
+        emit OrderPaused(id);
+    }
+
+    /// @notice Let a paused order fill again. With catch-up, the slots it missed are made up over
+    ///         the slots left before the deadline. Order owner only.
+    function resume(uint256 id) external {
+        Order storage o = _ownedOpen(id);
+        if (!o.paused) revert AlreadyInState();
+        o.paused = false;
+        emit OrderResumed(id);
+    }
+
+    /// @notice Re-plan an open order: spread the REMAINING budget over a new schedule and rules,
+    ///         starting at `p.startTime` (0 = now). Side, recipient and budget cannot change; a
+    ///         paused order stays paused. Order owner only.
+    function editOrder(uint256 id, EditParams calldata p) external {
+        Order storage o = _ownedOpen(id);
+        uint64 start = p.startTime == 0 ? uint64(block.timestamp) : p.startTime;
+        _validateSchedule(o.remaining, p.slices, p.interval, start, p.deadline, p.maxSpreadBps, p.maxSlippageBps);
+
+        o.slices = p.slices;
+        o.interval = p.interval;
+        o.startTime = start;
+        o.deadline = p.deadline;
+        o.maxSpreadBps = p.maxSpreadBps;
+        o.pauseOnTrend = p.pauseOnTrend;
+        o.catchUp = p.catchUp;
+        o.maxSlippageBps = p.maxSlippageBps;
+        o.minPriceWad = p.minPriceWad;
+        o.scheduleBudget = o.remaining;
+        o.scheduleFilled = 0;
+        o.lastSlotPlusOne = 0;
+        emit OrderEdited(id, p.slices, p.interval, start, p.deadline);
     }
 
     /// @notice After the deadline, anyone may return an order's unfilled budget to its owner.
@@ -295,22 +364,39 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
     // ------------------------------------------------------------------ internals
 
     function _validate(OrderParams calldata p, uint64 start) internal view {
-        if (p.amountIn == 0) revert InvalidParams("amountIn");
-        if (p.slices == 0 || p.slices > MAX_SLICES) revert InvalidParams("slices");
-        if (p.amountIn < p.slices) revert InvalidParams("amountIn below slices");
-        if (p.interval < MIN_INTERVAL) revert InvalidParams("interval");
-        if (start < block.timestamp) revert InvalidParams("startTime");
-        if (p.maxSpreadBps > BPS || p.maxSlippageBps > BPS) revert InvalidParams("bps");
         if (p.recipient == address(this)) revert InvalidParams("recipient");
+        _validateSchedule(p.amountIn, p.slices, p.interval, start, p.deadline, p.maxSpreadBps, p.maxSlippageBps);
+    }
+
+    /// @dev The schedule rules shared by createOrder and editOrder (same reason strings).
+    function _validateSchedule(uint256 budget, uint32 slices, uint32 interval, uint64 start, uint64 deadline, uint16 maxSpreadBps, uint16 maxSlippageBps)
+        internal
+        view
+    {
+        if (budget == 0) revert InvalidParams("amountIn");
+        if (slices == 0 || slices > MAX_SLICES) revert InvalidParams("slices");
+        if (budget < slices) revert InvalidParams("amountIn below slices");
+        if (interval < MIN_INTERVAL) revert InvalidParams("interval");
+        if (start < block.timestamp) revert InvalidParams("startTime");
+        if (maxSpreadBps > BPS || maxSlippageBps > BPS) revert InvalidParams("bps");
         // every planned slot must open before the deadline
-        uint256 lastPlanned = uint256(start) + uint256(p.slices - 1) * p.interval;
-        if (p.deadline < lastPlanned) revert InvalidParams("deadline");
+        uint256 lastPlanned = uint256(start) + uint256(slices - 1) * interval;
+        if (deadline < lastPlanned) revert InvalidParams("deadline");
+    }
+
+    /// @dev An existing, still-open order owned by the caller.
+    function _ownedOpen(uint256 id) internal view returns (Order storage o) {
+        o = _orders[id];
+        if (o.owner == address(0)) revert UnknownOrder();
+        if (msg.sender != o.owner) revert NotAuthorized();
+        if (o.cancelled || o.remaining == 0) revert OrderClosed();
     }
 
     function _preview(Order storage o) internal view returns (Preview memory pv) {
         if (o.cancelled) return _status(pv, Status.Cancelled);
         if (o.remaining == 0) return _status(pv, Status.Filled);
         if (block.timestamp > o.deadline) return _status(pv, Status.Expired);
+        if (o.paused) return _status(pv, Status.Paused);
         if (block.timestamp < o.startTime) {
             pv.nextSlotAt = o.startTime;
             return _status(pv, Status.NotStarted);
@@ -344,14 +430,15 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
     ///      final fill always takes the rounding remainder.
     function _sliceAmount(Order storage o, uint64 slot, uint64 lastSlot) internal view returns (uint256 amt) {
         uint256 remaining = o.remaining;
-        uint256 base = uint256(o.amountIn) / o.slices;
+        // shares of the CURRENT schedule (an edit re-plans what was left)
+        uint256 base = uint256(o.scheduleBudget) / o.slices;
         amt = base;
         if (o.catchUp) {
             uint256 slotsLeft = uint256(lastSlot) - slot + 1;
             uint256 even = (remaining + slotsLeft - 1) / slotsLeft;
             if (even > amt) amt = even;
         }
-        if (o.filled + 1 >= o.slices || amt > remaining) amt = remaining;
+        if (o.scheduleFilled + 1 >= o.slices || amt > remaining) amt = remaining;
     }
 
     /// @dev True when the detected trend runs with this side: the side the hook charges once its
