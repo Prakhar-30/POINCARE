@@ -144,13 +144,18 @@ From `frontend/`:
 npx supabase functions deploy poincare-api --no-verify-jwt
 npx supabase functions deploy dca-keeper --no-verify-jwt
 npx supabase secrets set POINCARE_DCA_ADDRESS=0x<dca> KEEPER_PRIVATE_KEY=0x<keeper key> DCA_KEEPER_SECRET=<long random string>
-# optional: POINCARE_RPC_URL=https://<dedicated rpc>   KEEPER_MAX_TX=20
+# optional: POINCARE_RPC_URL=https://<dedicated rpc>   KEEPER_MAX_TX=20   DCA_INDEX_MAX_CHUNKS=10
 ```
 
 `KEEPER_PRIVATE_KEY` and `DCA_KEEPER_SECRET` live only in Supabase secrets; never in the repo or a
 `VITE_` variable.
 
-### 4. Schedule the keeper
+### 4. Create the index tables, then schedule the keeper
+
+Run `frontend/supabase/migration_009_dca_index.sql` in the SQL editor first: it creates `dca_orders`,
+`dca_fills` and the indexer cursor (public read, service-role writes). Each keeper tick then also indexes
+every PoincareDCA event since the cursor (1,000-block pages, `DCA_INDEX_MAX_CHUNKS` per tick, default 10),
+and the app reads those tables before the chain.
 
 Open `frontend/supabase/migration_008_dca_keeper_cron.sql`, replace `<DCA_KEEPER_SECRET>` with the
 same value as the function secret, and run it in the SQL editor. Don't commit the edited file.
