@@ -1870,7 +1870,7 @@ function buildOrderParams(input, nowSec = Math.floor(Date.now() / 1e3)) {
   const effectiveStart = startTime === 0n ? now : startTime;
   const slices = input.slices;
   const interval = input.interval;
-  const deadline = input.deadline !== void 0 ? BigInt(input.deadline) : effectiveStart + BigInt(Math.max(0, slices)) * BigInt(interval);
+  const deadline = input.deadline !== void 0 ? BigInt(input.deadline) : input.duration !== void 0 ? effectiveStart + BigInt(Math.max(0, Math.trunc(input.duration))) : effectiveStart + BigInt(Math.max(0, slices)) * BigInt(interval);
   const p = {
     zeroForOne: sideToZeroForOne(input.side),
     amountIn: toAmount(input.amount),
@@ -1944,6 +1944,80 @@ function planSlice(o, ctx) {
   return plan;
 }
 var progressOf = (o) => o.amountIn === 0n ? 0 : Number((o.amountIn - o.remaining) * 10000n / o.amountIn) / 1e4;
+
+// src/plans.ts
+var FREQUENCIES = {
+  "5m": 300,
+  "15m": 900,
+  "1h": 3600,
+  "4h": 14400,
+  "1d": 86400,
+  "1w": 604800
+};
+var FREQUENCY_LABEL = {
+  "5m": "Every 5 min",
+  "15m": "Every 15 min",
+  "1h": "Hourly",
+  "4h": "Every 4 hours",
+  "1d": "Daily",
+  "1w": "Weekly"
+};
+var PROTECTIONS = {
+  /** Skip a buy while this side pays the trend spread; later buys make it up. The Poincaré default. */
+  "spread-guard": { maxSpreadBps: 0, pauseOnTrend: false, catchUp: true },
+  /** Also hold while a trend runs with this side, before the spread has even ramped. */
+  "trend-pause": { maxSpreadBps: 0, pauseOnTrend: true, catchUp: true },
+  /** Buy every period whatever the spread, like a plain recurring buy. */
+  "always": { maxSpreadBps: 1e4, pauseOnTrend: false, catchUp: true }
+};
+var PROTECTION_TEXT = {
+  "spread-guard": {
+    title: "Spread guard",
+    detail: "Never pays the trend spread. A buy that would pay it waits, and later buys catch up so the plan still finishes."
+  },
+  "trend-pause": {
+    title: "Trend pause",
+    detail: "Also waits while a trend runs in your direction, before any spread is charged. Most patient."
+  },
+  always: {
+    title: "Always fill",
+    detail: "Buys every period whatever the spread, like a plain recurring buy on an exchange."
+  }
+};
+function recurringOrder(r) {
+  const interval = typeof r.frequency === "number" ? r.frequency : FREQUENCIES[r.frequency];
+  const per = toAmount(r.amountPerBuy);
+  return {
+    side: r.side,
+    amount: per * BigInt(Math.max(0, Math.trunc(r.count))),
+    slices: r.count,
+    interval,
+    startTime: r.startTime,
+    ...PROTECTIONS[r.protection ?? "spread-guard"],
+    limitPrice: r.limitPrice,
+    maxSlippageBps: r.maxSlippageBps,
+    recipient: r.recipient
+  };
+}
+function twapOrder(t) {
+  const slices = t.slices ?? twapSlices(t.durationSec);
+  const interval = Math.max(60, Math.floor(t.durationSec / slices));
+  return {
+    side: t.side,
+    amount: t.total,
+    slices,
+    interval,
+    startTime: t.startTime,
+    duration: t.durationSec,
+    ...PROTECTIONS[t.protection ?? "spread-guard"],
+    limitPrice: t.limitPrice,
+    maxSlippageBps: t.maxSlippageBps,
+    recipient: t.recipient
+  };
+}
+function twapSlices(durationSec) {
+  return Math.min(48, Math.max(2, Math.round(durationSec / 300)));
+}
 
 // src/dcaClient.ts
 import {
@@ -2133,8 +2207,12 @@ export {
   DCA_STATUS_TEXT,
   DcaNotDeployedError,
   DcaParamError,
+  FREQUENCIES,
+  FREQUENCY_LABEL,
   MAX_SLICES,
   MIN_INTERVAL,
+  PROTECTIONS,
+  PROTECTION_TEXT,
   TOKEN_DECIMALS,
   TxRevertedError,
   UNICHAIN_SEPOLIA,
@@ -2169,6 +2247,7 @@ export {
   progressOf,
   quoteExactInput,
   readRegime,
+  recurringOrder,
   regimeHistory,
   requireDca,
   sendTx,
@@ -2180,6 +2259,8 @@ export {
   toDcaOrder,
   toRegime,
   trendOnsets,
+  twapOrder,
+  twapSlices,
   validateOrderParams,
   wadToBpsUp,
   watchRegime,

@@ -1527,6 +1527,8 @@ type DcaOrderInput = {
     startTime?: number | bigint;
     /** Unix seconds. Defaults to one spare slot after the last planned slice. */
     deadline?: number | bigint;
+    /** Alternative to `deadline`: seconds from the start (a TWAP's window). Ignored if `deadline` is set. */
+    duration?: number;
     /** Hold a slot while the spread on this side is above this many bps. Default: no cap. */
     maxSpreadBps?: number;
     /** Hold while a trend runs with this side. Default false. */
@@ -1623,6 +1625,80 @@ declare function planSlice(o: DcaOrder, ctx: {
 }): SlicePlan;
 /** Fraction of the budget filled so far (0..1). */
 declare const progressOf: (o: Pick<DcaOrder, "amountIn" | "remaining">) => number;
+
+/**
+ * Exchange-style plan builders. Centralised exchanges describe DCA in two ways, and users arrive
+ * expecting one of them:
+ *
+ *  - a RECURRING buy: a fixed amount every period, N times (Coinbase, Kraken, Binance Auto-Invest,
+ *    OKX recurring buy, Bybit DCA bot);
+ *  - a TWAP: one total spread evenly over a duration (Binance Spot TWAP, 5 min to 24 h).
+ *
+ * Both compile to the same PoincareDCA order. The Poincaré part is the PROTECTION preset: whether
+ * a buy may pay the trend spread the pool charges the with-trend side.
+ */
+declare const FREQUENCIES: {
+    readonly "5m": 300;
+    readonly "15m": 900;
+    readonly "1h": 3600;
+    readonly "4h": 14400;
+    readonly "1d": 86400;
+    readonly "1w": 604800;
+};
+type Frequency = keyof typeof FREQUENCIES;
+declare const FREQUENCY_LABEL: Record<Frequency, string>;
+declare const PROTECTIONS: {
+    /** Skip a buy while this side pays the trend spread; later buys make it up. The Poincaré default. */
+    readonly "spread-guard": {
+        readonly maxSpreadBps: 0;
+        readonly pauseOnTrend: false;
+        readonly catchUp: true;
+    };
+    /** Also hold while a trend runs with this side, before the spread has even ramped. */
+    readonly "trend-pause": {
+        readonly maxSpreadBps: 0;
+        readonly pauseOnTrend: true;
+        readonly catchUp: true;
+    };
+    /** Buy every period whatever the spread, like a plain recurring buy. */
+    readonly always: {
+        readonly maxSpreadBps: 10000;
+        readonly pauseOnTrend: false;
+        readonly catchUp: true;
+    };
+};
+type Protection = keyof typeof PROTECTIONS;
+declare const PROTECTION_TEXT: Record<Protection, {
+    title: string;
+    detail: string;
+}>;
+type Common = {
+    side: Side;
+    protection?: Protection;
+    /** USDC per WETH: the most a buy pays / the least a sell accepts. */
+    limitPrice?: string | number;
+    maxSlippageBps?: number;
+    /** Unix seconds; omit to start now. */
+    startTime?: number | bigint;
+    recipient?: Address;
+};
+/** A fixed amount every period, `count` times. The budget escrowed is amountPerBuy × count. */
+declare function recurringOrder(r: Common & {
+    amountPerBuy: string | number | bigint;
+    frequency: Frequency | number;
+    count: number;
+}): DcaOrderInput;
+/**
+ * One total, spread evenly over `durationSec`. Slices default to one every five minutes (2..48);
+ * the deadline is the end of the window, so a TWAP never runs past the duration you chose.
+ */
+declare function twapOrder(t: Common & {
+    total: string | number | bigint;
+    durationSec: number;
+    slices?: number;
+}): DcaOrderInput;
+/** Default TWAP slicing: one buy every ~5 minutes, at least 2 and at most 48 buys. */
+declare function twapSlices(durationSec: number): number;
 
 /**
  * Explicit gas limits. Testnet eth_estimateGas mis-simulates calls that run through the hook,
@@ -3512,4 +3588,4 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;
 
-export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildExecuteSliceTx, buildOrderParams, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
+export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildExecuteSliceTx, buildOrderParams, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };

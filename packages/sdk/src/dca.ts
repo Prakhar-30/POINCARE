@@ -52,6 +52,8 @@ export type DcaOrderInput = {
   startTime?: number | bigint;
   /** Unix seconds. Defaults to one spare slot after the last planned slice. */
   deadline?: number | bigint;
+  /** Alternative to `deadline`: seconds from the start (a TWAP's window). Ignored if `deadline` is set. */
+  duration?: number;
   /** Hold a slot while the spread on this side is above this many bps. Default: no cap. */
   maxSpreadBps?: number;
   /** Hold while a trend runs with this side. Default false. */
@@ -119,7 +121,11 @@ export function buildOrderParams(input: DcaOrderInput, nowSec: number | bigint =
   const slices = input.slices;
   const interval = input.interval;
   const deadline =
-    input.deadline !== undefined ? BigInt(input.deadline) : effectiveStart + BigInt(Math.max(0, slices)) * BigInt(interval);
+    input.deadline !== undefined
+      ? BigInt(input.deadline)
+      : input.duration !== undefined
+        ? effectiveStart + BigInt(Math.max(0, Math.trunc(input.duration)))
+        : effectiveStart + BigInt(Math.max(0, slices)) * BigInt(interval);
   const p: DcaOrderParams = {
     zeroForOne: sideToZeroForOne(input.side),
     amountIn: toAmount(input.amount),
