@@ -273,7 +273,7 @@ export function LiquidityDepth({ x, y, fee, spreadBuy, spreadSell, range, height
               color: "var(--text-2)",
             }}
           >
-            <div style={{ fontWeight: 800, color: read.side === "ask" ? "var(--down-ink)" : "var(--up-ink)" }}>
+            <div style={{ fontWeight: 650, color: read.side === "ask" ? "var(--down-ink)" : "var(--up-ink)" }}>
               {read.side === "ask" ? "Ask" : "Bid"} · {fmtNum(read.q, 2)}
             </div>
             {read.live > 0 ? (
@@ -281,7 +281,7 @@ export function LiquidityDepth({ x, y, fee, spreadBuy, spreadSell, range, height
                 <div>{read.side === "ask" ? "You get" : "You sell"} <b style={{ color: "var(--text)" }}>{fmtNum(read.live, 3)} WETH</b></div>
                 <div>{read.side === "ask" ? "You pay" : "You receive"} <b style={{ color: "var(--text)" }}>{fmtUsd(read.usdc, { compact: read.usdc >= 1e6, dp: 0 })}</b></div>
                 {lean && plainSame > 0 && (
-                  <div style={{ color: "var(--honey-ink)", fontWeight: 700 }}>
+                  <div style={{ color: "var(--honey-ink)", fontWeight: 600 }}>
                     Plain pool, same trade: {read.side === "ask" ? `${fmtNum(plainSame, 3)} WETH` : fmtUsd(plainSame, { compact: plainSame >= 1e6, dp: 0 })} (+{fmtPct(extraPct, 1)})
                   </div>
                 )}
@@ -309,7 +309,7 @@ export function DepthLegend({ lean }: { lean: boolean }) {
     <span className="inline-flex items-center gap-1.5">{swatch}{label}</span>
   );
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1" style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
       {item(<span aria-hidden="true" style={{ width: 12, height: 8, borderRadius: 2, background: "var(--up)", opacity: 0.7 }} />, "Bids")}
       {item(<span aria-hidden="true" style={{ width: 12, height: 8, borderRadius: 2, background: "var(--down)", opacity: 0.7 }} />, "Asks")}
       {item(<span aria-hidden="true" style={{ width: 14, borderTop: "2px dashed var(--lav)" }} />, "Pool price")}

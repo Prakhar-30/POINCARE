@@ -56,16 +56,16 @@ export function Tape({
     <section className={[bare ? "" : "card-quiet overflow-hidden", fill ? "flex flex-col h-full min-h-0" : ""].join(" ").trim() || undefined} aria-labelledby={bare ? undefined : "tape-title"} aria-label={bare ? title : undefined}>
       {!bare && <div className="flex justify-between items-center px-5 py-3.5" style={{ borderBottom: "1px solid var(--divider)" }}>
         <div className="flex items-center gap-3">
-          <h2 id="tape-title" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>{title}</h2>
+          <h2 id="tape-title" style={{ fontSize: 13, fontWeight: 650, color: "var(--text-2)" }}>{title}</h2>
           {actions}
         </div>
-        <span className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--green-label)" }}>
+        <span className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--green-label)" }}>
           <span className="anim-pulse-dot" aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
           {badge}
         </span>
       </div>}
       <div role="table" className={fill ? "flex flex-col flex-1 min-h-0" : undefined} aria-labelledby={bare ? undefined : "tape-title"} aria-label={bare ? title : undefined}>
-      <div role="row" className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider-2)" }}>
+      <div role="row" className="grid px-5 py-2" style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, fontWeight: 600, color: "var(--muted)", borderBottom: "1px solid var(--divider-2)" }}>
         <span role="columnheader">Side</span>
         <span role="columnheader" className="text-right">Price</span>
         <span role="columnheader" className="text-right">Size · WETH</span>
@@ -97,7 +97,7 @@ export function Tape({
                 className="grid items-center px-5 py-2"
                 style={{ gridTemplateColumns: COLS, gap: 10, fontSize: 12, borderBottom: "1px solid var(--divider-2)" }}
               >
-                <span role="cell" style={{ color: buy ? "var(--up-ink)" : "var(--down-ink)", fontWeight: 800 }}>{buy ? "Buy" : "Sell"}</span>
+                <span role="cell" style={{ color: buy ? "var(--up-ink)" : "var(--down-ink)", fontWeight: 650 }}>{buy ? "Buy" : "Sell"}</span>
                 <span role="cell" className="text-right truncate" style={{ color: "var(--text-2)", fontWeight: 600 }}>{fmtUsd(priceOf(t))}</span>
                 <span role="cell" className="text-right truncate" style={{ color: "var(--text-3)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 3)}</span>
                 <span
@@ -117,7 +117,7 @@ export function Tape({
 
       {rows.some((t) => isReplayTrader(t.trader)) && (
         <div className="px-5 py-2 shrink-0" style={{ fontSize: 12, lineHeight: 1.5, color: "var(--muted)", borderTop: "1px solid var(--divider-2)" }}>
-          <span style={{ color: "var(--lav-ink)", fontWeight: 700 }} aria-hidden="true">◦</span> Earlier market activity, shown at its original trade time.
+          <span style={{ color: "var(--lav-ink)", fontWeight: 600 }} aria-hidden="true">◦</span> Earlier market activity, shown at its original trade time.
         </div>
       )}
 

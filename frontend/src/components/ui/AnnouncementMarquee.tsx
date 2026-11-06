@@ -16,9 +16,9 @@ function Group() {
   return (
     <span className="marquee-group">
       {ITEMS.map((t, i) => (
-        <span key={i} className="inline-flex items-center gap-2.5" style={{ paddingRight: 52 }}>
-          <span style={{ color: "#ffe9a8", display: "inline-flex", filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }}>
-            <Icon name="shield" size={15} strokeWidth={2.2} />
+        <span key={i} className="inline-flex items-center gap-2" style={{ paddingRight: 48 }}>
+          <span style={{ color: "var(--green-label)", display: "inline-flex" }}>
+            <Icon name="shield" size={14} />
           </span>
           <span>{t}</span>
         </span>
@@ -28,21 +28,20 @@ function Group() {
 }
 
 /** Scrolling announcement strip: the SFS-Labs independent scoped review and Olympix pre-audit scan
- *  results. Pauses while hovered, stops under reduced motion. Screen readers get the list once, not a loop. */
+ *  results. Pauses while hovered, stops under reduced motion. Screen readers get the list once, not a loop.
+ *  Styled like the landing page's "Reviewed by" badge: a quiet lavender-tint band with a hairline,
+ *  ink text and green shields, rather than a saturated gradient with glow and text shadow. */
 export function AnnouncementMarquee() {
   return (
     <div
       className="relative"
       style={{
-        // Fixed in both themes: white text needs the deeper lavender to clear 4.5:1.
-        background: "linear-gradient(90deg, #5f58b8, #6f68c8 45%, #5f58b8)",
-        borderBottom: "1px solid rgba(255,255,255,.18)",
-        boxShadow: "inset 0 -6px 14px rgba(0,0,0,.08), 0 2px 10px rgba(20,18,45,.10)",
+        background: "var(--lav-soft)",
+        borderBottom: "1px solid var(--lx-line)",
         fontSize: 13,
-        fontWeight: 800,
-        color: "#fff",
-        letterSpacing: ".02em",
-        textShadow: "0 1px 2px rgba(0,0,0,.22)",
+        fontWeight: 550,
+        color: "var(--text-2)",
+        letterSpacing: "-0.005em",
       }}
     >
       <p className="sr-only">Security: {ITEMS.join(" · ")}.</p>

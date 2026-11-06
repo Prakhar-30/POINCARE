@@ -13,11 +13,11 @@ function ExplorerLink({ label, address }: { label: string; address: string }) {
       target="_blank"
       rel="noreferrer"
       className="link-quiet inline-flex items-center gap-1.5 rounded-md py-1"
-      style={{ fontSize: 13, fontWeight: 600 }}
+      style={{ fontSize: 13, fontWeight: 500 }}
       aria-label={`${label} contract ${address} on the block explorer (opens in a new tab)`}
     >
       <span>{label}</span>
-      <span translate="no" style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-2)" }}>{shorten(address)}</span>
+      <span translate="no" style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-2)" }}>{shorten(address)}</span>
       <Icon name="external" size={12} aria-hidden="true" />
     </a>
   );
@@ -43,7 +43,7 @@ function FaucetButton() {
           <span>Get test tokens<span className="hidden sm:inline"> · 50k&nbsp;USDC + 20&nbsp;WETH</span></span>
         )}
       </button>
-      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
         Testnet only · test tokens have no value
       </span>
     </div>
@@ -53,12 +53,13 @@ function FaucetButton() {
 /** Footer for the wallet-gated app. Links contract addresses out to the explorer. */
 export function AppFooter() {
   return (
-    <footer className="mt-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}>
+    // on the page, split off by a hairline, as the landing footer is (no separate grey band)
+    <footer className="mt-4" style={{ borderTop: "1px solid var(--lx-line)" }}>
       <div className="mx-auto px-4 sm:px-6 py-8" style={{ maxWidth: 1600 }}>
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4 flex-wrap">
             <Wordmark size={26} />
-            <span className="flex items-center gap-1.5" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-3)" }}>
+            <span className="flex items-center gap-1.5" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-3)" }}>
               <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--lav)" }} />
               {CHAIN_NAME} · testnet · research preview
             </span>
@@ -73,7 +74,7 @@ export function AppFooter() {
               target="_blank"
               rel="noreferrer"
               className="link-quiet inline-flex items-center gap-1.5 rounded-md py-1"
-              style={{ fontSize: 13, fontWeight: 700 }}
+              style={{ fontSize: 13, fontWeight: 500 }}
               aria-label="Poincaré on X (opens in a new tab)"
             >
               <Icon name="xSocial" size={13} aria-hidden="true" />
@@ -84,14 +85,9 @@ export function AppFooter() {
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
           <FaucetButton />
-          <Link to="/developers" className="btn btn-secondary btn-sm">
+          <Link to="/docs" className="btn btn-secondary btn-sm">
             <Icon name="layers" size={14} aria-hidden="true" /> Build on Poincaré · Docs
           </Link>
-        </div>
-
-        <div className="mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ borderTop: "1px solid var(--divider)", fontSize: 12, color: "var(--muted)" }}>
-          <span>Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.</span>
-          <span>Prices off the pool's own reserves · no oracle; the pool itself needs no keeper.</span>
         </div>
       </div>
     </footer>

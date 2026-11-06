@@ -106,12 +106,12 @@ export function Pool() {
             <span style={{ marginLeft: -8 }}><TokenIcon sym="USDC" size={26} /></span>
           </span>
           <div>
-            <h2 id="pool-head" className="font-display flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.15, whiteSpace: "nowrap" }}>
+            <h2 id="pool-head" className="font-display flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 16, fontWeight: 650, color: "var(--text)", lineHeight: 1.15, whiteSpace: "nowrap" }}>
               WETH / USDC
-              <span className="rounded-full px-2 py-0.5" role="status" style={{ fontSize: 12, fontWeight: 800, color: regime.ink, background: regime.bg, fontFamily: "var(--font-sans)" }}>{regime.label}</span>
+              <span className="rounded-full px-2 py-0.5" role="status" style={{ fontSize: 12, fontWeight: 650, color: regime.ink, background: regime.bg, fontFamily: "var(--font-sans)" }}>{regime.label}</span>
             </h2>
             <a href={`${EXPLORER}/address/${CONTRACTS.hook}`} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" translate="no"
-              aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
+              aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 600, fontFamily: "var(--font-mono)" }}>
               Hook {shorten(CONTRACTS.hook)} <Icon name="external" size={11} aria-hidden="true" />
             </a>
           </div>
@@ -209,7 +209,7 @@ export function Pool() {
   const positionTab = (
     <div className="grid p-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20 }}>
       <div>
-        <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 8 }}>Your stake</h3>
+        <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 8 }}>Your stake</h3>
         {pos.shares > 0 ? (
           <dl className="flex flex-col" style={{ gap: 7 }}>
             <Detail label="Position value" value={fmtUsd(pos.valueUsdc, { dp: 2, compact: pos.valueUsdc >= 1e6 })} strong />
@@ -221,7 +221,7 @@ export function Pool() {
         )}
       </div>
       <div>
-        <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 8 }}>Redeems for</h3>
+        <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 8 }}>Redeems for</h3>
         <dl className="flex flex-col" style={{ gap: 7 }}>
           <Detail label="USDC" value={pos.shares > 0 ? big(pos.underlying0, 2) : "—"} />
           <Detail label="WETH" value={pos.shares > 0 ? big(pos.underlying1, 4) : "—"} />
@@ -229,10 +229,10 @@ export function Pool() {
         </dl>
       </div>
       <div className="rounded-xl p-3.5" style={{ background: "var(--green-bg)", border: "1px solid var(--green-border)" }}>
-        <div className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--green-label)" }}>
+        <div className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--green-label)" }}>
           <Icon name="spark" size={13} aria-hidden="true" /> Your LVR avoided
         </div>
-        <div className="font-display" style={{ fontSize: 22, fontWeight: 800, color: "var(--green-label)", lineHeight: 1.25 }}>{pos.sharePct > 0 ? fmtUsd(lpLvr, { dp: 2 }) : "—"}</div>
+        <div className="font-display" style={{ fontSize: 22, fontWeight: 650, color: "var(--green-label)", lineHeight: 1.25 }}>{pos.sharePct > 0 ? fmtUsd(lpLvr, { dp: 2 }) : "—"}</div>
         <div style={{ fontSize: 12, color: "var(--green-sub)", lineHeight: 1.5, marginTop: 2 }}>
           Your {fmtPct(pos.sharePct)} share of {totals ? fmtUsd(totals.lvr_avoided, { dp: 2 }) : "—"} kept pool-wide. Accrues as trades are recorded; not guaranteed.
         </div>
@@ -243,7 +243,7 @@ export function Pool() {
   const compositionTab = (
     <div className="grid p-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 24 }}>
       <div>
-        <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>
+        <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
           <span>Reserves by value</span><span>{fmtNum(price, 2)} USDC / WETH</span>
         </div>
         <div className="flex overflow-hidden rounded-full" style={{ height: 8, gap: 2 }} role="img"
@@ -258,12 +258,12 @@ export function Pool() {
           <div key={r.sym} className="flex items-center justify-between gap-3" style={{ padding: "10px 0", borderBottom: "1px solid var(--divider-2)" }}>
             <span className="flex items-center gap-2.5">
               <TokenIcon sym={r.sym} size={22} />
-              <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{r.sym}</span>
+              <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{r.sym}</span>
               <span className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--text-3)" }}>
                 <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: r.color }} />{Math.round(r.share * 100)}%
               </span>
             </span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{r.amt} <span style={{ fontWeight: 600, color: "var(--text-3)" }}>· {fmtUsd(r.value, { compact: true })}</span></span>
+            <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{r.amt} <span style={{ fontWeight: 600, color: "var(--text-3)" }}>· {fmtUsd(r.value, { compact: true })}</span></span>
           </div>
         ))}
       </div>
@@ -290,7 +290,7 @@ export function Pool() {
           <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
             <tr>
               {["Time", "Action", "USDC", "WETH", "Shares", "Value", ""].map((h, i) => (
-                <th key={h || i} scope="col" style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h || <span className="sr-only">Transaction</span>}</th>
+                <th key={h || i} scope="col" style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h || <span className="sr-only">Transaction</span>}</th>
               ))}
             </tr>
           </thead>
@@ -298,13 +298,13 @@ export function Pool() {
             {me.lpEvents.map((e) => (
               <tr key={e.tx_hash} className="row-hover">
                 <td style={{ ...cell, color: "var(--text-3)" }}>{e.ts ? stampFmt.format(new Date(e.ts)) : "—"}</td>
-                <td style={{ ...cell, fontWeight: 800, color: e.kind === "add" ? "var(--up-ink)" : "var(--down-ink)" }}>
+                <td style={{ ...cell, fontWeight: 650, color: e.kind === "add" ? "var(--up-ink)" : "var(--down-ink)" }}>
                   <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: e.kind === "add" ? "var(--up)" : "var(--down)" }} />{e.kind === "add" ? "Deposit" : "Withdraw"}</span>
                 </td>
                 <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{big(e.amount0, 2)}</td>
                 <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{big(e.amount1, 4)}</td>
                 <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }} title={e.shares > 0 ? undefined : "Share count not recorded for this deposit"}>{e.shares > 0 ? big(e.shares, 4) : "—"}</td>
-                <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(e.value_usdc || 0, { dp: 2, compact: (e.value_usdc || 0) >= 1e6 })}</td>
+                <td style={{ ...cell, textAlign: "right", fontWeight: 600, color: "var(--text)" }}>{fmtUsd(e.value_usdc || 0, { dp: 2, compact: (e.value_usdc || 0) >= 1e6 })}</td>
                 <td style={{ ...cell, textAlign: "right" }}>
                   <a href={`${EXPLORER}/tx/${e.tx_hash}`} target="_blank" rel="noreferrer" className="link-quiet inline-flex" aria-label="View transaction on the block explorer (opens in a new tab)" style={{ color: "var(--text-3)" }}>
                     <Icon name="external" size={13} aria-hidden="true" />
@@ -327,9 +327,9 @@ export function Pool() {
       ].map((st, i) => (
         <div key={st.t} className="flex gap-3">
           <span className="font-display shrink-0 flex items-center justify-center" aria-hidden="true"
-            style={{ width: 24, height: 24, borderRadius: 99, fontSize: 12, fontWeight: 800, color: "var(--lav-ink)", background: "var(--lav-soft)" }}>{i + 1}</span>
+            style={{ width: 24, height: 24, borderRadius: 99, fontSize: 12, fontWeight: 650, color: "var(--lav-ink)", background: "var(--lav-soft)" }}>{i + 1}</span>
           <span>
-            <span className="block" style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{st.t}</span>
+            <span className="block" style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{st.t}</span>
             <span className="block" style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-3)", marginTop: 2 }}>{st.d}</span>
           </span>
         </div>
@@ -447,7 +447,7 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
           </button>
           {insufficient && (
             <button type="button" onClick={() => void faucet.mint().then(() => bal.refetch())} disabled={faucet.minting} aria-busy={faucet.minting}
-              className="link-quiet w-full mt-1.5" style={{ fontSize: 12, fontWeight: 700, minHeight: 28 }}>
+              className="link-quiet w-full mt-1.5" style={{ fontSize: 12, fontWeight: 600, minHeight: 28 }}>
               {faucet.minting ? "Minting test tokens…" : "Get free test tokens: 50k USDC + 20 WETH"}
             </button>
           )}
@@ -503,8 +503,8 @@ function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>;
       }
     >
       <div className="flex items-baseline justify-between mb-1">
-        <label htmlFor="remove-pct" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-3)" }}>Amount to withdraw</label>
-        <span className="font-display" aria-hidden="true" style={{ fontSize: 28, fontWeight: 800, color: "var(--text)" }}>{pct}%</span>
+        <label htmlFor="remove-pct" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-3)" }}>Amount to withdraw</label>
+        <span className="font-display" aria-hidden="true" style={{ fontSize: 28, fontWeight: 650, color: "var(--text)" }}>{pct}%</span>
       </div>
       <input id="remove-pct" name="remove-pct" type="range" min={1} max={100} value={pct} onChange={(e) => setPct(Number(e.target.value))}
         aria-valuetext={`${pct}% of your position`}
@@ -537,14 +537,14 @@ function LiqInput({ label, sub, value, onInput, error }: { label: string; sub: s
         <input id={id} name={id} value={value} onChange={(e) => onInput(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
           autoComplete="off" spellCheck={false} placeholder={label === "USDC" ? "3000…" : "1.5…"}
           aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
-          style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", color: "var(--text)", fontSize: 22, fontWeight: 800 }} />
+          className="num-input" style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", color: "var(--text)", fontSize: 22, fontWeight: 650 }} />
         <div className="flex items-center gap-2 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--nav-border)", borderRadius: 22, padding: "5px 11px 5px 6px", boxShadow: "var(--shadow-sm)" }}>
           <TokenIcon sym={label} size={18} />
-          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{label}</span>
+          <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{label}</span>
         </div>
       </div>
     </div>
-    {error && <p id={`${id}-error`} style={{ fontSize: 12, fontWeight: 700, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
+    {error && <p id={`${id}-error`} style={{ fontSize: 12, fontWeight: 600, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
     </div>
   );
 }

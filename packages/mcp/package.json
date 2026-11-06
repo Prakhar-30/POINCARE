@@ -4,7 +4,7 @@
   "description": "MCP server for the Poincaré hook: lets AI agents read the trend regime and create and manage spread-aware DCA orders.",
   "license": "BUSL-1.1",
   "author": "Prakhar Srivastava",
-  "homepage": "https://www.poincaretrade.in/#/developers",
+  "homepage": "https://www.poincaretrade.in/#/docs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Prakhar-30/POINCARE.git",

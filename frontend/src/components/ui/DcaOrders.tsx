@@ -78,12 +78,12 @@ function OrderRow({ o, actions }: { o: DcaOrderWithNext; actions: Actions }) {
     <li className="px-3 py-2.5" style={{ borderBottom: "1px solid var(--divider-2)" }}>
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 min-w-0">
-          <span style={{ fontSize: 12, fontWeight: 800, color: "var(--muted)" }}>#{o.id.toString()}</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: o.side === "buy" ? "var(--up-ink)" : "var(--down-ink)" }}>
+          <span style={{ fontSize: 12, fontWeight: 650, color: "var(--muted)" }}>#{o.id.toString()}</span>
+          <span style={{ fontSize: 13, fontWeight: 650, color: o.side === "buy" ? "var(--up-ink)" : "var(--down-ink)" }}>
             {o.side === "buy" ? "Buy" : "Sell"} WETH
           </span>
         </span>
-        <span className="rounded-full px-2 py-0.5 shrink-0" style={{ fontSize: 11, fontWeight: 800, color: tone.ink, background: tone.bg }}>
+        <span className="rounded-full px-2 py-0.5 shrink-0" style={{ fontSize: 11, fontWeight: 650, color: tone.ink, background: tone.bg }}>
           {label}
         </span>
       </div>
@@ -198,9 +198,9 @@ function EditPlan({ o, busy, onClose, onSave }: { o: DcaOrderWithNext; busy: boo
       </p>
 
       <div className="field flex items-center gap-3" style={{ padding: "7px 10px", borderRadius: 12, background: "var(--surface)", borderColor: !check.ok && check.reason !== "invalid" && /slices/.test(check.reason) ? "var(--negative)" : undefined }}>
-        <label htmlFor={`edit-count-${o.id}`} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", flex: 1 }}>Number of {noun} left</label>
+        <label htmlFor={`edit-count-${o.id}`} style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", flex: 1 }}>Number of {noun} left</label>
         <input ref={first} id={`edit-count-${o.id}`} name={`edit-count-${o.id}`} value={count} inputMode="numeric" autoComplete="off" onChange={(e) => setCount(e.target.value.replace(/\D/g, "").slice(0, 5))}
-          className="text-right" style={{ width: 72, background: "transparent", border: "none", fontSize: 15, fontWeight: 800, color: "var(--text)" }} />
+          className="text-right num-input" style={{ width: 72, background: "transparent", border: "none", fontSize: 15, fontWeight: 650, color: "var(--text)" }} />
       </div>
 
       <Chips label={freqNow || freq ? "Frequency" : `Frequency (now every ${Math.round(o.interval / 60)} min)`} value={freq ?? ""}
@@ -232,7 +232,7 @@ function EditPlan({ o, busy, onClose, onSave }: { o: DcaOrderWithNext; busy: boo
 function RowAction({ icon, children, ...rest }: { icon: "play" | "pause" | "target" | "close" | "check"; children: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button type="button" className="link-quiet inline-flex items-center gap-1 rounded-md" {...rest}
-      style={{ fontSize: 12, fontWeight: 800, minHeight: 32, padding: "0 8px" }}>
+      style={{ fontSize: 12, fontWeight: 650, minHeight: 32, padding: "0 8px" }}>
       <Icon name={icon} size={12} aria-hidden="true" /> {children}
     </button>
   );

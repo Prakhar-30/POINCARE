@@ -20,7 +20,7 @@ export const PAGES: DocPage[] = [
   {
     slug: "overview",
     group: "Get started",
-    title: "Build on Poincaré",
+    title: "Introduction",
     lede: "Read the pool's trend regime, quote exactly what the router will execute, and run spread-aware DCA orders: from TypeScript, from an AI agent, or over plain HTTP. No API keys and no oracle; everything comes from the live pool on Unichain Sepolia.",
     keywords: "intro sdk mcp api tools",
     body: () => (

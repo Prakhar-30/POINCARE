@@ -91,7 +91,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <Icon name={m.icon} size={16} />
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{t.title}</div>
+                  <div style={{ fontSize: 14, fontWeight: 650, color: "var(--text)" }}>{t.title}</div>
                   {t.message && (
                     <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5, marginTop: 2 }}>{t.message}</div>
                   )}
@@ -101,7 +101,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 mt-2"
-                      style={{ fontSize: 12, fontWeight: 700, color: m.color }}
+                      style={{ fontSize: 12, fontWeight: 600, color: m.color }}
                     >
                       View on explorer <Icon name="external" size={12} aria-hidden="true" />
                     </a>

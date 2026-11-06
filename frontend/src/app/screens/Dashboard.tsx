@@ -220,7 +220,7 @@ function AccountBar({
           {addr ? <WalletAvatar address={addr} size={52} /> : <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: 999, background: "var(--surface-2)" }} />}
           <div className="min-w-0">
             <div className="flex items-center gap-1">
-              <span className="font-display truncate" translate="no" title={addr} style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>{addr ? shorten(addr) : "—"}</span>
+              <span className="font-display truncate" translate="no" title={addr} style={{ fontSize: 18, fontWeight: 650, color: "var(--text)" }}>{addr ? shorten(addr) : "—"}</span>
               <button type="button" className="icon-btn icon-btn-plain" onClick={copy} aria-label={copied ? "Address copied" : "Copy wallet address"} title="Copy address" style={{ color: copied ? "var(--up-ink)" : "var(--text-3)" }}>
                 <Icon name={copied ? "check" : "copy"} size={15} aria-hidden="true" />
               </button>
@@ -234,7 +234,7 @@ function AccountBar({
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 12, color: "var(--text-3)" }}>
               <span>{firstSeen ? `Member since ${dateFmt.format(new Date(firstSeen))}` : "Welcome to Poincaré"}</span>
               {visits && visits > 1 ? <><span aria-hidden="true">·</span><span>{visits} visits</span></> : null}
-              <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5" style={{ fontWeight: 700, color: "var(--text-2)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5" style={{ fontWeight: 600, color: "var(--text-2)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
                 Unichain Sepolia
               </span>
@@ -249,7 +249,7 @@ function AccountBar({
               {minting ? "Minting…" : "Get test tokens"}
             </button>
           ) : null}
-          <Link to={{ search: "?tab=trade" }} onClick={goTop} className="btn btn-positive btn-sm">
+          <Link to={{ search: "?tab=trade" }} onClick={goTop} className="btn btn-primary btn-sm">
             <Icon name="swap" size={14} aria-hidden="true" /> Trade
           </Link>
           <Link to={{ search: "?tab=pool" }} onClick={goTop} className="btn btn-secondary btn-sm">
@@ -263,14 +263,14 @@ function AccountBar({
 
       <dl className="acct-strip">
         <div className="acct-cell">
-          <dt className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+          <dt className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
             Estimated balance
             <button type="button" className="icon-btn icon-btn-plain hit-slop" onClick={onToggleHide} aria-pressed={hide} aria-label={hide ? "Show balances" : "Hide balances"} title={hide ? "Show balances" : "Hide balances"} style={{ color: "var(--text-3)", width: 22, height: 18, borderRadius: 6 }}>
               <Icon name={hide ? "eye-off" : "eye"} size={14} aria-hidden="true" />
             </button>
           </dt>
           <dd>
-            <div className="font-display" style={{ fontSize: "clamp(22px, 2.4vw, 28px)", fontWeight: 800, color: "var(--text)", lineHeight: 1.15 }}>{money(total)}</div>
+            <div className="font-display" style={{ fontSize: "clamp(22px, 2.4vw, 28px)", fontWeight: 650, color: "var(--text)", lineHeight: 1.15 }}>{money(total)}</div>
             <div className="truncate" style={{ fontSize: 12, color: "var(--text-3)", marginTop: 3 }} title={hide ? undefined : `Wallet ${fmtUsd(walletValue, { dp: 2 })} · Liquidity ${fmtUsd(lpValue, { dp: 2 })}`}>
               Wallet <b style={{ color: "var(--text-2)" }}>{money(walletValue)}</b> · Liquidity <b style={{ color: "var(--text-2)" }}>{money(lpValue)}</b>
             </div>
@@ -287,9 +287,9 @@ function AccountBar({
 function AccStat({ label, value, sub, ink }: { label: string; value: string; sub: string; ink?: string }) {
   return (
     <div className="acct-cell min-w-0">
-      <dt style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{label}</dt>
+      <dt style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{label}</dt>
       <dd>
-        <div className="font-display truncate" title={value} style={{ fontSize: "clamp(16px, 4.6vw, 20px)", fontWeight: 800, color: ink ?? "var(--text)", lineHeight: 1.3 }}>{value}</div>
+        <div className="font-display truncate" title={value} style={{ fontSize: "clamp(16px, 4.6vw, 20px)", fontWeight: 650, color: ink ?? "var(--text)", lineHeight: 1.3 }}>{value}</div>
         <div className="acct-sub truncate" style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>{sub}</div>
       </dd>
     </div>
@@ -324,7 +324,7 @@ function MarketPanel({
       </>}>
         <div className="flex items-center gap-2">
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Detector · two-sided CUSUM</span>
-          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ fontSize: 12, fontWeight: 800, color: regime.ink, background: regime.bg }} role="status">
+          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ fontSize: 12, fontWeight: 650, color: regime.ink, background: regime.bg }} role="status">
             <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: regime.ink }} />
             {regime.label}
           </span>
@@ -356,7 +356,7 @@ function MarketPanel({
 function Readout({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0" style={{ fontSize: 15 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 2 }}>{label}</div>
       {children}
     </div>
   );
@@ -403,7 +403,7 @@ function AssetsCard({
   return (
     <section className="card" aria-labelledby="assets-title" style={{ padding: 0 }}>
       <PanelHead id="assets-title" title="Your assets">
-        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>{money(total)}</span>
+        <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-2)" }}>{money(total)}</span>
       </PanelHead>
 
       {total > 0 && (
@@ -418,7 +418,7 @@ function AssetsCard({
         <thead>
           <tr>
             {["Asset", "Amount", "Value"].map((h, i) => (
-              <th key={h} scope="col" style={{ textAlign: i ? "right" : "left", padding: i === 1 ? "8px 8px" : "8px clamp(12px, 3.5vw, 20px)", fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{h}</th>
+              <th key={h} scope="col" style={{ textAlign: i ? "right" : "left", padding: i === 1 ? "8px 8px" : "8px clamp(12px, 3.5vw, 20px)", fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -429,13 +429,13 @@ function AssetsCard({
                 <span className="flex items-center gap-2.5">
                   {r.icon}
                   <span>
-                    <span className="block" style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{r.key}</span>
+                    <span className="block" style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{r.key}</span>
                     <span className="block" style={{ fontSize: 12, color: "var(--text-3)", whiteSpace: "nowrap" }}>{r.name}</span>
                   </span>
                 </span>
               </th>
-              <td title={hide ? undefined : r.full} style={{ textAlign: "right", padding: "10px 8px", fontSize: 13, fontWeight: 700, color: "var(--text-2)", whiteSpace: "nowrap" }}>{r.amount}</td>
-              <td style={{ textAlign: "right", padding: "10px clamp(12px, 3.5vw, 20px)", fontSize: 13, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>
+              <td title={hide ? undefined : r.full} style={{ textAlign: "right", padding: "10px 8px", fontSize: 13, fontWeight: 600, color: "var(--text-2)", whiteSpace: "nowrap" }}>{r.amount}</td>
+              <td style={{ textAlign: "right", padding: "10px clamp(12px, 3.5vw, 20px)", fontSize: 13, fontWeight: 650, color: "var(--text)", whiteSpace: "nowrap" }}>
                 {money(r.value)}
                 <span className="block" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>{share(r.value)}</span>
               </td>
@@ -477,7 +477,7 @@ function Line({ label, value, ink, hint }: { label: string; value: ReactNode; in
   return (
     <div className="flex justify-between gap-3" style={{ fontSize: 12 }} title={hint}>
       <dt style={{ color: "var(--text-3)" }}>{label}</dt>
-      <dd style={{ color: ink ?? "var(--text-2)", fontWeight: 800, textAlign: "right" }}>{value}</dd>
+      <dd style={{ color: ink ?? "var(--text-2)", fontWeight: 650, textAlign: "right" }}>{value}</dd>
     </div>
   );
 }
@@ -511,7 +511,7 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
     <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
       <tr>
         {cols.map((h, i) => (
-          <th key={h || i} scope="col" style={{ textAlign: right.includes(i) ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)", whiteSpace: "nowrap" }}>
+          <th key={h || i} scope="col" style={{ textAlign: right.includes(i) ? "right" : "left", padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "var(--muted)", borderBottom: "1px solid var(--divider)", whiteSpace: "nowrap" }}>
             {h || <span className="sr-only">Transaction</span>}
           </th>
         ))}
@@ -559,14 +559,14 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
                     return (
                       <tr key={`${f.txHash}:${f.logIndex}`} className="row-hover">
                         <td style={{ ...cell, color: "var(--text-3)" }}>{stampFmt.format(new Date(f.ts))}</td>
-                        <td style={{ ...cell, fontWeight: 800, color: buy ? "var(--up-ink)" : "var(--down-ink)" }}>
+                        <td style={{ ...cell, fontWeight: 650, color: buy ? "var(--up-ink)" : "var(--down-ink)" }}>
                           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: buy ? "var(--up)" : "var(--down)" }} />{buy ? "Buy" : "Sell"}</span>
                         </td>
                         <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(buy ? f.amountOut : f.amountIn, 4)}</td>
                         <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(f.price, 2)}</td>
-                        <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(buy ? f.amountIn : f.amountOut, { dp: 2 })}</td>
+                        <td style={{ ...cell, textAlign: "right", fontWeight: 600, color: "var(--text)" }}>{fmtUsd(buy ? f.amountIn : f.amountOut, { dp: 2 })}</td>
                         <td style={cell}>
-                          <span className="rounded-full px-2 py-0.5" style={{ fontWeight: 700, color: paid ? "var(--honey-ink)" : "var(--lav-ink)", background: paid ? "var(--warn-bg)" : "var(--lav-soft)" }}>
+                          <span className="rounded-full px-2 py-0.5" style={{ fontWeight: 600, color: paid ? "var(--honey-ink)" : "var(--lav-ink)", background: paid ? "var(--warn-bg)" : "var(--lav-soft)" }}>
                             DCA #{f.orderId.toString()} · {paid ? `paid ${fmtPct(f.spreadBps / 10_000)}` : "free"}
                           </span>
                         </td>
@@ -580,13 +580,13 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
                   return (
                     <tr key={t.tx_hash} className="row-hover">
                       <td style={{ ...cell, color: "var(--text-3)" }}>{t.ts ? stampFmt.format(new Date(t.ts)) : "—"}</td>
-                      <td style={{ ...cell, fontWeight: 800, color: buy ? "var(--up-ink)" : "var(--down-ink)" }}>
+                      <td style={{ ...cell, fontWeight: 650, color: buy ? "var(--up-ink)" : "var(--down-ink)" }}>
                         <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: buy ? "var(--up)" : "var(--down)" }} />{buy ? "Buy" : "Sell"}</span>
                       </td>
                       <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(buy ? t.amount_out : t.amount_in, 4)}</td>
                       <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(priceOf(t), 2)}</td>
-                      <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(t.notional_usdc || 0, { dp: 2 })}</td>
-                      <td style={cell}><span className="rounded-full px-2 py-0.5" style={{ fontWeight: 700, color: tag.ink, background: tag.bg }}>{tag.text}</span></td>
+                      <td style={{ ...cell, textAlign: "right", fontWeight: 600, color: "var(--text)" }}>{fmtUsd(t.notional_usdc || 0, { dp: 2 })}</td>
+                      <td style={cell}><span className="rounded-full px-2 py-0.5" style={{ fontWeight: 600, color: tag.ink, background: tag.bg }}>{tag.text}</span></td>
                       <td style={{ ...cell, textAlign: "right" }}><TxLink hash={t.tx_hash} /></td>
                     </tr>
                   );
@@ -616,11 +616,11 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
               {lpEvents.map((e) => (
                 <tr key={e.tx_hash} className="row-hover">
                   <td style={{ ...cell, color: "var(--text-3)" }}>{e.ts ? stampFmt.format(new Date(e.ts)) : "—"}</td>
-                  <td style={{ ...cell, fontWeight: 800, color: e.kind === "add" ? "var(--up-ink)" : "var(--down-ink)" }}>{e.kind === "add" ? "Add" : "Remove"}</td>
+                  <td style={{ ...cell, fontWeight: 650, color: e.kind === "add" ? "var(--up-ink)" : "var(--down-ink)" }}>{e.kind === "add" ? "Add" : "Remove"}</td>
                   <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }} title={e.shares > 0 ? undefined : "Share count not recorded for this deposit"}>{e.shares > 0 ? fmtNum(e.shares, 4) : "—"}</td>
                   <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(e.amount0, 2)}</td>
                   <td style={{ ...cell, textAlign: "right", color: "var(--text-2)" }}>{fmtNum(e.amount1, 4)}</td>
-                  <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{fmtUsd(e.value_usdc || 0, { dp: 2 })}</td>
+                  <td style={{ ...cell, textAlign: "right", fontWeight: 600, color: "var(--text)" }}>{fmtUsd(e.value_usdc || 0, { dp: 2 })}</td>
                   <td style={{ ...cell, textAlign: "right" }}><TxLink hash={e.tx_hash} /></td>
                 </tr>
               ))}
@@ -661,7 +661,7 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
     <section className="card flex flex-col" aria-labelledby="pool-title" style={{ padding: 0 }}>
       <PanelHead id="pool-title" title="Pool overview">
         <a href={`${EXPLORER}/address/${CONTRACTS.hook}`} target="_blank" rel="noreferrer" className="link-quiet inline-flex items-center gap-1" translate="no"
-          aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
+          aria-label={`Hook contract ${CONTRACTS.hook} on the block explorer (opens in a new tab)`} style={{ fontSize: 12, fontWeight: 600, fontFamily: "var(--font-mono)" }}>
           {shorten(CONTRACTS.hook)} <Icon name="external" size={12} aria-hidden="true" />
         </a>
       </PanelHead>
@@ -670,10 +670,10 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
         <PoolStat label="24h volume" value={totals ? fmtUsd(totals.volume_24h, { compact: true }) : <Skel />} sub={`${fmtNum(totals?.swap_count ?? 0, 0)} swaps all time`} />
       </div>
       <div className="m-5 mt-4 rounded-xl p-3.5" style={{ background: "var(--green-bg)", border: "1px solid var(--green-border)" }}>
-        <div className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 700, color: "var(--green-label)" }}>
+        <div className="flex items-center gap-1.5" style={{ fontSize: 12, fontWeight: 600, color: "var(--green-label)" }}>
           <Icon name="spark" size={13} aria-hidden="true" /> LVR retained for LPs
         </div>
-        <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: "var(--green-label)", lineHeight: 1.2 }}>
+        <div className="font-display" style={{ fontSize: 24, fontWeight: 650, color: "var(--green-label)", lineHeight: 1.2 }}>
           {!totals ? <Skel /> : totals.swap_count > 0 ? fmtUsd(totals.lvr_avoided, { dp: 2, compact: totals.lvr_avoided > 99_999 }) : "—"}
         </div>
         <div style={{ fontSize: 12, color: "var(--green-sub)", lineHeight: 1.5, marginTop: 2 }}>
@@ -683,7 +683,7 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
 
       <div className="px-5 pb-5 flex flex-col" style={{ gap: 14 }}>
         <div>
-          <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>
+          <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
             <span>Reserves by value</span>
             <span>
               <span style={{ color: "var(--lav-ink)" }}>USDC {Math.round(usdcShare * 100)}%</span>
@@ -712,8 +712,8 @@ function PoolCard({ s, totals, cfg }: { s: ReturnType<typeof usePoolState>; tota
 function PoolStat({ label, value, sub }: { label: string; value: ReactNode; sub: string }) {
   return (
     <div className="min-w-0">
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{label}</div>
-      <div className="font-display" style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", lineHeight: 1.3 }}>{value}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{label}</div>
+      <div className="font-display" style={{ fontSize: 18, fontWeight: 650, color: "var(--text)", lineHeight: 1.3 }}>{value}</div>
       <div style={{ fontSize: 12, color: "var(--text-3)" }}>{sub}</div>
     </div>
   );

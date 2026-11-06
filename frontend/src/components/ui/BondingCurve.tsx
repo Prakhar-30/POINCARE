@@ -152,7 +152,7 @@ export function BondingCurve({
       </svg>
 
       <div className="absolute left-3 top-2.5 hidden sm:block" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>x · y = k · WETH ↔ USDC</div>
-      <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 12, fontWeight: 700 }}>
+      <div className="absolute right-3 top-2.5 flex items-center gap-3" style={{ fontSize: 12, fontWeight: 600 }}>
         <span style={{ color: "var(--up-ink)" }}>● buy quote</span>
         <span style={{ color: "var(--down-ink)" }}>● sell quote</span>
       </div>

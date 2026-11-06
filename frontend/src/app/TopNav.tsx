@@ -44,9 +44,10 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
       }}
     >
       <Link to="/" className="shrink-0 rounded-xl" aria-label="Poincaré home">
-        <div className="flex items-center gap-3">
-          <Mark size={34} decorative />
-          <span className="font-display text-text hidden lg:block" style={{ fontWeight: 700, fontSize: 19, letterSpacing: ".5px" }}>
+        <div className="flex items-center gap-2.5">
+          <Mark size={30} decorative />
+          {/* the wordmark as the landing page and docs set it */}
+          <span className="hidden lg:block" style={{ fontWeight: 600, fontSize: 18, letterSpacing: "-0.03em", color: "var(--lx-ink)" }}>
             Poincaré
           </span>
         </div>
@@ -54,7 +55,8 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
 
       {!mobile && (
         <nav aria-label="App sections" className="shrink-0">
-          <ul className="flex gap-1 rounded-2xl p-1" style={{ background: "var(--nav-pill)" }}>
+          {/* no tray: the active section is a lavender-tint pill, as in the docs' top bar */}
+          <ul className="flex gap-1">
             {TABS.map((t, i) => {
               const active = t.id === tab;
               return (
@@ -66,14 +68,14 @@ export function TopNav({ tab, setTab, openMenu }: { tab: Tab; setTab: (t: Tab) =
                     aria-label={t.label}
                     aria-keyshortcuts={String(i + 1)}
                     title={`${t.label} (${i + 1})`}
-                    className="nav-tab relative flex items-center gap-2 rounded-xl px-3 lg:px-3.5 text-[13px] font-bold"
-                    style={{ minHeight: 40, color: active ? "var(--lav-ink)" : "var(--text-3)" }}
+                    className="nav-tab relative flex items-center gap-2 rounded-full px-3 lg:px-3.5"
+                    style={{ minHeight: 38, fontSize: 14, fontWeight: 550, letterSpacing: "-0.01em", color: active ? "var(--lx-ink)" : "var(--text-3)" }}
                   >
                     {active && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 rounded-xl"
-                        style={{ background: "var(--surface)", boxShadow: "var(--shadow-sm)" }}
+                        className="absolute inset-0 rounded-full"
+                        style={{ background: "var(--lav-soft)" }}
                         transition={{ type: "spring", stiffness: 420, damping: 34 }}
                       />
                     )}

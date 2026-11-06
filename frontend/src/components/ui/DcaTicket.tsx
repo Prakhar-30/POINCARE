@@ -167,10 +167,11 @@ export function DcaTicket({
           <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ gap: 10, padding: "12px 16px 10px" }}>
             <SideToggle side={side} s={s} onChange={switchSide} />
 
-            <div className="seg seg-sm w-full" role="group" aria-label="Plan type" style={{ padding: 2 }}>
-              <button type="button" className="seg-item" aria-pressed={kind === "recurring"} onClick={() => setKind("recurring")}>Recurring</button>
-              <button type="button" className="seg-item" aria-pressed={kind === "twap"} onClick={() => setKind("twap")}>TWAP</button>
-            </div>
+            {/* A setting of the DCA plan, so it is drawn like the plan's other settings (Frequency,
+                Number of buys): a labelled chip group, not a third full-width switch that would read
+                as independent of the order type above it. */}
+            <Chips label="Plan type" value={kind} onChange={(v) => setKind(v as "recurring" | "twap")}
+              options={[{ id: "recurring", label: "Recurring" }, { id: "twap", label: "TWAP · one total over a window" }]} />
 
             {kind === "recurring" ? (
               <>
@@ -198,11 +199,11 @@ export function DcaTicket({
                   : <>{plan.p.slices} {one}s of ≈{fmtNum(perNum, dp(paySym))} {paySym}, one every {Math.round(plan.p.interval / 60)} min, done by {when(plan.p.deadline)}.</>
                 : empty
                   ? "Enter an amount to see the schedule."
-                  : <span style={{ color: "var(--down-ink)", fontWeight: 700 }}>{paramHint(plan.error ?? "")}</span>}
+                  : <span style={{ color: "var(--down-ink)", fontWeight: 600 }}>{paramHint(plan.error ?? "")}</span>}
             </p>
 
             <fieldset>
-              <legend style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>Protection from the trend spread</legend>
+              <legend style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Protection from the trend spread</legend>
               {/* Native radios: arrow keys move the choice, screen readers announce "1 of 3". */}
               <div className="flex flex-col" style={{ gap: 6 }}>
                 {PROTECTION_ORDER.map((p) => (
@@ -214,27 +215,27 @@ export function DcaTicket({
 
             <div>
               <button type="button" className="link-quiet inline-flex items-center gap-1.5" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}
-                style={{ fontSize: 12, fontWeight: 800, minHeight: 28 }}>
+                style={{ fontSize: 12, fontWeight: 650, minHeight: 28 }}>
                 <Icon name={advanced ? "minus" : "plus"} size={12} aria-hidden="true" /> Advanced: limit price, slippage, catch-up
               </button>
               {advanced && (
                 <div className="flex flex-col" style={{ gap: 8, marginTop: 6 }}>
                   <div className="grid grid-cols-2" style={{ gap: 8 }}>
                     <div className="field" style={{ padding: "7px 10px", borderRadius: 12 }}>
-                      <label htmlFor="dca-limit" style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>
+                      <label htmlFor="dca-limit" style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>
                         {side === "buy" ? "Max price" : "Min price"} <span style={{ fontWeight: 600 }}>(optional)</span>
                       </label>
                       <input id="dca-limit" name="dca-limit" value={limit} inputMode="decimal" autoComplete="off" spellCheck={false}
                         placeholder={s.price > 0 ? `${fmtNum(s.price, 0)}…` : "USDC…"}
-                        onChange={(e) => setLimit(cleanDecimal(e.target.value))} className="w-full"
-                        style={{ background: "transparent", border: "none", fontSize: 14, fontWeight: 800, color: "var(--text)" }} />
+                        onChange={(e) => setLimit(cleanDecimal(e.target.value))} className="w-full num-input"
+                        style={{ background: "transparent", border: "none", fontSize: 14, fontWeight: 650, color: "var(--text)" }} />
                     </div>
                     <div>
-                      <div id="dca-slip-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>Slippage per {one}</div>
+                      <div id="dca-slip-label" style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 5 }}>Slippage per {one}</div>
                       <div className="flex gap-1" role="group" aria-labelledby="dca-slip-label">
                         {SLIPPAGE.map((v) => (
                           <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md chip-touch"
-                            style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 28, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
+                            style={{ fontSize: 12, fontWeight: 650, padding: "2px 8px", minHeight: 28, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
                             {v}%
                           </button>
                         ))}
@@ -248,7 +249,7 @@ export function DcaTicket({
           </div>
 
           <div className="flex flex-col shrink-0" style={{ gap: 8, padding: "10px 16px 14px", borderTop: "1px solid var(--divider)", background: "var(--surface)", borderRadius: "0 0 var(--r-card) var(--r-card)" }}>
-            <button ref={submitRef} type="submit" disabled={setupBlocked} className={`btn btn-lg btn-block ${side === "buy" ? "btn-positive" : "btn-negative"}`}>
+            <button ref={submitRef} type="submit" disabled={setupBlocked} className="btn btn-lg btn-block btn-primary">
               {setupCta}
               {!setupBlocked && <Icon name="arrowRight" size={16} aria-hidden="true" />}
             </button>
@@ -300,17 +301,17 @@ function Review({
           <button type="button" onClick={onBack} className="icon-btn icon-btn-plain" aria-label="Back to the plan">
             <Icon name="arrowRight" size={16} aria-hidden="true" style={{ transform: "rotate(180deg)" }} />
           </button>
-          <h3 ref={heading} tabIndex={-1} className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", outline: "none" }}>Review your plan</h3>
+          <h3 ref={heading} tabIndex={-1} className="font-display" style={{ fontSize: 16, fontWeight: 650, color: "var(--text)", outline: "none" }}>Review your plan</h3>
         </div>
 
         <div className="rounded-xl" style={{ padding: "12px 14px", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 800, color: side === "buy" ? "var(--up-ink)" : "var(--down-ink)" }}>
+            <span className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 650, color: side === "buy" ? "var(--up-ink)" : "var(--down-ink)" }}>
               <TokenIcon sym="WETH" size={18} /> {side === "buy" ? "Buy" : "Sell"} WETH
             </span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>{label}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>{label}</span>
           </div>
-          <div className="font-display" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginTop: 4 }}>
+          <div className="font-display" style={{ fontSize: 22, fontWeight: 650, color: "var(--text)", marginTop: 4 }}>
             {fmtNum(totalNum, dp(paySym))} {paySym}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-3)" }}>escrowed now · ≈{fmtNum(perNum, dp(paySym))} {paySym} per {one}</div>
@@ -327,7 +328,7 @@ function Review({
         </dl>
 
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>Schedule</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Schedule</div>
           <ol className="flex flex-col" style={{ gap: 3, fontSize: 12, color: "var(--text-2)" }}>
             {times.map((t, i) => (
               <li key={i} className="flex justify-between"><span>{one === "buy" ? "Buy" : "Sell"} {i + 1}</span><span>{when(t)}</span></li>
@@ -348,7 +349,7 @@ function Review({
           {busy && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
           {!hasDca ? "DCA not live yet" : busy ? "Confirming…" : "Confirm & start plan"}
         </button>
-        <button type="button" onClick={onBack} className="link-quiet w-full" style={{ fontSize: 12, fontWeight: 800, minHeight: 28 }}>Edit plan</button>
+        <button type="button" onClick={onBack} className="link-quiet w-full" style={{ fontSize: 12, fontWeight: 650, minHeight: 28 }}>Edit plan</button>
       </div>
     </div>
   );
@@ -386,17 +387,17 @@ function ProtectionCard({ id, name, selected, onSelect, now, recommended }: { id
       style={{ padding: "8px 10px", cursor: "pointer", background: selected ? "var(--lav-soft)" : "var(--surface)", border: `1px solid ${selected ? "var(--action)" : "var(--border)"}`, transition: "border-color .15s ease-out, background-color .15s ease-out" }}>
       <input type="radio" name={name} value={id} checked={selected} onChange={onSelect} className="sr-only" aria-describedby={`${name}-${id}-detail`} />
       <span className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 min-w-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap" }}>
+        <span className="flex items-center gap-2 min-w-0" style={{ fontSize: 13, fontWeight: 650, color: "var(--text)", whiteSpace: "nowrap" }}>
           <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: 14, height: 14, border: `2px solid ${selected ? "var(--action)" : "var(--border-strong)"}`, background: selected ? "radial-gradient(var(--action) 0 3px, transparent 4px)" : "transparent" }} />
           {t.title}
-          {recommended && <span className="rounded-full px-1.5" style={{ fontSize: 10, fontWeight: 800, color: "var(--lav-ink)", background: "var(--surface)", border: "1px solid var(--lav-dim)" }}>Recommended</span>}
+          {recommended && <span className="rounded-full px-1.5" style={{ fontSize: 10, fontWeight: 650, color: "var(--lav-ink)", background: "var(--surface)", border: "1px solid var(--lav-dim)" }}>Recommended</span>}
         </span>
-        <span className="rounded-full px-2 py-0.5 shrink-0" style={{ fontSize: 11, fontWeight: 800, whiteSpace: "nowrap", color: now.tone === "good" ? "var(--up-ink)" : "var(--honey-ink)", background: now.tone === "good" ? "var(--green-bg)" : "var(--warn-bg)" }}>
+        <span className="rounded-full px-2 py-0.5 shrink-0" style={{ fontSize: 11, fontWeight: 650, whiteSpace: "nowrap", color: now.tone === "good" ? "var(--up-ink)" : "var(--honey-ink)", background: now.tone === "good" ? "var(--green-bg)" : "var(--warn-bg)" }}>
           {now.text}
         </span>
       </span>
       <span id={`${name}-${id}-detail`} className="block" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4, marginTop: 3, paddingLeft: 22 }}>
-        {now.why && <b style={{ color: "var(--honey-ink)", fontWeight: 700 }}>{now.why} </b>}
+        {now.why && <b style={{ color: "var(--honey-ink)", fontWeight: 600 }}>{now.why} </b>}
         {t.detail}
       </span>
     </label>
@@ -416,7 +417,7 @@ function SideToggle({ side, s, onChange }: { side: Side; s: PoolState; onChange:
             <Icon name="arrowRight" size={14} aria-hidden="true" style={{ transform: `rotate(${id === "buy" ? -90 : 90}deg)` }} />
             <span>{id === "buy" ? "Buy" : "Sell"}<span className="sr-only"> WETH</span></span>
             {sp > 0 && (
-              <span className="rounded-full px-1.5" style={{ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.22)" : "var(--warn-bg)", color: on ? "#fff" : "var(--honey-ink)" }}>
+              <span className="rounded-full px-1.5" style={{ fontSize: 11, fontWeight: 650, background: on ? "rgba(255,255,255,.22)" : "var(--warn-bg)", color: on ? "#fff" : "var(--honey-ink)" }}>
                 +{fmtPct(sp, 1)}
               </span>
             )}
@@ -432,18 +433,18 @@ function AmountField({ id, label, value, onChange, sym, foot, error }: { id: str
     <div>
       <div className="field" style={{ padding: "9px 12px", borderRadius: 12, borderColor: error ? "var(--negative)" : undefined }}>
         <div className="flex items-center gap-3">
-          <label htmlFor={id} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 64, flexShrink: 0 }}>{label}</label>
+          <label htmlFor={id} style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", width: 64, flexShrink: 0 }}>{label}</label>
           <input id={id} name={id} value={value} inputMode="decimal" autoComplete="off" spellCheck={false} placeholder={sym === "WETH" ? "0.5…" : "100…"}
             aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
-            onChange={(e) => onChange(cleanDecimal(e.target.value))} className="flex-1 min-w-0 text-right"
-            style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 800, color: "var(--text)" }} />
-          <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>
+            onChange={(e) => onChange(cleanDecimal(e.target.value))} className="flex-1 min-w-0 text-right num-input"
+            style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 650, color: "var(--text)" }} />
+          <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 650, color: "var(--text-2)" }}>
             <TokenIcon sym={sym} size={16} />{sym}
           </span>
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-3)" }}>{foot}</div>
       </div>
-      {error && <p id={`${id}-error`} role="alert" style={{ fontSize: 12, fontWeight: 700, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
+      {error && <p id={`${id}-error`} role="alert" style={{ fontSize: 12, fontWeight: 600, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
     </div>
   );
 }
@@ -452,13 +453,13 @@ export function Chips({ label, value, onChange, options }: { label: string; valu
   const lid = `chips-${label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <div>
-      <div id={lid} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>{label}</div>
+      <div id={lid} style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 5 }}>{label}</div>
       <div className="flex flex-wrap" style={{ gap: 4 }} role="group" aria-labelledby={lid}>
         {options.map((o) => {
           const on = o.id === value;
           return (
             <button key={o.id} type="button" aria-pressed={on} onClick={() => onChange(o.id)} className="rounded-md chip-touch"
-              style={{ fontSize: 12, fontWeight: 800, padding: "0 10px", minHeight: 30, cursor: "pointer", color: on ? "var(--lav-ink)" : "var(--text-3)", background: on ? "var(--lav-soft)" : "var(--surface-2)", border: `1px solid ${on ? "var(--action)" : "var(--border)"}` }}>
+              style={{ fontSize: 12, fontWeight: 650, padding: "0 10px", minHeight: 30, cursor: "pointer", color: on ? "var(--lav-ink)" : "var(--text-3)", background: on ? "var(--lav-soft)" : "var(--surface-2)", border: `1px solid ${on ? "var(--action)" : "var(--border)"}` }}>
               {o.label}
             </button>
           );
@@ -474,7 +475,7 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
     <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} aria-describedby={hid}
       className="flex items-center justify-between gap-3 text-left" style={{ cursor: "pointer", minHeight: 30 }}>
       <span className="flex flex-col">
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)" }}>{label}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-2)" }}>{label}</span>
         <span id={hid} style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.4 }}>{hint}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 rounded-full relative" style={{ width: 34, height: 20, background: checked ? "var(--action)" : "var(--track)", transition: "background-color .15s ease-out" }}>
@@ -488,7 +489,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex justify-between items-start gap-3" style={{ fontSize: 12 }}>
       <dt style={{ color: "var(--text-3)" }}>{label}</dt>
-      <dd style={{ color: "var(--text-2)", fontWeight: 700, textAlign: "right" }}>{children}</dd>
+      <dd style={{ color: "var(--text-2)", fontWeight: 600, textAlign: "right" }}>{children}</dd>
     </div>
   );
 }

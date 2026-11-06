@@ -5,7 +5,7 @@ regime, swap quotes and spread-aware DCA orders as 15 tools. It reads the live p
 returns **unsigned** transactions; nothing is ever sent unless you add your own key and the agent calls a
 tool with `send: true`.
 
-Full docs: **https://www.poincaretrade.in/#/developers/mcp**
+Full docs: **https://www.poincaretrade.in/#/docs/mcp**
 
 ## Add it
 

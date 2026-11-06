@@ -140,7 +140,7 @@ export function Analytics() {
   const header = (
     <section className="card overflow-hidden" aria-labelledby="an-title" style={{ padding: 0 }}>
       <PanelHead id="an-title" title={<>Pool analytics <SourceTag kind="live" /></>} style={{ borderBottom: 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
           WETH / USDC · last sampled block #{cfg.lastSampledBlock || "—"}
         </span>
       </PanelHead>
@@ -167,7 +167,7 @@ export function Analytics() {
   const now = (
     <section className="card min-w-0" aria-labelledby="an-now" style={{ padding: 0 }}>
       <PanelHead id="an-now" title="Detector right now">
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>κ {fmtPct(s.kappa)} · σ̂ {fmtPct(s.sigma)}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>κ {fmtPct(s.kappa)} · σ̂ {fmtPct(s.sigma)}</span>
       </PanelHead>
       <div className="px-5 pt-4 pb-5">
         <RiskMeter risk={a.risk} dPct={s.directionalEfficiency} dFloorPct={cfg.dFloor} />
@@ -212,7 +212,7 @@ export function Analytics() {
   const paid = (
     <section className="card min-w-0" aria-labelledby="an-paid" style={{ padding: 0 }}>
       <PanelHead id="an-paid" title="Who paid">
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{tapeScope}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{tapeScope}</span>
       </PanelHead>
       <div className="px-5 pt-4 pb-5">
         <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 12px", textWrap: "pretty" }}>
@@ -235,7 +235,7 @@ export function Analytics() {
   const lean = (
     <section className="card min-w-0" aria-labelledby="an-lean" style={{ padding: 0 }}>
       <PanelHead id="an-lean" title="How hard it leans">
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>cap {fmtPct(cfg.kappaMax)}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>cap {fmtPct(cfg.kappaMax)}</span>
       </PanelHead>
       <div className="px-5 pt-4 pb-5">
         <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: "0 0 12px", textWrap: "pretty" }}>
@@ -243,7 +243,7 @@ export function Analytics() {
         </p>
         <KappaHistogram buckets={kappaHist} />
         <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
-          <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)", marginBottom: 8 }}>Sampled blocks, by what was charged</h3>
+          <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--text-2)", marginBottom: 8 }}>Sampled blocks, by what was charged</h3>
           <RegimeBar split={a.regime} />
           <dl className="mt-4 flex flex-col" style={{ gap: 6 }}>
             <Line label="Mean κ when leaning" value={a.meanKappaWhenEngaged > 0 ? fmtPct(a.meanKappaWhenEngaged) : "—"} ink="var(--honey-ink)" />
@@ -258,7 +258,7 @@ export function Analytics() {
   const reportPanel = (
     <section className="card min-w-0 flex flex-col" aria-labelledby="an-report" style={{ padding: 0 }}>
       <PanelHead id="an-report" title={<><span style={{ color: "var(--lav)" }} aria-hidden="true"><Icon name="brain" size={16} /></span>Analyst summary</>}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{a.samples} samples · {totals?.swap_count ?? 0} swaps</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{a.samples} samples · {totals?.swap_count ?? 0} swaps</span>
       </PanelHead>
       <div className="px-5 pt-4 pb-5 flex-1">
         <ReportBody tall={!narrow} open={reportOpen === "open"} onToggle={() => setReportOpen(reportOpen === "open" ? "closed" : "open")}>
@@ -300,7 +300,7 @@ export function Analytics() {
           <thead>
             <tr>
               {["Parameter", "Controls", "Value"].map((h, i) => (
-                <th key={h} scope="col" className={i === 1 ? "hidden sm:table-cell" : undefined} style={{ textAlign: i === 2 ? "right" : "left", padding: "8px 20px", fontSize: 12, fontWeight: 700, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h}</th>
+                <th key={h} scope="col" className={i === 1 ? "hidden sm:table-cell" : undefined} style={{ textAlign: i === 2 ? "right" : "left", padding: "8px 20px", fontSize: 12, fontWeight: 600, color: "var(--muted)", borderBottom: "1px solid var(--divider)" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -309,8 +309,8 @@ export function Analytics() {
               <tr key={r.sym} className="row-hover" style={{ borderBottom: "1px solid var(--divider-2)" }}>
                 <th scope="row" className="pl-4 pr-2 sm:px-5" style={{ textAlign: "left", fontWeight: 400, paddingTop: 10, paddingBottom: 10, verticalAlign: "top" }}>
                   <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
-                    <span className="font-display" style={{ fontSize: 12, fontWeight: 800, color: "var(--lav-ink)", background: "var(--lav-soft)", borderRadius: 7, padding: "2px 8px", minWidth: 52, textAlign: "center" }}>{r.sym}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)" }}>{r.name}</span>
+                    <span className="font-display" style={{ fontSize: 12, fontWeight: 650, color: "var(--lav-ink)", background: "var(--lav-soft)", borderRadius: 7, padding: "2px 8px", minWidth: 52, textAlign: "center" }}>{r.sym}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)" }}>{r.name}</span>
                   </span>
                   {/* phones: the "Controls" column folds in under the name instead of scrolling sideways */}
                   <div className="sm:hidden" style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5, marginTop: 4 }}>{r.desc}</div>
@@ -320,7 +320,7 @@ export function Analytics() {
                   <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5 }}>{r.desc}</div>
                   {paramsOpen === "open" && <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginTop: 3, maxWidth: "80ch" }}>{r.why}</div>}
                 </td>
-                <td className="font-display pl-2 pr-4 sm:px-5" style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", whiteSpace: "nowrap", textAlign: "right", verticalAlign: "top", paddingTop: 10, paddingBottom: 10 }}>{r.value}</td>
+                <td className="font-display pl-2 pr-4 sm:px-5" style={{ fontSize: 14, fontWeight: 650, color: "var(--text)", whiteSpace: "nowrap", textAlign: "right", verticalAlign: "top", paddingTop: 10, paddingBottom: 10 }}>{r.value}</td>
               </tr>
             ))}
           </tbody>
@@ -335,7 +335,7 @@ export function Analytics() {
   const evidence = (
     <section className="card overflow-hidden" aria-labelledby="an-study" style={{ padding: 0 }}>
       <PanelHead id="an-study" title={<>Backtest evidence <SourceTag kind="backtest" /></>} style={{ borderBottom: 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>Historical replays documented in the README, not this pool&rsquo;s activity</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Historical replays documented in the README, not this pool&rsquo;s activity</span>
       </PanelHead>
       <StatStrip cols="repeat(5, minmax(0, 1fr))" label="Backtest figures">
         {study.map((k) => <StatCell key={k.label} label={k.label} value={k.value} sub={k.sub} ink={k.ink} />)}
@@ -398,7 +398,7 @@ function Line({ label, value, ink }: { label: string; value: string; ink?: strin
   return (
     <div className="flex justify-between gap-3" style={{ fontSize: 12 }}>
       <dt style={{ color: "var(--text-3)" }}>{label}</dt>
-      <dd style={{ color: ink ?? "var(--text-2)", fontWeight: 800, textAlign: "right" }}>{value}</dd>
+      <dd style={{ color: ink ?? "var(--text-2)", fontWeight: 650, textAlign: "right" }}>{value}</dd>
     </div>
   );
 }

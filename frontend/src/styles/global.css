@@ -4,10 +4,11 @@
 /* Map design tokens to Tailwind v4 theme so utilities (bg-surface, text-text-2,
    rounded-card, font-display …) stay theme-reactive: each maps to a runtime var. */
 @theme {
-  /* Inter for reading text; Space Grotesk for headings and the big figures (prices, balances);
-     JetBrains Mono for addresses and hashes. All three carry tabular figures. */
+  /* One grotesque for everything, as on the landing page and the docs (after about.uniswap.org):
+     Inter, with headings and figures set tighter and at a medium weight rather than a second face.
+     JetBrains Mono stays for addresses, hashes and small metadata. */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-page: var(--page);
@@ -85,8 +86,9 @@
     background: var(--app-bg);
     background-attachment: fixed;
     transition: background-color 0.35s ease, color 0.35s ease;
-    /* figures line up in every price, amount and percentage, and stop jittering as they update */
-    font-variant-numeric: tabular-nums;
+    /* Prose keeps proportional figures: Inter's tabular feature also widens the hyphen, which
+       read as "custom - curve". Numbers that line up or update live get tabular figures below. */
+    font-variant-numeric: normal;
     /* viewport-fit=cover hands the notch and home-indicator areas to the page: keep content out of them */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -138,7 +140,7 @@
   border-radius: 12px;
   background: var(--surface);
   color: var(--text);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 14px;
   box-shadow: var(--shadow-lg);
   transition: transform 0.15s ease-out;
@@ -168,10 +170,10 @@
   min-height: 44px;
   padding: 0 20px;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 15px;
   line-height: 1.2;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out,
@@ -196,7 +198,6 @@
 .btn-primary {
   background: var(--action);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(111, 104, 200, 0.24);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--action-hover);
@@ -204,7 +205,6 @@
 .btn-positive {
   background: var(--positive);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(64, 129, 104, 0.22);
 }
 .btn-positive:hover:not(:disabled) {
   background: var(--positive-hover);
@@ -212,23 +212,22 @@
 .btn-negative {
   background: var(--negative);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(191, 78, 106, 0.2);
 }
 .btn-negative:hover:not(:disabled) {
   background: var(--negative-hover);
 }
+/* the landing's tonal secondary: a lavender-tint fill draws the shape, no outline */
 .btn-soft {
   background: var(--lav-soft);
   color: var(--lav-ink);
-  border: 1px solid var(--lav-dim);
 }
 .btn-soft:hover:not(:disabled) {
-  border-color: var(--lav);
+  background: var(--lx-tint);
 }
 .btn-secondary {
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--lx-btn-line);
 }
 .btn-secondary:hover:not(:disabled) {
   background: var(--surface-2);
@@ -305,8 +304,9 @@
   gap: 4px;
   padding: var(--seg-pad);
   border-radius: var(--seg-r);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  /* a tinted track, so the white selected pill stands clear of it (a near-white track left the
+     choice barely visible) */
+  background: var(--lav-soft);
 }
 .seg-item {
   flex: 1;
@@ -316,10 +316,10 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: calc(var(--seg-r) - var(--seg-pad) - 1px);
+  border-radius: calc(var(--seg-r) - var(--seg-pad));
   font-size: 13px;
-  font-weight: 800;
-  color: var(--text-3);
+  font-weight: 600;
+  color: var(--text-2);
   cursor: pointer;
   transition: background-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.15s ease-out;
 }
@@ -328,8 +328,8 @@
 }
 .seg-item[aria-pressed="true"] {
   background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+  color: var(--lx-ink);
+  box-shadow: 0 1px 2px rgba(23, 21, 31, 0.08), 0 2px 8px -2px rgba(70, 60, 150, 0.18);
 }
 .seg-sm {
   --seg-r: 10px;
@@ -401,6 +401,20 @@
 /* Crafted helpers --------------------------------------------------------- */
 .font-display {
   font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+/* figures line up in every price, amount and table, and stop jittering as they update */
+.font-display,
+td,
+th,
+dd,
+output,
+input,
+b,
+kbd,
+[role="cell"],
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Scrollbars: thin, soft and theme-tinted, and only shown while the pointer is over the area
@@ -824,7 +838,7 @@
   width: 100%;
   height: var(--bottom-nav, 64px);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-3);
   cursor: pointer;
 }
@@ -914,4 +928,367 @@
   color: var(--text-3);
   font: 700 11px/1 var(--font-sans);
   white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Landing page (lx-*). Layout after aave.com: a light page made of large rounded "chapters" inset
+   from the viewport, each easing from the page colour at the top into a soft lavender at the
+   bottom, so sections flow into one another instead of being boxed off; one dark chapter carries
+   the evidence. Type after about.uniswap.org: a single grotesque (Inter here) for everything,
+   headings at weight 550 with -0.04em tracking and ~1.0 line height, grey body copy, monospace
+   only for small metadata. Colours stay Poincaré's: the lavender action, honey for a charged
+   spread, green for what LPs keep. Kept separate from lp-*, which the docs top bar still uses. */
+:root {
+  --lx-bg: #ffffff;
+  --lx-ink: #17151f;
+  --lx-sub: #5b566c;
+  --lx-faint: #6b6680;
+  --lx-line: rgba(23, 21, 31, 0.09);
+  --lx-tint: #e3defa;
+  --lx-tint-soft: #f4f2fd;
+  --lx-accent-ink: #5a52b5;
+  --lx-card: #ffffff;
+  --lx-card-line: rgba(23, 21, 31, 0.07);
+  --lx-btn-line: rgba(23, 21, 31, 0.16);
+  --lx-card-shadow: 0 1px 2px rgba(23, 21, 31, 0.04), 0 18px 48px -24px rgba(70, 60, 150, 0.22);
+}
+[data-theme="dark"] {
+  --lx-bg: #121019;
+  --lx-ink: #f4f1fb;
+  --lx-sub: #b3aec6;
+  --lx-faint: #a09bb4;
+  --lx-line: rgba(255, 255, 255, 0.1);
+  --lx-tint: #2b2547;
+  --lx-tint-soft: #19162a;
+  --lx-accent-ink: #bdb7f5;
+  --lx-card: #1c1928;
+  --lx-card-line: rgba(255, 255, 255, 0.08);
+  --lx-btn-line: rgba(255, 255, 255, 0.18);
+  --lx-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 48px -24px rgba(0, 0, 0, 0.6);
+}
+.lx {
+  background: var(--lx-bg);
+  color: var(--lx-ink);
+  /* the body sets tabular figures for the app's number columns; in Inter that also widens the
+     hyphen ("custom - curve"), so prose here uses proportional figures and only .lx-num is tabular */
+  font-variant-numeric: normal;
+}
+.lx-h {
+  font-family: var(--font-sans);
+  font-weight: 550;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  color: var(--lx-ink);
+  text-wrap: balance;
+}
+.lx-h3 {
+  font-family: var(--font-sans);
+  font-weight: 550;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--lx-ink);
+}
+.lx-sub {
+  color: var(--lx-sub);
+  letter-spacing: -0.01em;
+}
+.lx-meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--lx-faint);
+}
+.lx-num {
+  font-family: var(--font-sans);
+  font-weight: 550;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* a chapter: inset, rounded, page colour at the top easing into lavender at the bottom */
+.lx-chapter {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 clamp(8px, 1.7vw, 24px);
+  border-radius: clamp(24px, 3vw, 36px);
+  background:
+    radial-gradient(55% 45% at 12% 100%, var(--lx-tint) 0%, transparent 70%),
+    radial-gradient(50% 40% at 92% 96%, var(--lx-tint) 0%, transparent 70%),
+    linear-gradient(180deg, var(--lx-bg) 0%, var(--lx-tint-soft) 50%, var(--lx-tint) 100%);
+}
+.lx-chapter-dark {
+  background:
+    radial-gradient(70% 42% at 50% 100%, rgba(111, 104, 200, 0.5) 0%, transparent 75%),
+    linear-gradient(180deg, #0c0b11 0%, #0c0b11 42%, #1d1a33 100%);
+  color: #f6f3fb;
+}
+.lx-chapter-dark .lx-h,
+.lx-chapter-dark .lx-num {
+  color: #f6f3fb;
+}
+.lx-chapter-dark .lx-sub {
+  color: #b9b3cd;
+}
+.lx-chapter-dark .lx-meta {
+  color: #a49eb9;
+}
+.lx-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--lx-sub);
+}
+.lx-eyebrow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--action);
+  color: #fff;
+}
+.lx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out, opacity 0.15s ease-out, transform 0.1s ease-out;
+}
+.lx-btn:active {
+  transform: translateY(1px);
+}
+.lx-btn-sm {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+.lx-btn-primary {
+  background: var(--action);
+  color: #fff;
+}
+.lx-btn-primary:hover {
+  background: var(--action-hover);
+}
+/* Secondary action. Lavender stays the one accent (the primary pill); the secondary is a neutral
+   surface pill: the page's card colour, ink text and a hairline. A lavender-tint pill disappeared
+   into the lavender floor of a chapter (~1.1:1 against it); a surface pill holds against both the
+   white top and the lavender bottom of every chapter, in both themes. */
+.lx-btn-secondary {
+  background: var(--lx-card);
+  color: var(--lx-ink);
+  box-shadow: inset 0 0 0 1px var(--lx-btn-line), 0 1px 2px rgba(23, 21, 31, 0.06);
+}
+.lx-btn-secondary:hover {
+  box-shadow: inset 0 0 0 1px var(--lav), 0 1px 2px rgba(23, 21, 31, 0.06);
+  color: var(--lx-accent-ink);
+}
+/* The same secondary on a plain page-colour surface (footer, docs). There a white pill is white on
+   white and only its text shows, so it takes the lavender tint instead: the fill draws the shape. */
+.lx-btn-tonal {
+  background: var(--lav-soft);
+  color: var(--lx-accent-ink);
+}
+.lx-btn-tonal:hover {
+  background: var(--lx-tint);
+}
+/* the facts around the hero book drift gently, out of step with one another; reduced motion
+   stops them through the global rule */
+@keyframes lxFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+.lx-float {
+  animation: lxFloat 6s ease-in-out infinite;
+}
+.lx-float-2 {
+  animation-duration: 7s;
+  animation-delay: -2.5s;
+}
+.lx-float-3 {
+  animation-duration: 6.5s;
+  animation-delay: -4s;
+}
+.lx-fact-link {
+  transition: border-color 0.15s ease-out;
+}
+.lx-fact-link:hover {
+  border-color: var(--lav);
+}
+.lx-float:hover {
+  animation-play-state: paused;
+}
+.lx-btn-ink {
+  background: var(--lx-ink);
+  color: var(--lx-bg);
+}
+.lx-btn-ink:hover {
+  opacity: 0.86;
+}
+.lx-btn-light {
+  background: #f6f3fb;
+  color: #15131c;
+}
+.lx-btn-light:hover {
+  background: #ffffff;
+}
+.lx-card {
+  background: var(--lx-card);
+  border: 1px solid var(--lx-card-line);
+  border-radius: 20px;
+}
+a.lx-card {
+  transition: border-color 0.15s ease-out, transform 0.15s ease-out;
+}
+a.lx-card:hover {
+  border-color: var(--lav);
+  transform: translateY(-2px);
+}
+.lx-link {
+  color: var(--lx-sub);
+  transition: color 0.15s ease-out;
+}
+.lx-link:hover {
+  color: var(--lx-accent-ink);
+}
+/* inline figures split by hairlines instead of boxes: two per row on phones, one row from 768 */
+.lx-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: 28px;
+}
+.lx-stats > * {
+  padding: 0 clamp(12px, 2.4vw, 32px);
+  text-align: center;
+}
+.lx-stats > :nth-child(2n) {
+  border-left: 1px solid var(--lx-line);
+}
+@media (min-width: 768px) {
+  .lx-stats {
+    grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
+  }
+  .lx-stats > * + * {
+    border-left: 1px solid var(--lx-line);
+  }
+}
+.lx-chapter-dark .lx-stats > * {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Docs home: tinted guide cards lift a little; use-case links turn lavender, arrow nudging right */
+.docs-guide {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.docs-guide:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px var(--lav) !important;
+}
+.docs-row {
+  color: var(--lx-ink);
+  transition: color 0.15s ease-out;
+}
+.docs-row svg {
+  color: var(--lx-sub);
+  transition: transform 0.15s ease-out, color 0.15s ease-out;
+}
+.docs-row:hover,
+.docs-row:hover svg {
+  color: var(--lx-accent-ink);
+}
+.docs-row:hover svg {
+  transform: translateX(2px);
+}
+
+/* Landing trust badge: one white pill holding "Reviewed by" and each reviewer as its own tinted
+   chip (the fill draws each chip's shape; a hairline on a rounded item only drew a stray curve).
+   Phones: a rounded block with the chips stacked. */
+.lx-trust {
+  background: var(--lx-card);
+  border-radius: 22px;
+  box-shadow: inset 0 0 0 1px var(--lx-card-line), 0 1px 2px rgba(23, 21, 31, 0.04);
+  padding: 5px;
+  gap: 5px;
+}
+.lx-trust-head {
+  padding: 8px 14px;
+}
+.lx-trust-item {
+  padding: 6px 12px 6px 8px;
+  min-height: 44px;
+  border-radius: 16px;
+  background: var(--lav-soft);
+  transition: background-color 0.15s ease-out;
+}
+.lx-trust-item:hover {
+  background: var(--lx-tint);
+}
+.lx-trust-arrow {
+  color: var(--lx-sub);
+  margin-left: auto;
+  transition: color 0.15s ease-out;
+}
+/* an outbound mark (the report lives on GitHub), not an arrow: arrows between the two reviewers
+   read as a sequence, as if one review led to the other */
+.lx-trust-item:hover .lx-trust-arrow {
+  color: var(--lx-accent-ink);
+}
+@media (min-width: 640px) {
+  .lx-trust {
+    border-radius: 999px;
+  }
+  .lx-trust-head {
+    padding: 0 8px 0 12px;
+  }
+  .lx-trust-item {
+    border-radius: 999px;
+    padding: 6px 14px 6px 6px;
+  }
+  .lx-trust-arrow {
+    margin-left: 6px;
+  }
+}
+
+/* Editable numbers: an underline under the figure says "type here". Dashed at rest, solid lavender
+   while focused, so a right-aligned amount never reads as a static label. */
+.num-input {
+  border: 0;
+  border-bottom: 1.5px dashed var(--lx-btn-line) !important;
+  border-radius: 0;
+  padding-bottom: 2px;
+  transition: border-color 0.15s ease-out;
+}
+.num-input:hover {
+  border-bottom-color: var(--lav) !important;
+}
+.num-input:focus {
+  border-bottom: 1.5px solid var(--action) !important;
+}
+.num-input::placeholder {
+  color: var(--faint);
+}
+/* dark theme: the selected option lifts lighter than its track, not darker */
+[data-theme="dark"] .seg-item[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Trade ticket order-type tabs: the core look is inline in Trade.tsx (so a stale stylesheet can
+   never leave them unstyled); here only the hover, which inline styles cannot express. */
+.ticket-tab {
+  transition: color 0.15s ease-out, border-color 0.15s ease-out;
+}
+.ticket-tab[aria-pressed="false"]:hover {
+  color: var(--text) !important;
 }

@@ -112,7 +112,7 @@ export function CurveDepth({
           boxShadow: shadows || undefined,
         }}
       >
-        <span className="text-left" style={{ fontWeight: 700, color: ask ? "var(--down-ink)" : "var(--up-ink)" }}>{fx(l.price, 2)}</span>
+        <span className="text-left" style={{ fontWeight: 600, color: ask ? "var(--down-ink)" : "var(--up-ink)" }}>{fx(l.price, 2)}</span>
         <span style={{ color: "var(--text-2)" }}>{fx(l.size, 4)}</span>
         <span style={{ color: "var(--text-2)" }}>{fx(l.cumWeth, 3)}</span>
       </button>
@@ -128,7 +128,7 @@ export function CurveDepth({
 
   return (
     <div className="flex flex-col h-full" style={{ fontVariantNumeric: "tabular-nums" }}>
-      <div className="grid px-3.5 py-1.5" style={{ gridTemplateColumns: COLS, gap: 8, fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+      <div className="grid px-3.5 py-1.5" style={{ gridTemplateColumns: COLS, gap: 8, fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
         <span>Price · USDC</span>
         <span className="text-right">Size · WETH</span>
         <span className="text-right">Total</span>
@@ -137,11 +137,11 @@ export function CurveDepth({
 
       <div className="px-3.5 py-2 my-1" style={{ background: "var(--surface-2)", borderTop: "1px solid var(--divider)", borderBottom: "1px solid var(--divider)" }}>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-display" style={{ fontSize: 17, fontWeight: 800, color: "var(--text)" }}>{fx(mid, 2)}</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)" }}>mid · gap {fmtPct(gap)}</span>
+          <span className="font-display" style={{ fontSize: 17, fontWeight: 650, color: "var(--text)" }}>{fx(mid, 2)}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>mid · gap {fmtPct(gap)}</span>
         </div>
         {(spreadBuy > 0 || spreadSell > 0) && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--honey-ink)", marginTop: 2 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--honey-ink)", marginTop: 2 }}>
             {spreadBuy > 0 ? `Asks +${fmtPct(spreadBuy)} trend spread` : `Bids −${fmtPct(spreadSell)} trend spread`} · other side free
           </div>
         )}
@@ -151,22 +151,22 @@ export function CurveDepth({
 
       <div className="mt-auto px-3.5 pt-3 pb-3" style={{ borderTop: "1px solid var(--divider)", fontSize: 12 }}>
         <div className="flex items-center gap-2" role="img" aria-label={`Depth on screen: bids ${Math.round(bidShare * 100)}%, asks ${Math.round((1 - bidShare) * 100)}%`}>
-          <span style={{ fontWeight: 800, color: "var(--up-ink)" }}>B {Math.round(bidShare * 100)}%</span>
+          <span style={{ fontWeight: 650, color: "var(--up-ink)" }}>B {Math.round(bidShare * 100)}%</span>
           <span className="flex flex-1 overflow-hidden rounded-full" style={{ height: 6, gap: 2 }} aria-hidden="true">
             <span style={{ width: `${bidShare * 100}%`, background: "var(--up)" }} />
             <span style={{ flex: 1, background: "var(--down)" }} />
           </span>
-          <span style={{ fontWeight: 800, color: "var(--down-ink)" }}>{Math.round((1 - bidShare) * 100)}% S</span>
+          <span style={{ fontWeight: 650, color: "var(--down-ink)" }}>{Math.round((1 - bidShare) * 100)}% S</span>
         </div>
         <dl className="grid mt-2.5" style={{ gridTemplateColumns: "auto 1fr", gap: "4px 10px" }}>
           <dt style={{ color: "var(--text-3)" }}>Best bid / ask</dt>
-          <dd className="text-right" style={{ fontWeight: 700, color: "var(--text-2)" }}>
+          <dd className="text-right" style={{ fontWeight: 600, color: "var(--text-2)" }}>
             <span style={{ color: "var(--up-ink)" }}>{fx(bestBid, 2)}</span> / <span style={{ color: "var(--down-ink)" }}>{fx(bestAsk, 2)}</span>
           </dd>
           <dt style={{ color: "var(--text-3)" }}>Depth ±{fmtPct(rangePct, 1)}</dt>
-          <dd className="text-right" style={{ fontWeight: 700, color: "var(--text-2)" }}>{fx(bidDepth, 2)} / {fx(askDepth, 2)} WETH</dd>
+          <dd className="text-right" style={{ fontWeight: 600, color: "var(--text-2)" }}>{fx(bidDepth, 2)} / {fx(askDepth, 2)} WETH</dd>
           <dt style={{ color: "var(--text-3)" }}>Trend spread</dt>
-          <dd className="text-right" style={{ fontWeight: 700, color: spreadBuy > 0 || spreadSell > 0 ? "var(--honey-ink)" : "var(--up-ink)" }}>
+          <dd className="text-right" style={{ fontWeight: 600, color: spreadBuy > 0 || spreadSell > 0 ? "var(--honey-ink)" : "var(--up-ink)" }}>
             {spreadBuy > 0 ? `Buy +${fmtPct(spreadBuy)}` : spreadSell > 0 ? `Sell +${fmtPct(spreadSell)}` : "None · both sides free"}
           </dd>
         </dl>

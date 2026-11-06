@@ -20,7 +20,6 @@ import { TxSteps } from "@/components/ui/TxSteps";
 import { CurveDepth, depthOf } from "@/components/ui/CurveDepth";
 import { useIsNarrow, useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useParam } from "@/hooks/useParam";
-import { Seg } from "@/components/ui/Panel";
 import { DcaTicket, type DcaPrefill } from "@/components/ui/DcaTicket";
 import { DcaOrders } from "@/components/ui/DcaOrders";
 
@@ -276,9 +275,29 @@ export function Trade() {
   const ticket = (
     <section className="card min-w-0 flex flex-col" aria-labelledby="ticket-title" style={narrow ? undefined : { height: "100%" }}>
       <h2 id="ticket-title" className="sr-only">Order form</h2>
-      <div className="px-4 pt-3">
-        <Seg label="Order type" value={mode} onChange={setMode} className="w-full"
-          options={[{ id: "market", label: "Market" }, { id: "dca", label: <>DCA <span style={{ fontWeight: 600, opacity: 0.75 }}>· spread-aware</span></> }]} />
+      {/* The order type is the ticket's mode, so it is the ticket's tabs (an underline across the top,
+          as exchanges draw Market / Limit), not one more switch in the stack: everything below it,
+          including the DCA plan's own settings, belongs to the tab that is open. */}
+      {/* Core look inline (layout, size, colour, underline), so the tabs render right even when a
+          dev server serves a stale stylesheet; .ticket-tab in global.css adds hover only. */}
+      <div className="ticket-tabs" role="group" aria-label="Order type"
+        style={{ display: "flex", gap: 4, padding: "0 8px", borderBottom: "1px solid var(--lx-line)" }}>
+        {([["market", "Market"], ["dca", "DCA"]] as const).map(([id, label]) => {
+          const on = mode === id;
+          return (
+            <button key={id} type="button" className="ticket-tab" aria-pressed={on} onClick={() => setMode(id)}
+              style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 48, marginBottom: -1,
+                fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", cursor: "pointer",
+                color: on ? "var(--lx-ink)" : "var(--text-3)", borderBottom: `2px solid ${on ? "var(--action)" : "transparent"}` }}>
+              {label}
+              {id === "dca" && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 999, color: "var(--lx-accent-ink)", background: "var(--lav-soft)" }}>
+                  spread-aware
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
       {mode === "dca" ? (
         <DcaTicket key={dcaPrefill ? `prefill-${dcaPrefill.total}` : "plan"} s={s} side={side} onSide={setSide} payBal={payBal}
@@ -300,7 +319,7 @@ export function Trade() {
                 {/* one word like Deposit / Withdraw, so the spread badge fits; the CTA and screen readers keep "WETH" */}
                 <span>{id === "buy" ? "Buy" : "Sell"}<span className="sr-only"> WETH</span></span>
                 {sp > 0 && (
-                  <span className="rounded-full px-1.5" style={{ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.22)" : "var(--warn-bg)", color: on ? "#fff" : "var(--honey-ink)" }}>
+                  <span className="rounded-full px-1.5" style={{ fontSize: 11, fontWeight: 650, background: on ? "rgba(255,255,255,.22)" : "var(--warn-bg)", color: on ? "#fff" : "var(--honey-ink)" }}>
                     +{fmtPct(sp, 1)}
                   </span>
                 )}
@@ -350,13 +369,13 @@ export function Trade() {
             placeholder={zeroForOne ? "1000…" : "0.5…"}
             aria-invalid={invalid || (insufficient && amtNum > 0)}
             aria-describedby={invalid || (insufficient && amtNum > 0 && !faucetFirst) ? "ticket-amount-error" : undefined}
-            className="w-full text-right"
-            style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 800, color: "var(--text)", minWidth: 0 }}
+            className="w-full text-right num-input"
+            style={{ background: "transparent", border: "none", fontSize: 16, fontWeight: 650, color: "var(--text)", minWidth: 0 }}
           />
         </InlineField>
 
         <InlineField label="Receive" unit={getSym} muted>
-          <output htmlFor="ticket-amount" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>
+          <output htmlFor="ticket-amount" style={{ fontSize: 16, fontWeight: 650, color: "var(--text)" }}>
             {outText}
           </output>
         </InlineField>
@@ -374,7 +393,7 @@ export function Trade() {
             <div className="flex gap-1" role="group" aria-labelledby="slippage-label">
               {SLIPPAGE_OPTIONS.map((v) => (
                 <button key={v} type="button" onClick={() => setSlip(v)} aria-pressed={slip === v} className="rounded-md chip-touch"
-                  style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
+                  style={{ fontSize: 12, fontWeight: 650, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: slip === v ? "var(--text)" : "var(--text-3)", background: slip === v ? "var(--surface-2)" : "transparent", border: `1px solid ${slip === v ? "var(--border-strong)" : "transparent"}` }}>
                   {v}%
                 </button>
               ))}
@@ -425,7 +444,7 @@ export function Trade() {
               {ctaLabel}
             </button>
             {payBal < 1 && (
-              <button type="button" onClick={onFaucet} disabled={faucet.minting} aria-busy={faucet.minting} className="link-quiet w-full mt-1.5" style={{ fontSize: 12, fontWeight: 700, minHeight: 28 }}>
+              <button type="button" onClick={onFaucet} disabled={faucet.minting} aria-busy={faucet.minting} className="link-quiet w-full mt-1.5" style={{ fontSize: 12, fontWeight: 600, minHeight: 28 }}>
                 {faucet.minting ? "Minting test tokens…" : "Get free test tokens"}
               </button>
             )}
@@ -450,7 +469,7 @@ export function Trade() {
           <div className="flex gap-1" role="group" aria-label="Price step">
             {BOOK_STEPS.map((st) => (
               <button key={st} type="button" aria-pressed={step === st} onClick={() => { setStep(st); setBookSel(null); }} className="rounded-md chip-touch"
-                style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", minHeight: 24, cursor: "pointer", color: step === st ? "var(--text)" : "var(--text-3)", background: step === st ? "var(--surface-2)" : "transparent", border: `1px solid ${step === st ? "var(--border-strong)" : "transparent"}` }}>
+                style={{ fontSize: 12, fontWeight: 650, padding: "2px 7px", minHeight: 24, cursor: "pointer", color: step === st ? "var(--text)" : "var(--text-3)", background: step === st ? "var(--surface-2)" : "transparent", border: `1px solid ${step === st ? "var(--border-strong)" : "transparent"}` }}>
                 {fmtPct(st, 1)}
               </button>
             ))}
@@ -459,7 +478,7 @@ export function Trade() {
           <div className="flex gap-1" role="group" aria-label="Whose trades">
             {([[false, "All"], [true, "Yours"]] as const).map(([v, l]) => (
               <button key={l} type="button" aria-pressed={mine === v} onClick={() => { setMine(v); setVisible(PAGE); }} className="rounded-md chip-touch"
-                style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: mine === v ? "var(--text)" : "var(--text-3)", background: mine === v ? "var(--surface-2)" : "transparent", border: `1px solid ${mine === v ? "var(--border-strong)" : "transparent"}` }}>
+                style={{ fontSize: 12, fontWeight: 650, padding: "2px 8px", minHeight: 24, cursor: "pointer", color: mine === v ? "var(--text)" : "var(--text-3)", background: mine === v ? "var(--surface-2)" : "transparent", border: `1px solid ${mine === v ? "var(--border-strong)" : "transparent"}` }}>
                 {l}{v && myRows.length > 0 ? ` ${myRows.length}` : ""}
               </button>
             ))}
@@ -554,25 +573,25 @@ function TickerBar({ s, risk, ready, spreadCap }: { s: PoolState; risk: RiskStat
               <span style={{ marginLeft: -8 }}><TokenIcon sym="USDC" size={26} /></span>
             </span>
             <div className="min-w-0">
-              <div className="font-display" style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", lineHeight: 1.1, whiteSpace: "nowrap" }}>WETH / USDC</div>
+              <div className="font-display" style={{ fontSize: 16, fontWeight: 650, color: "var(--text)", lineHeight: 1.1, whiteSpace: "nowrap" }}>WETH / USDC</div>
               <div style={{ fontSize: 12, color: "var(--text-3)", whiteSpace: "nowrap" }}>Poincaré pool</div>
             </div>
           </div>
-          <div className="font-display text-right lg:text-left" style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>
+          <div className="font-display text-right lg:text-left" style={{ fontSize: 22, fontWeight: 650, color: "var(--text)" }}>
             {s.loading ? <Skel w="7ch" /> : s.price > 0 ? fmtNum(s.price, 2) : "—"}
             <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", fontFamily: "inherit" }}>Mid price</span>
           </div>
         </div>
         <Divider />
         <Cell label="Detector">
-          <span className="rounded-full px-2 py-0.5" style={{ fontSize: 12, fontWeight: 800, color: tone.ink, background: tone.bg }} role="status"
+          <span className="rounded-full px-2 py-0.5" style={{ fontSize: 12, fontWeight: 650, color: tone.ink, background: tone.bg }} role="status"
             title={risk.detail}>
             {ready ? risk.label : "Reading…"}
           </span>
         </Cell>
         <Cell label={risk.gated ? "Evidence · gated" : "Evidence"}>
           <span className="flex items-center gap-2">
-            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{ready ? `${Math.round(risk.progress * 100)}%` : "—"}</span>
+            <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{ready ? `${Math.round(risk.progress * 100)}%` : "—"}</span>
             <span style={{ width: 40, height: 5, borderRadius: 3, background: "var(--track)", overflow: "hidden", display: "inline-block" }} aria-hidden="true">
               <span style={{ display: "block", height: "100%", background: tone.bar, transform: `scaleX(${Math.max(0.03, risk.progress)})`, transformOrigin: "left" }} />
             </span>
@@ -607,19 +626,19 @@ function InlineField({ label, unit, htmlFor, muted, error, footer, children }: {
       <div className="field" style={{ padding: "9px 12px", borderRadius: 12, background: muted ? "transparent" : undefined, borderColor: error ? "var(--negative)" : undefined }}>
       <div className="flex items-center gap-3">
         {htmlFor ? (
-          <label htmlFor={htmlFor} style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 56, flexShrink: 0 }}>{label}</label>
+          <label htmlFor={htmlFor} style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", width: 56, flexShrink: 0 }}>{label}</label>
         ) : (
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 56, flexShrink: 0 }}>{label}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", width: 56, flexShrink: 0 }}>{label}</span>
         )}
         <div className="flex-1 min-w-0 text-right truncate">{children}</div>
-        <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 800, color: "var(--text-2)" }}>
+        <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 13, fontWeight: 650, color: "var(--text-2)" }}>
           <TokenIcon sym={unit} size={16} />
           {unit}
         </span>
       </div>
       {footer && <div style={{ marginTop: 8 }}>{footer}</div>}
       </div>
-      {error && <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" style={{ fontSize: 12, fontWeight: 700, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
+      {error && <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" style={{ fontSize: 12, fontWeight: 600, color: "var(--down-ink)", marginTop: 4 }}>{error}</p>}
     </div>
   );
 }
@@ -663,7 +682,7 @@ function HookCheck({ s, side, spread, q, risk, onDca }: { s: PoolState; side: Si
         {/* Paying the spread is a choice: the same amount as a spread-aware DCA waits it out. */}
         {spread > 0 && onDca && (
           <button type="button" onClick={onDca} className="inline-flex items-center gap-1 mt-1"
-            style={{ fontSize: 12, fontWeight: 800, color: "var(--lav-ink)", cursor: "pointer", minHeight: 24 }}>
+            style={{ fontSize: 12, fontWeight: 650, color: "var(--lav-ink)", cursor: "pointer", minHeight: 24 }}>
             Skip the spread: spread this {side === "buy" ? "buy" : "sell"} out with DCA
             <Icon name="arrowRight" size={13} aria-hidden="true" />
           </button>
@@ -677,7 +696,7 @@ function Row({ label, color, children }: { label: string; color?: string; childr
   return (
     <div className="flex justify-between items-center gap-3" style={{ fontSize: 12 }}>
       <dt style={{ color: "var(--text-3)" }}>{label}</dt>
-      <dd style={{ color: color ?? "var(--text-2)", fontWeight: 700, textAlign: "right" }}>{children}</dd>
+      <dd style={{ color: color ?? "var(--text-2)", fontWeight: 600, textAlign: "right" }}>{children}</dd>
     </div>
   );
 }

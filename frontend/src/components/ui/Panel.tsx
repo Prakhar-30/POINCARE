@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 export function PanelHead({ id, title, children, style }: { id: string; title: ReactNode; children?: ReactNode; style?: CSSProperties }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3" style={{ minHeight: 54, borderBottom: "1px solid var(--divider)", ...style }}>
-      <h2 id={id} className="font-display flex items-center gap-2.5" style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{title}</h2>
+      <h2 id={id} className="font-display flex items-center gap-2.5" style={{ fontSize: 15, fontWeight: 650, color: "var(--text)" }}>{title}</h2>
       {children}
     </div>
   );
@@ -37,9 +37,9 @@ export function StatCell({
 }) {
   return (
     <div className="min-w-0" data-tone={tone} title={title}>
-      <dt style={{ fontSize: 12, fontWeight: 700, color: tone ? "var(--green-label)" : "var(--muted)" }}>{label}</dt>
+      <dt style={{ fontSize: 12, fontWeight: 600, color: tone ? "var(--green-label)" : "var(--muted)" }}>{label}</dt>
       <dd>
-        <div className="font-display truncate" style={{ fontSize: "clamp(17px, 4.6vw, 21px)", fontWeight: 800, color: ink ?? "var(--text)", lineHeight: 1.3 }}>{value}</div>
+        <div className="font-display truncate" style={{ fontSize: "clamp(17px, 4.6vw, 21px)", fontWeight: 650, color: ink ?? "var(--text)", lineHeight: 1.3 }}>{value}</div>
         {/* captions wrap rather than truncate: they carry the figure's basis ("over the latest 200 swaps") */}
         {sub && <div style={{ fontSize: 12, lineHeight: 1.4, color: tone ? "var(--green-sub)" : "var(--text-3)", marginTop: 2, textWrap: "pretty" }}>{sub}</div>}
       </dd>
@@ -59,7 +59,7 @@ export type SourceKind = keyof typeof TAGS;
 export function SourceTag({ kind }: { kind: SourceKind }) {
   const t = TAGS[kind];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5" style={{ fontSize: 12, fontWeight: 700, color: t.color, background: t.bg, fontFamily: "var(--font-sans)" }}>
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5" style={{ fontSize: 12, fontWeight: 600, color: t.color, background: t.bg, fontFamily: "var(--font-sans)" }}>
       <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 3, background: t.dot }} />
       {t.label}
     </span>

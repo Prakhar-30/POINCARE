@@ -116,13 +116,13 @@ export function PoolChart({ height = 220 }: { height?: number }) {
     <div ref={wrapRef}>
       <div className="flex items-end justify-between gap-3 mb-2 flex-wrap">
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: ".3px" }}>WETH / USDC · last trade</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", letterSpacing: ".3px" }}>WETH / USDC · last trade</div>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="font-display" style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>
+            <span className="font-display" style={{ fontSize: 24, fontWeight: 650, color: "var(--text)" }}>
               {model ? fmtUsd(model.lastPrice, { dp: 2 }) : "—"}
             </span>
             {model && (
-              <span style={{ fontSize: 13, fontWeight: 800, color: accentInk }}>
+              <span style={{ fontSize: 13, fontWeight: 650, color: accentInk }}>
                 <span aria-hidden="true">{change === 0 ? "" : up ? "▲ " : "▼ "}</span>
                 <span className="sr-only">{up ? "Up" : "Down"} </span>
                 {Math.abs(change).toFixed(2)}%
@@ -207,7 +207,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
             {/* last-price tag on the axis, as on an exchange chart */}
             <line x1={PAD.l} x2={PAD.l + innerW} y1={model.y(model.lastPrice)} y2={model.y(model.lastPrice)} stroke={accent} strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
             <rect x={PAD.l + innerW + 2} y={model.y(model.lastPrice) - 10} width={PAD.r - 4} height={20} rx={5} fill={up ? "var(--positive)" : "var(--negative)"} />
-            <text x={PAD.l + innerW + PAD.r / 2} y={model.y(model.lastPrice) + 4} textAnchor="middle" fontSize="12" fontWeight="800" fill="#fff">
+            <text x={PAD.l + innerW + PAD.r / 2} y={model.y(model.lastPrice) + 4} textAnchor="middle" fontSize="12" fontWeight="650" fill="#fff">
               {fmtNum(model.lastPrice, priceDp)}
             </text>
 
@@ -222,7 +222,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
         )}
 
         {quiet && model && (
-          <div className="absolute rounded-lg px-3 py-1.5" style={{ left: PAD.l + 8, top: PAD.t + 6, fontSize: 12, fontWeight: 700, color: "var(--text-3)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+          <div className="absolute rounded-lg px-3 py-1.5" style={{ left: PAD.l + 8, top: PAD.t + 6, fontSize: 12, fontWeight: 600, color: "var(--text-3)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
             No trades in the last {win} · price unchanged
           </div>
         )}
@@ -244,7 +244,7 @@ export function PoolChart({ height = 220 }: { height?: number }) {
               padding: "9px 11px",
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
               {tipFmt.format(new Date(hp.t))}
             </div>
             <TipRow label="Price" value={fmtUsd(hp.p, { dp: 2 })} bold />
