@@ -36,7 +36,7 @@ function order(over: Partial<DcaOrder> = {}): DcaOrder {
     interval: H,
     filled: 0,
     startTime: NOW,
-    deadline: NOW + 3n * BigInt(H),
+    deadline: NOW + 4n * BigInt(H), // the default: the 4th slice gets a full interval
     lastSlotPlusOne: 0n,
     amountIn: 4n * E,
     remaining: 4n * E,
@@ -88,6 +88,7 @@ describe("buildOrderParams", () => {
     bad({ amount: 3n }, "amountIn below slices");
     bad({ amount: 0n }, "amountIn");
     bad({ deadline: NOW + 2n * BigInt(H) }, "deadline");
+    bad({ deadline: NOW + 3n * BigInt(H) }, "deadline"); // the 4th slice would open AT the deadline
     bad({ startTime: NOW - 1n }, "startTime");
     bad({ maxSpreadBps: 10_001 }, "bps");
     bad({ maxSlippageBps: -1 }, "bps");
@@ -138,6 +139,16 @@ describe("slice schedule (mirrors PoincareDCA._sliceAmount)", () => {
     expect(slotInfo(o, NOW + 3n * BigInt(H)).nextSlotAt).toBe(0n); // no slot after the last
     expect(slotInfo({ ...o, startTime: NOW + 10n }, NOW).nextSlotAt).toBe(NOW + 10n);
   });
+
+  it("never counts a slot that opens at the deadline (mirrors the live fix)", () => {
+    const o = order({ catchUp: true });
+    const late = slotInfo(o, NOW + 3n * BigInt(H));
+    expect(late).toEqual({ slot: 3n, lastSlot: 3n, nextSlotAt: 0n });
+    // nothing filled for slots 0..2: the last real slot takes everything
+    expect(sliceAmount(o, late.slot, late.lastSlot)).toBe(4n * E);
+    // at the deadline instant the clock is clamped to the last slot
+    expect(slotInfo(o, o.deadline).slot).toBe(3n);
+  });
 });
 
 describe("planSlice (mirrors PoincareDCA._preview)", () => {
@@ -146,7 +157,7 @@ describe("planSlice (mirrors PoincareDCA._preview)", () => {
   it("checks in the contract's order", () => {
     expect(planSlice(order({ cancelled: true }), ctx).status).toBe("cancelled");
     expect(planSlice(order({ remaining: 0n }), ctx).status).toBe("filled");
-    expect(planSlice(order(), { ...ctx, now: NOW + 3n * BigInt(H) + 1n }).status).toBe("expired");
+    expect(planSlice(order(), { ...ctx, now: NOW + 4n * BigInt(H) + 1n }).status).toBe("expired");
     expect(planSlice(order({ startTime: NOW + 5n }), ctx).status).toBe("not-started");
     expect(planSlice(order({ lastSlotPlusOne: 1n }), ctx).status).toBe("waiting-for-slot");
     expect(planSlice(order({ maxSpreadBps: 100 }), { ...ctx, spreadBps: 101 }).status).toBe("spread-too-high");
@@ -177,7 +188,7 @@ describe("planSlice (mirrors PoincareDCA._preview)", () => {
 
   it("a paused order holds, after the closed/expired checks (as on chain)", () => {
     expect(planSlice(order({ paused: true }), ctx).status).toBe("paused");
-    expect(planSlice(order({ paused: true }), { ...ctx, now: NOW + 3n * BigInt(H) + 1n }).status).toBe("expired");
+    expect(planSlice(order({ paused: true }), { ...ctx, now: NOW + 4n * BigInt(H) + 1n }).status).toBe("expired");
     expect(planSlice(order({ paused: true, cancelled: true }), ctx).status).toBe("cancelled");
   });
 

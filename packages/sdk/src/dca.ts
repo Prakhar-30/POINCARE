@@ -157,7 +157,7 @@ export function validateOrderParams(p: DcaOrderParams, nowSec: bigint, dca?: Add
   if (!inBps(p.maxSpreadBps) || !inBps(p.maxSlippageBps)) throw new DcaParamError("bps", "0..10000");
   if (dca && p.recipient.toLowerCase() === dca.toLowerCase()) throw new DcaParamError("recipient");
   const lastPlanned = start + BigInt(p.slices - 1) * BigInt(p.interval);
-  if (p.deadline < lastPlanned) throw new DcaParamError("deadline", "must leave room for every slice");
+  if (p.deadline <= lastPlanned) throw new DcaParamError("deadline", "every slice must open before the deadline");
 }
 
 const inBps = (v: number) => Number.isInteger(v) && v >= 0 && v <= 10_000;
@@ -201,10 +201,12 @@ export function toDcaOrder(id: bigint, o: Omit<DcaOrder, "id" | "side">): DcaOrd
 /** Slot geometry: which slot `now` is in, the last slot before the deadline, the next opening. */
 export function slotInfo(o: Pick<DcaOrder, "startTime" | "interval" | "deadline">, now: bigint) {
   const interval = BigInt(o.interval);
-  const slot = now >= o.startTime ? (now - o.startTime) / interval : 0n;
-  const lastSlot = (o.deadline - o.startTime) / interval;
+  // the last slot opening strictly before the deadline (a slot AT the deadline has no window)
+  const lastSlot = o.deadline > o.startTime ? (o.deadline - o.startTime - 1n) / interval : 0n;
+  let slot = now >= o.startTime ? (now - o.startTime) / interval : 0n;
+  if (slot > lastSlot) slot = lastSlot; // only at the deadline instant itself
   const next = o.startTime + (slot + 1n) * interval;
-  return { slot, lastSlot, nextSlotAt: now < o.startTime ? o.startTime : next <= o.deadline ? next : 0n };
+  return { slot, lastSlot, nextSlotAt: now < o.startTime ? o.startTime : next < o.deadline ? next : 0n };
 }
 
 /** PoincareDCA._sliceAmount. */

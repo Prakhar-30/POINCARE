@@ -2077,7 +2077,7 @@ function validateOrderParams(p, nowSec, dca) {
   if (!inBps(p.maxSpreadBps) || !inBps(p.maxSlippageBps)) throw new DcaParamError("bps", "0..10000");
   if (dca && p.recipient.toLowerCase() === dca.toLowerCase()) throw new DcaParamError("recipient");
   const lastPlanned = start + BigInt(p.slices - 1) * BigInt(p.interval);
-  if (p.deadline < lastPlanned) throw new DcaParamError("deadline", "must leave room for every slice");
+  if (p.deadline <= lastPlanned) throw new DcaParamError("deadline", "every slice must open before the deadline");
 }
 var inBps = (v) => Number.isInteger(v) && v >= 0 && v <= 1e4;
 function toDcaOrder(id, o) {
@@ -2085,10 +2085,11 @@ function toDcaOrder(id, o) {
 }
 function slotInfo(o, now) {
   const interval = BigInt(o.interval);
-  const slot = now >= o.startTime ? (now - o.startTime) / interval : 0n;
-  const lastSlot = (o.deadline - o.startTime) / interval;
+  const lastSlot = o.deadline > o.startTime ? (o.deadline - o.startTime - 1n) / interval : 0n;
+  let slot = now >= o.startTime ? (now - o.startTime) / interval : 0n;
+  if (slot > lastSlot) slot = lastSlot;
   const next = o.startTime + (slot + 1n) * interval;
-  return { slot, lastSlot, nextSlotAt: now < o.startTime ? o.startTime : next <= o.deadline ? next : 0n };
+  return { slot, lastSlot, nextSlotAt: now < o.startTime ? o.startTime : next < o.deadline ? next : 0n };
 }
 function sliceAmount(o, slot, lastSlot) {
   const base = o.scheduleBudget / BigInt(o.slices);

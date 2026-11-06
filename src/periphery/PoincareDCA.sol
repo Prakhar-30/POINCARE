@@ -379,9 +379,9 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
         if (interval < MIN_INTERVAL) revert InvalidParams("interval");
         if (start < block.timestamp) revert InvalidParams("startTime");
         if (maxSpreadBps > BPS || maxSlippageBps > BPS) revert InvalidParams("bps");
-        // every planned slot must open before the deadline
+        // every planned slot must open strictly before the deadline, so each one has a window
         uint256 lastPlanned = uint256(start) + uint256(slices - 1) * interval;
-        if (deadline < lastPlanned) revert InvalidParams("deadline");
+        if (deadline <= lastPlanned) revert InvalidParams("deadline");
     }
 
     /// @dev An existing, still-open order owned by the caller.
@@ -402,11 +402,16 @@ contract PoincareDCA is Ownable2Step, ReentrancyGuard {
             return _status(pv, Status.NotStarted);
         }
 
+        // The last slot is the last one that opens strictly BEFORE the deadline: a slot opening at
+        // the deadline itself would have a zero-length window, and counting it made catch-up leave
+        // part of the budget for a fill that could never happen. (deadline > startTime: validated.)
+        uint64 lastSlot = uint64((uint256(o.deadline) - o.startTime - 1) / o.interval);
         uint64 slot = uint64((block.timestamp - o.startTime) / o.interval);
-        uint64 lastSlot = uint64((uint256(o.deadline) - o.startTime) / o.interval);
+        // only at the deadline instant itself can the clock reach past the last slot
+        if (slot > lastSlot) slot = lastSlot;
         pv.slot = slot;
         uint256 next = uint256(o.startTime) + uint256(slot + 1) * o.interval;
-        pv.nextSlotAt = next <= o.deadline ? uint64(next) : 0;
+        pv.nextSlotAt = next < o.deadline ? uint64(next) : 0;
 
         pv.amountIn = _sliceAmount(o, slot, lastSlot);
         if (o.lastSlotPlusOne > slot) return _status(pv, Status.WaitingForSlot);

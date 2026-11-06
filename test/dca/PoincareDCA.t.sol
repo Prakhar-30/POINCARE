@@ -164,6 +164,9 @@ contract PoincareDCATest is PoincareTestBase {
         p.deadline = uint64(block.timestamp + 2 * H); // the 4th slot opens at +3H
         vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "deadline"));
         _create(p);
+        p.deadline = uint64(block.timestamp + 3 * H); // ...and would have no window if it ended there
+        vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "deadline"));
+        _create(p);
 
         p = _params(true, 3, 4);
         vm.expectRevert(abi.encodeWithSelector(PoincareDCA.InvalidParams.selector, "amountIn below slices"));
@@ -344,7 +347,7 @@ contract PoincareDCATest is PoincareTestBase {
 
     function test_catchUp_makesUpSkippedSlots() public {
         PoincareDCA.OrderParams memory p = _params(true, 4 ether, 4);
-        p.deadline = uint64(block.timestamp + 3 * H); // slots 0..3, no spare
+        p.deadline = uint64(block.timestamp + 4 * H); // the SDK default: the 4th slot gets a full interval
         p.catchUp = true;
         uint256 id = _create(p);
 
@@ -363,9 +366,46 @@ contract PoincareDCATest is PoincareTestBase {
         assertEq(dca.getOrder(id).remaining, 0, "completed by the deadline");
     }
 
+    /// @dev Found live: with the default deadline (start + slices * interval) the old last-slot
+    ///      maths counted a slot opening AT the deadline. After missed slots, catch-up split the
+    ///      rest with that zero-length slot and the final real fill took only half.
+    function test_catchUp_finalSlotTakesEverything_afterMissedSlots() public {
+        PoincareDCA.OrderParams memory p = _params(true, 4 ether, 4);
+        p.deadline = uint64(block.timestamp + 4 * H);
+        p.catchUp = true;
+        uint256 id = _create(p);
+        vm.warp(block.timestamp + 3 * H); // no keeper for slots 0..2
+        vm.roll(block.number + 1);
+        PoincareDCA.Preview memory pv = dca.canExecute(id);
+        assertEq(pv.slot, 3);
+        assertEq(pv.nextSlotAt, 0, "no slot opens after this one");
+        assertEq(pv.amountIn, 4 ether, "the last real slot takes the whole remainder");
+        _exec(id);
+        assertEq(dca.getOrder(id).remaining, 0);
+    }
+
+    /// @dev At the deadline instant the clock can sit one past the last slot; the preview must not
+    ///      underflow and that last slot can still fill (the deadline is inclusive).
+    function test_deadlineInstant_clampsToLastSlot() public {
+        PoincareDCA.OrderParams memory p = _params(true, 2 ether, 2);
+        p.deadline = uint64(block.timestamp + 2 * H);
+        p.catchUp = true;
+        uint256 id = _create(p);
+        _exec(id);
+        vm.warp(uint256(p.deadline)); // exactly the deadline: (deadline - start) / H = 2 > lastSlot 1
+        vm.roll(block.number + 1);
+        PoincareDCA.Preview memory pv = dca.canExecute(id);
+        assertEq(pv.slot, 1);
+        assertEq(uint8(pv.status), uint8(PoincareDCA.Status.Ready));
+        _exec(id);
+        assertEq(dca.getOrder(id).remaining, 0);
+        vm.warp(block.timestamp + 1);
+        assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Filled));
+    }
+
     function test_noCatchUp_leavesRemainderForRefund() public {
         PoincareDCA.OrderParams memory p = _params(true, 4 ether, 4);
-        p.deadline = uint64(block.timestamp + 3 * H);
+        p.deadline = uint64(block.timestamp + 3 * H + H / 2);
         uint256 id = _create(p);
 
         _exec(id);
@@ -374,7 +414,7 @@ contract PoincareDCATest is PoincareTestBase {
         assertEq(dca.canExecute(id).amountIn, 1 ether, "even share only");
         _exec(id);
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(uint256(dca.getOrder(id).deadline) + 1);
         assertEq(uint8(_status(id)), uint8(PoincareDCA.Status.Expired));
         uint256 before = _t0().balanceOf(user);
         vm.prank(stranger);
@@ -494,7 +534,7 @@ contract PoincareDCATest is PoincareTestBase {
 
     function test_pause_thenCatchUpMakesUpTheMissedSlots() public {
         PoincareDCA.OrderParams memory p = _params(true, 4 ether, 4);
-        p.deadline = uint64(block.timestamp + 3 * H);
+        p.deadline = uint64(block.timestamp + 4 * H);
         p.catchUp = true;
         uint256 id = _create(p);
         _exec(id); // slot 0
