@@ -1,0 +1,34 @@
+{
+  "name": "@poincare/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the Poincaré hook: lets AI agents read the trend regime and create and manage spread-aware DCA orders.",
+  "license": "BUSL-1.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "poincare-mcp": "./dist/index.js"
+  },
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@poincare/sdk": "workspace:*",
+    "viem": "2.53.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.6",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
