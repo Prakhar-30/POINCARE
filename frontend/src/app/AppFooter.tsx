@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Wordmark } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/Icon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
@@ -81,13 +82,16 @@ export function AppFooter() {
           </nav>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
           <FaucetButton />
+          <Link to="/developers" className="btn btn-secondary btn-sm">
+            <Icon name="layers" size={14} aria-hidden="true" /> Build on Poincaré · Docs
+          </Link>
         </div>
 
         <div className="mt-5 pt-4 flex flex-wrap items-center justify-between gap-3" style={{ borderTop: "1px solid var(--divider)", fontSize: 12, color: "var(--muted)" }}>
           <span>Poincaré is a Uniswap v4 custom-curve hook. Not investment advice. Test tokens carry no value.</span>
-          <span>Prices off the pool's own reserves · no oracle, no keeper.</span>
+          <span>Prices off the pool's own reserves · no oracle; the pool itself needs no keeper.</span>
         </div>
       </div>
     </footer>

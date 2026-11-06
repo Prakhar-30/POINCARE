@@ -376,6 +376,13 @@
 .link-quiet:hover {
   color: var(--lav-ink);
 }
+/* Docs cards and pagers: the border answers the pointer, as on the big docs sites. */
+.docs-card {
+  transition: border-color 0.15s ease-out;
+}
+.docs-card:hover {
+  border-color: var(--lav);
+}
 /* A card that wraps a visually hidden native radio: the card shows the keyboard focus. */
 .radio-card:has(input:focus-visible) {
   outline: 2px solid var(--focus-ring);

@@ -20,6 +20,7 @@ export function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<Suspense fallback={<div className="min-h-screen" style={{ background: "var(--app-bg)" }} />}><AppRoute /></Suspense>} />
           <Route path="/developers" element={<Suspense fallback={<div className="min-h-screen" style={{ background: "var(--page)" }} />}><Developers /></Suspense>} />
+          <Route path="/developers/:slug" element={<Suspense fallback={<div className="min-h-screen" style={{ background: "var(--page)" }} />}><Developers /></Suspense>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Analytics />

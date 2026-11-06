@@ -634,6 +634,20 @@ function Footer() {
   );
   return (
     <footer className="mx-auto px-4 sm:px-6 pt-14 pb-10" style={{ maxWidth: WIDTH + 48 }}>
+      {/* the developer way in: one clear call to the docs above the link columns */}
+      <div className="card flex flex-col md:flex-row md:items-center gap-5 mb-12" style={{ padding: "clamp(20px, 3vw, 28px)" }}>
+        <div className="flex-1 min-w-0">
+          <p style={{ fontSize: 12.5, fontWeight: 800, color: "var(--lav-ink)", letterSpacing: "0.04em", textTransform: "uppercase" }}>For developers</p>
+          <h2 className="font-display mt-1.5" style={{ fontSize: "clamp(22px, 2.4vw, 28px)", fontWeight: 700, letterSpacing: "-0.01em", color: "var(--text)" }}>Build on the trend detector.</h2>
+          <p className="mt-1.5" style={{ fontSize: 15, lineHeight: 1.55, color: "var(--text-3)", maxWidth: "42rem" }}>
+            A TypeScript SDK, an MCP server for AI agents and an HTTP API: read the regime, quote swaps and run spread-aware DCA. No API keys.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <Link to="/developers" className="btn lp-btn-ink">Read the docs <Icon name="arrowRight" size={15} aria-hidden="true" /></Link>
+          <Link to="/developers/quickstart" className="btn btn-secondary">Quickstart</Link>
+        </div>
+      </div>
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
@@ -652,7 +666,7 @@ function Footer() {
         ])}
         {col("Research", [
           { label: "README & backtests", href: README },
-          { label: "Developers: SDK, MCP, API", to: "/developers" },
+          { label: "Developer docs", to: "/developers" },
           { label: "Source code", href: REPO },
         ])}
         {col("Network", [
