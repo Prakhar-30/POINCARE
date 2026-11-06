@@ -1,4 +1,4 @@
-import { UNICHAIN_SEPOLIA, dcaAbi, withDca } from "@poincare/sdk";
+import { UNICHAIN_SEPOLIA, dcaAbi, withDca } from "@poincaretrade/sdk";
 import { decodeFunctionData, type Hex, type PublicClient, type WalletClient } from "viem";
 import { describe, expect, it } from "vitest";
 import { runKeeper } from "../src/keeper.js";

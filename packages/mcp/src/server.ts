@@ -17,7 +17,7 @@ import {
   formatAmount,
   trendOnsets,
   wadToBpsUp,
-} from "@poincare/sdk";
+} from "@poincaretrade/sdk";
 import { getAddress, type Address, type TransactionReceipt } from "viem";
 import { z } from "zod";
 import { describeRegime, fail, ok } from "./format.js";

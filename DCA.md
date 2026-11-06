@@ -13,8 +13,8 @@ like any other user.
 | `PoincareDCA` | `src/periphery/PoincareDCA.sol` | Escrows each order's budget and fills it slice by slice, re-checking the order's rules on chain every time |
 | Keeper | `frontend/supabase/functions/dca-keeper` | Every minute, fills the slices the contract says are due |
 | HTTP API | `frontend/supabase/functions/poincare-api` | Regime data, quotes, orders, and unsigned transactions |
-| SDK | `packages/sdk` (`@poincare/sdk`) | TypeScript: regime and trend-onset signals, quotes, DCA orders |
-| MCP server | `packages/mcp` (`@poincare/mcp`) | Lets AI agents read the regime and run DCA orders |
+| SDK | `packages/sdk` (`@poincaretrade/sdk`) | TypeScript: regime and trend-onset signals, quotes, DCA orders |
+| MCP server | `packages/mcp` (`@poincaretrade/mcp`) | Lets AI agents read the regime and run DCA orders |
 | App | Trade screen, Market / DCA switch + DCA tab | Create, watch, pause / resume / edit and cancel orders |
 | Docs | `/#/developers` on the site (`frontend/src/pages/Developers.tsx`) | The SDK, MCP server and HTTP API on one page |
 

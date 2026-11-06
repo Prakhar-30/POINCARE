@@ -1,4 +1,4 @@
-# @poincare/mcp
+# @poincaretrade/mcp
 
 An [MCP](https://modelcontextprotocol.io) server that gives Claude, or any MCP client, **Poincaré**'s trend
 regime, swap quotes and spread-aware DCA orders as 15 tools. It reads the live pool on Unichain Sepolia and
@@ -12,7 +12,7 @@ Full docs: **https://www.poincaretrade.in/#/developers/mcp**
 **Claude Code**
 
 ```sh
-claude mcp add poincare -- npx -y @poincare/mcp
+claude mcp add poincare -- npx -y @poincaretrade/mcp
 ```
 
 **Claude Desktop and other clients** (`mcpServers` in the client's config):
@@ -20,7 +20,7 @@ claude mcp add poincare -- npx -y @poincare/mcp
 ```json
 {
   "mcpServers": {
-    "poincare": { "command": "npx", "args": ["-y", "@poincare/mcp"] }
+    "poincare": { "command": "npx", "args": ["-y", "@poincaretrade/mcp"] }
   }
 }
 ```

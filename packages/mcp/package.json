@@ -1,5 +1,5 @@
 {
-  "name": "@poincare/mcp",
+  "name": "@poincaretrade/mcp",
   "version": "0.1.0",
   "description": "MCP server for the Poincaré hook: lets AI agents read the trend regime and create and manage spread-aware DCA orders.",
   "license": "BUSL-1.1",
@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@poincare/sdk": "workspace:*",
+    "@poincaretrade/sdk": "workspace:*",
     "viem": "2.53.1",
     "zod": "4.6.6"
   },

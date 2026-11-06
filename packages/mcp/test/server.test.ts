@@ -21,7 +21,7 @@ import {
   type PoincareClient,
   type SlicePreview,
   type TxRequest,
-} from "@poincare/sdk";
+} from "@poincaretrade/sdk";
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, type TransactionReceipt } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jsonSafe } from "../src/format.js";

@@ -14,7 +14,7 @@ import {
   type DcaOrder,
   type PoincareClient,
   type SlicePreview,
-} from "@poincare/sdk";
+} from "@poincaretrade/sdk";
 import { decodeFunctionData, type Hex } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiHandler } from "../src/handler.js";

@@ -8,7 +8,7 @@ import {
   previewSlice,
   requireDca,
   sendTx,
-} from "@poincare/sdk";
+} from "@poincaretrade/sdk";
 import type { Hash, PublicClient, WalletClient } from "viem";
 
 export type KeeperRun = {

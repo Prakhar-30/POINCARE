@@ -16,7 +16,7 @@ import {
   spentOf,
   trendOnsets,
   wadToBpsUp,
-} from "@poincare/sdk";
+} from "@poincaretrade/sdk";
 import { getAddress, isAddress, type Address } from "viem";
 import { HttpError, json } from "./json.js";
 

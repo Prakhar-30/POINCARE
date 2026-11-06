@@ -27,7 +27,7 @@ export const PAGES: DocPage[] = [
       <>
         <CardGrid items={[
           { to: "quickstart", title: "Quickstart", body: "Read the regime, quote a swap and plan a DCA order in five minutes.", icon: "spark" },
-          { to: "sdk", title: "TypeScript SDK", body: "@poincare/sdk: one client for regime, quotes and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
+          { to: "sdk", title: "TypeScript SDK", body: "@poincaretrade/sdk: one client for regime, quotes and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
           { to: "mcp", title: "MCP server", body: "15 tools for Claude and any MCP client. Unsigned by default; sends only with your key and send: true.", icon: "curve" },
           { to: "http-api", title: "HTTP API", body: "Stateless JSON over HTTPS. Reads from the chain, returns unsigned transactions, never holds keys.", icon: "chart" },
         ]} />
@@ -59,10 +59,10 @@ export const PAGES: DocPage[] = [
     body: () => (
       <>
         <H2>Set up</H2>
-        <P>The SDK and the MCP server are on npm under {mono("@poincare")}; the HTTP API needs nothing at all.</P>
+        <P>The SDK and the MCP server are on npm under {mono("@poincaretrade")}; the HTTP API needs nothing at all.</P>
         <CodeTabs tabs={[
-          { label: "SDK", lang: "sh", code: "npm i @poincare/sdk viem" },
-          { label: "MCP", lang: "sh", code: "claude mcp add poincare -- npx -y @poincare/mcp" },
+          { label: "SDK", lang: "sh", code: "npm i @poincaretrade/sdk viem" },
+          { label: "MCP", lang: "sh", code: "claude mcp add poincare -- npx -y @poincaretrade/mcp" },
           { label: "From source", lang: "sh", code: `git clone ${REPO}.git && cd POINCARE/packages
 pnpm install && pnpm check    # builds, type-checks and tests sdk, mcp and api` },
         ]} />
@@ -71,7 +71,7 @@ pnpm install && pnpm check    # builds, type-checks and tests sdk, mcp and api` 
           <div key="1">
             <B>Read the regime</B>: is there a confirmed trend, and which side pays?
             <CodeTabs tabs={[
-              { label: "SDK", lang: "ts", code: `import { createPoincareClient } from "@poincare/sdk";
+              { label: "SDK", lang: "ts", code: `import { createPoincareClient } from "@poincaretrade/sdk";
 
 const poincare = createPoincareClient();
 const r = await poincare.regime();
@@ -94,7 +94,7 @@ console.log(r.trend, r.level, r.chargedSide, r.spread);
           <div key="3">
             <B>Plan a DCA order</B>: validated exactly like the contract, with a preview of the first fill.
             <CodeTabs tabs={[
-              { label: "SDK", lang: "ts", code: `import { buildOrderParams, recurringOrder } from "@poincare/sdk";
+              { label: "SDK", lang: "ts", code: `import { buildOrderParams, recurringOrder } from "@poincaretrade/sdk";
 
 const input = recurringOrder({ side: "buy", amountPerBuy: "100", frequency: "1h", count: 10 });
 const params = buildOrderParams(input);            // throws DcaParamError with the contract's reason
@@ -234,15 +234,15 @@ const txs = await poincare.dca.build.create(owner, input);   // [approve, create
     slug: "sdk",
     group: "Build",
     title: "TypeScript SDK",
-    lede: "@poincare/sdk is a typed, viem-based ESM package. One client covers the regime, quotes and DCA orders; reads need no wallet.",
+    lede: "@poincaretrade/sdk is a typed, viem-based ESM package. One client covers the regime, quotes and DCA orders; reads need no wallet.",
     keywords: "typescript viem client createPoincareClient recurringOrder twapOrder watchRegime",
     body: () => (
       <>
         <H2>Install</H2>
-        <CodeBlock lang="sh" code="npm i @poincare/sdk viem" />
+        <CodeBlock lang="sh" code="npm i @poincaretrade/sdk viem" />
         <P>viem 2 is a peer dependency. The package is ESM-only and ships its own types.</P>
         <H2>Create a client</H2>
-        <CodeBlock lang="ts" code={`import { createPoincareClient } from "@poincare/sdk";
+        <CodeBlock lang="ts" code={`import { createPoincareClient } from "@poincaretrade/sdk";
 
 const poincare = createPoincareClient();      // the live Unichain Sepolia deployment, public RPC
 // createPoincareClient({ rpcUrl, publicClient, walletClient, deployment })`} />
@@ -258,7 +258,7 @@ const stop = poincare.watchRegime({
 const samples = await poincare.history(fromBlock);   // the hook's DetectorSample trace`} />
         <H2>Open a DCA order</H2>
         <P>{mono("create")} approves exactly the budget (never an unlimited allowance) and resolves to the order id.</P>
-        <CodeBlock lang="ts" code={`import { createPoincareClient, recurringOrder, twapOrder } from "@poincare/sdk";
+        <CodeBlock lang="ts" code={`import { createPoincareClient, recurringOrder, twapOrder } from "@poincaretrade/sdk";
 
 const poincare = createPoincareClient({ walletClient });
 
@@ -311,12 +311,12 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
       <>
         <H2>Install</H2>
         <CodeTabs tabs={[
-          { label: "Claude Code", lang: "sh", code: "claude mcp add poincare -- npx -y @poincare/mcp" },
+          { label: "Claude Code", lang: "sh", code: "claude mcp add poincare -- npx -y @poincaretrade/mcp" },
           { label: "Claude Desktop", lang: "json", code: `{
   "mcpServers": {
     "poincare": {
       "command": "npx",
-      "args": ["-y", "@poincare/mcp"],
+      "args": ["-y", "@poincaretrade/mcp"],
       "env": { "POINCARE_RPC_URL": "https://sepolia.unichain.org" }
     }
   }
@@ -413,7 +413,7 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
           deadline. Nothing else: no withdrawals, no edits, and the contract re-checks every rule in the fill. Orders never
           depend on one keeper, because owners can fill their own slices.
         </P>
-        <CodeBlock lang="ts" code={`import { makeKeeper } from "@poincare/api";
+        <CodeBlock lang="ts" code={`import { makeKeeper } from "@poincaretrade/api";
 
 const pass = makeKeeper({ dcaAddress, privateKey: process.env.KEEPER_PRIVATE_KEY!, maxTx: 20 });
 const run = await pass();

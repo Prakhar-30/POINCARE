@@ -1,4 +1,4 @@
-import type { Regime } from "@poincare/sdk";
+import type { Regime } from "@poincaretrade/sdk";
 
 /** Deep-convert bigints to decimal strings so a value is JSON-safe for MCP clients. */
 export function jsonSafe<T>(v: T): unknown {

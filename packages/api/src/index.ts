@@ -1,4 +1,4 @@
-import { UNICHAIN_SEPOLIA, createPoincareClient, withDca } from "@poincare/sdk";
+import { UNICHAIN_SEPOLIA, createPoincareClient, withDca } from "@poincaretrade/sdk";
 import { createPublicClient, createWalletClient, getAddress, http, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { unichainSepolia } from "viem/chains";

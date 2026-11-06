@@ -1,4 +1,4 @@
-import { type DcaOrder, type PoincareDeployment, dcaAbi, formatAmount, getOrder, requireDca, spentOf } from "@poincare/sdk";
+import { type DcaOrder, type PoincareDeployment, dcaAbi, formatAmount, getOrder, requireDca, spentOf } from "@poincaretrade/sdk";
 import type { PublicClient } from "viem";
 
 /** One slice fill, as stored in public.dca_fills (amounts in human units, 18-decimal tokens). */

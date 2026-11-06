@@ -1,4 +1,4 @@
-# @poincare/sdk
+# @poincaretrade/sdk
 
 TypeScript SDK for **Poincaré**, a Uniswap v4 hook whose pool charges a spread only to swaps that push
 **with** a confirmed trend. Read the trend regime, quote exactly what the router will execute, and run
@@ -7,11 +7,11 @@ TypeScript SDK for **Poincaré**, a Uniswap v4 hook whose pool charges a spread 
 Live on Unichain Sepolia (testnet). Full docs: **https://www.poincaretrade.in/#/developers**
 
 ```sh
-npm i @poincare/sdk viem
+npm i @poincaretrade/sdk viem
 ```
 
 ```ts
-import { createPoincareClient, recurringOrder } from "@poincare/sdk";
+import { createPoincareClient, recurringOrder } from "@poincaretrade/sdk";
 
 const poincare = createPoincareClient();              // live deployment, public RPC, no keys
 

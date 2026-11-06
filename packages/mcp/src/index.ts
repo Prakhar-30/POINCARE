@@ -9,7 +9,7 @@
  *                          tool returns unsigned transactions and nothing is ever sent.
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { UNICHAIN_SEPOLIA, createPoincareClient, sendTx, withDca } from "@poincare/sdk";
+import { UNICHAIN_SEPOLIA, createPoincareClient, sendTx, withDca } from "@poincaretrade/sdk";
 import { createPublicClient, createWalletClient, getAddress, http, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { unichainSepolia } from "viem/chains";

@@ -1,5 +1,5 @@
 {
-  "name": "@poincare/api",
+  "name": "@poincaretrade/api",
   "version": "0.1.0",
   "description": "Poincaré HTTP API and DCA keeper, built for Supabase edge functions (bundled into frontend/supabase/functions/_shared).",
   "license": "BUSL-1.1",
@@ -14,7 +14,7 @@
     "bundle:edge": "tsup --config tsup.edge.config.ts && node scripts/check-edge-bundle.mjs"
   },
   "dependencies": {
-    "@poincare/sdk": "workspace:*",
+    "@poincaretrade/sdk": "workspace:*",
     "viem": "2.53.1"
   },
   "devDependencies": {

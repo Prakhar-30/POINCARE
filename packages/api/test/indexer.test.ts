@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PublicClient } from "viem";
-import { UNICHAIN_SEPOLIA, withDca } from "@poincare/sdk";
+import { UNICHAIN_SEPOLIA, withDca } from "@poincaretrade/sdk";
 import { indexDca, statusOfRow } from "../src/indexer.js";
 
 const DCA = "0x00000000000000000000000000000000000000Dc";

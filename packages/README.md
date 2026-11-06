@@ -7,9 +7,9 @@ the site at **[poincaretrade.in/#/developers](https://www.poincaretrade.in/#/dev
 
 | Package | For |
 |---|---|
-| [`sdk`](sdk) `@poincare/sdk` | TypeScript apps, bots and scripts |
-| [`mcp`](mcp) `@poincare/mcp` | AI agents (Claude, any MCP client) |
-| [`api`](api) `@poincare/api` | The HTTP API and the keeper, deployed as Supabase edge functions |
+| [`sdk`](sdk) `@poincaretrade/sdk` | TypeScript apps, bots and scripts |
+| [`mcp`](mcp) `@poincaretrade/mcp` | AI agents (Claude, any MCP client) |
+| [`api`](api) `@poincaretrade/api` | The HTTP API and the keeper, deployed as Supabase edge functions |
 
 ```sh
 pnpm install          # in this folder
@@ -18,12 +18,12 @@ pnpm check            # build + typecheck + test all three
 
 ### Publishing to npm
 
-`@poincare/sdk` and `@poincare/mcp` are publishable (`@poincare/api` stays private: it ships as Supabase
+`@poincaretrade/sdk` and `@poincaretrade/mcp` are publishable (`@poincaretrade/api` stays private: it ships as Supabase
 edge functions). Use **pnpm** to publish, so the MCP server's `workspace:*` dependency on the SDK becomes
 the real version:
 
 ```sh
-npm login                       # an account that owns the "poincare" npm org
+npm login                       # an account that owns the "poincaretrade" npm org
 pnpm pack:npm                   # optional dry run: tarballs in ../.npm-pack
 pnpm publish:npm                # builds, type-checks and tests each package first (prepublishOnly)
 ```
@@ -36,7 +36,7 @@ pays USDC for WETH; `sell` pays WETH for USDC.
 ## SDK
 
 ```ts
-import { createPoincareClient } from "@poincare/sdk";
+import { createPoincareClient } from "@poincaretrade/sdk";
 
 const poincare = createPoincareClient({
   // walletClient,  // only to send: create / pause / resume / edit / cancel / execute / closeExpired
@@ -81,7 +81,7 @@ From npm (or, from this repo, `node /abs/path/to/packages/mcp/dist/index.js` aft
 **Claude Code**
 
 ```sh
-claude mcp add poincare -- npx -y @poincare/mcp
+claude mcp add poincare -- npx -y @poincaretrade/mcp
 ```
 
 **Claude Desktop / any MCP client** (`mcpServers` in the client's config):
@@ -91,7 +91,7 @@ claude mcp add poincare -- npx -y @poincare/mcp
   "mcpServers": {
     "poincare": {
       "command": "npx",
-      "args": ["-y", "@poincare/mcp"],
+      "args": ["-y", "@poincaretrade/mcp"],
       "env": {}
     }
   }
