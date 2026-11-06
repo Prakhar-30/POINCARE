@@ -2,7 +2,8 @@
 
 Three ways to build on Poincaré's trend detector and its spread-aware DCA orders. All of them read
 the live pool on Unichain Sepolia; none of them needs an API key. See [`../DCA.md`](../DCA.md) for
-the strategy, the contract rules and the deploy runbook.
+the strategy, the contract rules and the deploy runbook. The same material, for integrators, is on
+the site at **[poincaretrade.in/#/developers](https://www.poincaretrade.in/#/developers)**.
 
 | Package | For |
 |---|---|
@@ -21,12 +22,11 @@ pays USDC for WETH; `sell` pays WETH for USDC.
 ## SDK
 
 ```ts
-import { createPoincareClient, withDca, UNICHAIN_SEPOLIA } from "@poincare/sdk";
+import { createPoincareClient } from "@poincare/sdk";
 
 const poincare = createPoincareClient({
-  deployment: withDca(UNICHAIN_SEPOLIA, "0x<PoincareDCA>"), // DCA calls need the address
-  // walletClient,  // only for create / cancel / execute / closeExpired
-});
+  // walletClient,  // only to send: create / pause / resume / edit / cancel / execute / closeExpired
+}); // the live Unichain Sepolia deployment, PoincareDCA included (withDca() points elsewhere)
 
 // What the next swap of this block sees
 const r = await poincare.regime();
@@ -46,7 +46,12 @@ const txs = await poincare.dca.build.create("0x<owner>", {
   side: "buy", amount: "1000", slices: 6, interval: 3600, maxSpreadBps: 0, catchUp: true,
 }); // [approve exact amount, createOrder], unsigned; or poincare.dca.create(input) with a walletClient
 
-await poincare.dca.preview(1n); // { status: "spread-too-high" | "ready" | ..., amountIn, quoteOut, ... }
+await poincare.dca.preview(1n); // { status: "spread-too-high" | "ready" | "paused" | ..., amountIn, quoteOut, ... }
+
+// Owner controls (also unsigned under dca.build.*)
+await poincare.dca.pause(1n);
+await poincare.dca.edit(1n, { slices: 12, interval: 1800, limitPrice: null }); // re-plan what is left
+await poincare.dca.resume(1n);
 ```
 
 Lower level: `readRegime`, `diffRegime`, `regimeHistory`, `trendOnsets`, `buildOrderParams`
@@ -62,7 +67,7 @@ Build once (`pnpm --dir mcp build`), then add it to your client.
 **Claude Code**
 
 ```sh
-claude mcp add poincare -e POINCARE_DCA_ADDRESS=0x<PoincareDCA> -- node /abs/path/to/packages/mcp/dist/index.js
+claude mcp add poincare -- node /abs/path/to/packages/mcp/dist/index.js
 ```
 
 **Claude Desktop / any MCP client** (`mcpServers` in the client's config):
@@ -73,7 +78,7 @@ claude mcp add poincare -e POINCARE_DCA_ADDRESS=0x<PoincareDCA> -- node /abs/pat
     "poincare": {
       "command": "node",
       "args": ["/abs/path/to/packages/mcp/dist/index.js"],
-      "env": { "POINCARE_DCA_ADDRESS": "0x<PoincareDCA>" }
+      "env": {}
     }
   }
 }
@@ -88,6 +93,7 @@ claude mcp add poincare -e POINCARE_DCA_ADDRESS=0x<PoincareDCA> -- node /abs/pat
 | `dca_plan_order` | Validates an order like the contract and says what its first fill would do now |
 | `dca_create_order` | Approve + create (unsigned unless `send: true`) |
 | `dca_get_order`, `dca_list_orders`, `dca_preview_slice` | Order state and the contract's verdict on the next fill |
+| `dca_pause_order`, `dca_resume_order`, `dca_edit_order` | Owner controls; edit re-plans what is left (unsigned unless `send: true`) |
 | `dca_execute_slice`, `dca_cancel_order`, `dca_close_expired` | Order actions (unsigned unless `send: true`) |
 
 **Sending transactions.** By default every write tool returns unsigned transactions for you to
@@ -109,7 +115,9 @@ Base: `https://gogjpdgluflntcgsarhn.supabase.co/functions/v1/poincare-api`
 | GET | `/dca/orders/:id` | One order + the contract's verdict on its next fill |
 | POST | `/dca/plan` | Validate an order, preview its first fill |
 | POST | `/dca/tx/create` | Unsigned approve + createOrder (`{ owner, side, amount, slices, intervalSec, ... }`) |
-| POST | `/dca/tx/execute` · `/dca/tx/cancel` · `/dca/tx/close-expired` | Unsigned tx (`{ id }`); execute answers 409 while the fill would be held |
+| POST | `/dca/tx/execute` · `/dca/tx/cancel` · `/dca/tx/close-expired` | Unsigned tx (`{ id }`); 409 while a fill would be held, the order is closed, or it has not expired |
+| POST | `/dca/tx/pause` · `/dca/tx/resume` | Unsigned tx (`{ id }`); 409 if already in that state |
+| POST | `/dca/tx/edit` | Unsigned editOrder (`{ id, slices?, intervalSec?, durationSec?, deadline?, maxSpreadBps?, pauseOnTrend?, catchUp?, maxSlippageBps?, limitPrice? }`; `limitPrice: null` removes it) |
 
 Bigints are returned as decimal strings. Errors are `{ "error": "..." }` with 400 for bad input
 (plus `reason`, the contract's own, for invalid orders), 404, 405, 409, 502 for upstream RPC
