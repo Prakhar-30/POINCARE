@@ -47,7 +47,7 @@ export type Protection = keyof typeof PROTECTIONS;
 export const PROTECTION_TEXT: Record<Protection, { title: string; detail: string }> = {
   "spread-guard": {
     title: "Spread guard",
-    detail: "Never pays the trend spread. A buy that would pay it waits, and later buys catch up so the plan still finishes.",
+    detail: "Never pays the trend spread. A fill that would pay it waits, and later fills catch up so the plan still finishes.",
   },
   "trend-pause": {
     title: "Trend pause",
@@ -55,7 +55,7 @@ export const PROTECTION_TEXT: Record<Protection, { title: string; detail: string
   },
   always: {
     title: "Always fill",
-    detail: "Buys every period whatever the spread, like a plain recurring buy on an exchange.",
+    detail: "Fills every period whatever the spread, like a plain recurring order on an exchange.",
   },
 };
 
