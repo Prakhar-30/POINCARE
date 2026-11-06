@@ -213,7 +213,7 @@ describe("DCA plan and unsigned transactions", () => {
   });
 
   it("503 with a clear message when the DCA address is not configured", async () => {
-    const bare = createApiHandler({ poincare: { ...poincare, dca: { ...poincare.dca, build: { ...poincare.dca.build, cancel: (id: bigint) => buildCancelTx(UNICHAIN_SEPOLIA, id) } } } as PoincareClient });
+    const bare = createApiHandler({ poincare: { ...poincare, dca: { ...poincare.dca, build: { ...poincare.dca.build, cancel: (id: bigint) => buildCancelTx({ ...UNICHAIN_SEPOLIA, dca: undefined }, id) } } } as PoincareClient });
     const r = await bare(new Request(`${BASE}/dca/tx/cancel`, { method: "POST", body: JSON.stringify({ id: 1 }) }));
     expect(r.status).toBe(503);
     expect((await r.json()).error).toContain("POINCARE_DCA_ADDRESS");

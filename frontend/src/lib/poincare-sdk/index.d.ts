@@ -1435,7 +1435,7 @@ type PoincareDeployment = {
     usdc: Address;
     /** currency1 */
     weth: Address;
-    /** The PoincareDCA periphery; undefined until it is deployed on this chain. */
+    /** The PoincareDCA periphery; undefined on a chain where it is not deployed. */
     dca?: Address;
     deployBlock: bigint;
     dcaDeployBlock?: bigint;

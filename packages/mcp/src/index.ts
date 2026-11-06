@@ -4,7 +4,7 @@
  *
  * Environment (all optional):
  *   POINCARE_RPC_URL       RPC endpoint (default: the public Unichain Sepolia RPC)
- *   POINCARE_DCA_ADDRESS   PoincareDCA address (needed for the dca_* tools until it ships in the SDK)
+ *   POINCARE_DCA_ADDRESS   PoincareDCA address override (default: the SDK's live deployment)
  *   POINCARE_PRIVATE_KEY   YOUR key, for tools called with send=true. Without it, every write
  *                          tool returns unsigned transactions and nothing is ever sent.
  */

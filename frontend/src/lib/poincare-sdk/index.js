@@ -1772,7 +1772,10 @@ var UNICHAIN_SEPOLIA = {
   router: getAddress("0x9cD2b0a732dd5e023a5539921e0FD1c30E198Dba"),
   usdc: getAddress("0x1b4034D6C443Eff3D2e9051A08147eF9eD8EBc70"),
   weth: getAddress("0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449"),
-  deployBlock: 66190311n
+  deployBlock: 66190311n,
+  /** deployments/unichain-sepolia-dca.json */
+  dca: getAddress("0x412C6d6a8566A013b2a3552BBE2a1beEF89fE78A"),
+  dcaDeployBlock: 67077212n
 };
 function withDca(dep, dca, dcaDeployBlock) {
   return { ...dep, dca: getAddress(dca), dcaDeployBlock };

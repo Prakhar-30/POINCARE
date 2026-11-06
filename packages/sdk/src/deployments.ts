@@ -15,7 +15,7 @@ export type PoincareDeployment = {
   usdc: Address;
   /** currency1 */
   weth: Address;
-  /** The PoincareDCA periphery; undefined until it is deployed on this chain. */
+  /** The PoincareDCA periphery; undefined on a chain where it is not deployed. */
   dca?: Address;
   deployBlock: bigint;
   dcaDeployBlock?: bigint;
@@ -37,6 +37,9 @@ export const UNICHAIN_SEPOLIA: PoincareDeployment = {
   usdc: getAddress("0x1b4034D6C443Eff3D2e9051A08147eF9eD8EBc70"),
   weth: getAddress("0x26b5D554c8118F247d5FA8a469Ff3a3d3084A449"),
   deployBlock: 66190311n,
+  /** deployments/unichain-sepolia-dca.json */
+  dca: getAddress("0x412C6d6a8566A013b2a3552BBE2a1beEF89fE78A"),
+  dcaDeployBlock: 67077212n,
 };
 
 /** A deployment with the DCA periphery address filled in (e.g. from unichain-sepolia-dca.json). */

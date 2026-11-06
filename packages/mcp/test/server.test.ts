@@ -257,7 +257,7 @@ describe("pause / resume / edit", () => {
 
 describe("configuration errors", () => {
   it("names the env var when the DCA address is missing", async () => {
-    const noDca = { ...fake, dca: { ...fake.dca, order: async () => buildCancelTx(UNICHAIN_SEPOLIA, 1n) } } as unknown as PoincareClient;
+    const noDca = { ...fake, dca: { ...fake.dca, order: async () => buildCancelTx({ ...UNICHAIN_SEPOLIA, dca: undefined }, 1n) } } as unknown as PoincareClient;
     const server = createServer({ poincare: noDca, now: () => NOW });
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test", version: "0" });
