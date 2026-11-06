@@ -1,0 +1,14 @@
+{
+  "name": "poincare-packages",
+  "private": true,
+  "description": "Poincaré developer tooling: the TypeScript SDK and the MCP server.",
+  "packageManager": "pnpm@10.30.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "check": "pnpm -r build && pnpm -r typecheck && pnpm -r test",
+    "publish:npm": "pnpm --filter @poincaretrade/sdk --filter @poincaretrade/mcp publish --access public",
+    "pack:npm": "pnpm --filter @poincaretrade/sdk --filter @poincaretrade/mcp pack --pack-destination ../.npm-pack"
+  }
+}

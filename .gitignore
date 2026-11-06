@@ -38,3 +38,7 @@ frontend/supabase/.temp/
 # the deploy build is kept in its own directory rather than racing for out/.
 out-deploy/
 cache-deploy/
+
+# npm packaging: LICENSE is copied in at pack time; local pack output
+packages/*/LICENSE
+.npm-pack/

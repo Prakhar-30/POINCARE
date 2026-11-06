@@ -1,0 +1,69 @@
+{
+  "name": "@poincaretrade/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Poincaré Uniswap v4 hook: regime and trend-onset signals, quotes, and spread-aware DCA orders.",
+  "license": "BUSL-1.1",
+  "author": "Prakhar Srivastava",
+  "homepage": "https://www.poincaretrade.in/#/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Prakhar-30/POINCARE.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/Prakhar-30/POINCARE/issues"
+  },
+  "keywords": [
+    "uniswap",
+    "uniswap-v4",
+    "hook",
+    "defi",
+    "dca",
+    "twap",
+    "amm",
+    "viem",
+    "unichain",
+    "poincare"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "gen:abi": "node scripts/gen-abi.mjs",
+    "build": "tsup",
+    "sync:frontend": "tsup && node scripts/sync-frontend.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:live": "vitest run --mode live test/live.test.ts",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\"",
+    "prepublishOnly": "pnpm run build && pnpm run typecheck && pnpm run test"
+  },
+  "peerDependencies": {
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.6",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "viem": "2.53.1",
+    "vitest": "4.1.12"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

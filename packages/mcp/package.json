@@ -1,0 +1,64 @@
+{
+  "name": "@poincaretrade/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the Poincaré hook: lets AI agents read the trend regime and create and manage spread-aware DCA orders.",
+  "license": "BUSL-1.1",
+  "author": "Prakhar Srivastava",
+  "homepage": "https://www.poincaretrade.in/#/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Prakhar-30/POINCARE.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/Prakhar-30/POINCARE/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "ai-agent",
+    "uniswap",
+    "uniswap-v4",
+    "defi",
+    "dca",
+    "poincare"
+  ],
+  "type": "module",
+  "bin": {
+    "poincare-mcp": "./dist/index.js"
+  },
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\"",
+    "prepublishOnly": "pnpm run build && pnpm run typecheck && pnpm run test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@poincaretrade/sdk": "workspace:*",
+    "viem": "2.53.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.6",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
