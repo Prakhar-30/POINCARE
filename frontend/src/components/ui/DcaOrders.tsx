@@ -90,7 +90,7 @@ function OrderRow({ o, actions }: { o: DcaOrderWithNext; actions: Actions }) {
 
       <div className="mt-1.5" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label={`Order ${o.id} filled`}
         style={{ height: 5, borderRadius: 3, background: "var(--track)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.max(2, progress * 100)}%`, background: o.side === "buy" ? "var(--up)" : "var(--down)" }} />
+        <div style={{ height: "100%", width: `${progress > 0 ? Math.max(2, progress * 100) : 0}%`, background: o.side === "buy" ? "var(--up)" : "var(--down)" }} />
       </div>
 
       <div className="mt-1.5" style={{ fontSize: 12, color: "var(--text-3)" }}>
