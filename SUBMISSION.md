@@ -1,6 +1,6 @@
 # Submission notes: Continuity track and AI tool use
 
-This document exists to satisfy two ETHOnline requirements that apply to this entry: the
+This document exists to satisfy two ETHGlobal Mumbai 2026 requirements that apply to this entry: the
 **Continuity track** rule that pre-existing work is clearly documented and separated from work
 done during the hackathon, and the **AI tools** rule that AI assistance is attributed
 specifically rather than generally.
@@ -15,7 +15,8 @@ the command is given.
 Poincaré is an existing codebase entered under the Continuity track. It was submitted to the
 **Uniswap Hook Incubator 10 (UHI10)** hookathon, where it was selected as one of the winners, and
 it was subsequently selected by the **Uniswap Foundation Security Fund**, which sponsored a
-security review by **Olympix**.
+security review by **Olympix**. Entered at **ETHGlobal Mumbai 2026** under the Continuity track,
+it won **1st place in Uniswap's Continuity track**.
 
 ### 1.1 The boundary
 

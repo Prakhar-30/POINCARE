@@ -10,8 +10,9 @@ hookathon, where it was selected as one of the winners. It was subsequently sele
 reported findings are fixed and each carries a regression test that fails on the pre-fix code
 (see [§11](#11-security-review)).
 
-Entered at **ETHOnline** under the Continuity track. What pre-existed, what was built during the
-hackathon, and how AI tools were used are documented in [`SUBMISSION.md`](./SUBMISSION.md).
+It then took **1st place in Uniswap's Continuity track at ETHGlobal Mumbai 2026**. What pre-existed,
+what was built during the hackathon, and how AI tools were used are documented in
+[`SUBMISSION.md`](./SUBMISSION.md).
 
 The repository was scaffolded from Uniswap's official
 [`v4-template`](https://github.com/Uniswap/v4-template), and the detector, control law, curve,
@@ -44,7 +45,7 @@ rather than sitting alongside it. Line numbers are against the current `main`.
 |---|---|
 | Hook | `0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88` |
 | Lens (quoter) | `0xe685a9e01a46f6ff581ffbd6b409e1cef4ab2fa2` |
-| App | https://poincare-beta.vercel.app |
+| App | https://www.poincaretrade.in |
 
 **Integrating?** The canonical `V4Quoter` prices this pool correctly — it simulates the swap, so
 the custom curve applies. [`PoincareLens`](./src/PoincareLens.sol) returns the same numbers as a

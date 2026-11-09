@@ -35,5 +35,5 @@ through the Uniswap Foundation Security Fund, and live on Unichain Sepolia.
 ## Links
 
 - Repo: https://github.com/Prakhar-30/POINCARE
-- App: https://poincare-beta.vercel.app
+- App: https://www.poincaretrade.in
 - Hook (Unichain Sepolia): `0x89A520e7faEd35CB6F89b0040F5Bc5ADe035Aa88`
