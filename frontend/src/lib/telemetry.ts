@@ -6,8 +6,8 @@ import type { PostHog } from "posthog-js";
  * - Off unless VITE_POSTHOG_KEY is set; the PostHog client is loaded in its own chunk only then,
  *   so the landing page pays nothing for it when analytics is off.
  * - Cookieless: persistence lives in memory, so there is nothing to consent to and a returning
- *   visitor is a new anonymous session. `person_profiles: "identified_only"` and no identify()
- *   call mean no person profiles are ever created.
+ *   visitor is a new anonymous session. `person_profiles: "always"` gives each session an
+ *   anonymous profile (a random ID, no identify() call), so a visit's journey can be followed.
  * - Respects Do Not Track; no session recording; no remote scripts (surveys, toolbar) are pulled
  *   in, which also keeps the content-security policy simple.
  * - Never sends wallet addresses, balances or amounts: events carry only coarse, non-identifying
@@ -42,7 +42,7 @@ export async function initAnalytics(): Promise<void> {
     posthog.init(KEY!, {
       api_host: HOST,
       persistence: "memory",
-      person_profiles: "identified_only",
+      person_profiles: "always",
       capture_pageview: false, // the HashRouter changes only the hash; pageviews are sent from the router
       capture_pageleave: true,
       autocapture: true, // clicks on buttons and links; input values are never captured
