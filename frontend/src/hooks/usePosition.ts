@@ -11,6 +11,7 @@ const ZERO = "0x0000000000000000000000000000000000000000";
 
 export type Position = {
   shares: number; // user LP shares (human)
+  sharesWei: bigint; // user LP shares, exact on-chain balance (use this for burns)
   supply: number; // total LP supply (human)
   sharePct: number; // 0..1 of the pool the user owns
   underlying0: number; // USDC the shares redeem for
@@ -40,7 +41,8 @@ export function usePosition(): Position {
   const r0 = fromWei(reserves?.[0] ?? 0n, "USDC");
   const r1 = fromWei(reserves?.[1] ?? 0n, "WETH");
   const supply = Number((data?.[1]?.result as bigint) ?? 0n) / SHARE_DECIMALS;
-  const shares = Number((data?.[2]?.result as bigint) ?? 0n) / SHARE_DECIMALS;
+  const sharesWei = (data?.[2]?.result as bigint) ?? 0n;
+  const shares = Number(sharesWei) / SHARE_DECIMALS;
 
   const price = r1 > 0 ? r0 / r1 : 0;
   const sharePct = supply > 0 ? shares / supply : 0;
@@ -49,5 +51,5 @@ export function usePosition(): Position {
   const valueUsdc = underlying0 + underlying1 * price;
   const poolValueUsdc = r0 + r1 * price;
 
-  return { shares, supply, sharePct, underlying0, underlying1, valueUsdc, poolValueUsdc, price, r0, r1, loading: isLoading, refetch };
+  return { shares, sharesWei, supply, sharePct, underlying0, underlying1, valueUsdc, poolValueUsdc, price, r0, r1, loading: isLoading, refetch };
 }

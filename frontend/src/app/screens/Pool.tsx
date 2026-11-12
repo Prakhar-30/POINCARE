@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { parseUnits } from "viem";
 import { usePoolState } from "@/hooks/usePoolState";
 import { usePosition } from "@/hooks/usePosition";
 import { useBalances } from "@/hooks/useBalances";
@@ -474,7 +473,6 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
 function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>; lp: ReturnType<typeof useLiquidity>; pinned: boolean }) {
   const [pct, setPct] = useState(50);
 
-  const sharesToBurn = pos.shares * (pct / 100);
   const out0 = pos.underlying0 * (pct / 100);
   const out1 = pos.underlying1 * (pct / 100);
   const valueUsdc = out0 + out1 * pos.price;
@@ -482,8 +480,9 @@ function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>;
   const disabled = busy || pos.shares <= 0 || pct <= 0;
 
   async function onRemove() {
-    // Burn in raw 18-dec units; the 100% branch avoids float drift leaving dust.
-    const shares = pct >= 100 ? parseUnits(pos.shares.toFixed(18), 18) : parseUnits(sharesToBurn.toFixed(18), 18);
+    // Burn from the exact on-chain balance in integer units. Rebuilding wei from the float
+    // (toFixed(18)) can land a few wei ABOVE the balance, which made a 100% removal revert.
+    const shares = pct >= 100 ? pos.sharesWei : (pos.sharesWei * BigInt(pct)) / 100n;
     track("liquidity_removed");
     await lp.remove({ shares, valueUsdc, amount0: out0, amount1: out1 });
     pos.refetch();
