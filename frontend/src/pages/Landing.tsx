@@ -336,13 +336,13 @@ function LiveFigures() {
         <span className="anim-pulse-dot" aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: "var(--up)" }} />
         Live from the hook · {shorten(CONTRACTS.hook)} <Icon name="external" size={12} aria-hidden="true" />
       </a>
-      <h2 id="live-title" className="sr-only">Trend spread kept by liquidity providers on the testnet pool</h2>
+      <h2 id="live-title" className="sr-only">Trend spread earned by liquidity providers on the live pool</h2>
       <p className="lx-num mt-6" style={{ fontSize: "clamp(64px, 11vw, 148px)", letterSpacing: "-0.055em", color: "var(--green-label)" }} aria-describedby="live-kept-what">
         {kept}
       </p>
-      <p className="lx-h3 mt-4" style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}>trend spread kept by LPs</p>
+      <p className="lx-h3 mt-4" style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}>earned by LPs from the trend spread</p>
       <p id="live-kept-what" className="lx-sub mx-auto mt-3" style={{ fontSize: "clamp(16px, 1.4vw, 18px)", lineHeight: 1.55, maxWidth: "38rem", textWrap: "pretty" }}>
-        Paid by swaps that pushed with a confirmed trend, and kept in the pool for liquidity providers. Unichain Sepolia testnet{totals && totals.swap_count > 0 ? `, ${fmtNum(totals.swap_count, 0)} swaps so far` : ""}.
+        Kept in the pool instead of going to arbitrageurs{totals && totals.swap_count > 0 ? `, across ${fmtNum(totals.swap_count, 0)} swaps` : ""}.
       </p>
       <dl className="lx-stats mx-auto mt-14" style={{ ["--n" as string]: 3, maxWidth: 880 }}>
         {supporting.map((f) => (
