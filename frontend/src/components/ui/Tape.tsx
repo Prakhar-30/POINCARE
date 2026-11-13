@@ -103,10 +103,11 @@ export function Tape({
                 <span
                   role="cell"
                   className="text-right"
-                  title={replay ? "Original trade time" : undefined}
-                  style={{ color: replay ? "var(--lav-ink)" : "var(--muted)", fontSize: 12, fontWeight: replay ? 700 : undefined }}
+                  title={replay ? "Original trade time" : "Live trade, execution time"}
+                  style={{ color: replay ? "var(--lav-ink)" : "var(--green-label)", fontSize: 12, fontWeight: 700 }}
                 >
-                  {replay ? <span aria-hidden="true">◦ </span> : ""}{when(t.ts)}{replay && <span className="sr-only"> (original trade time)</span>}
+                  <span aria-hidden="true">{replay ? "◦ " : "• "}</span>{when(t.ts)}
+                  <span className="sr-only">{replay ? " (original trade time)" : " (live trade)"}</span>
                 </span>
               </motion.div>
             );
@@ -116,8 +117,11 @@ export function Tape({
       </div>
 
       {rows.some((t) => isReplayTrader(t.trader)) && (
-        <div className="px-5 py-2 shrink-0" style={{ fontSize: 12, lineHeight: 1.5, color: "var(--muted)", borderTop: "1px solid var(--divider-2)" }}>
-          <span style={{ color: "var(--lav-ink)", fontWeight: 600 }} aria-hidden="true">◦</span> Earlier market activity, shown at its original trade time.
+        <div className="px-5 py-2 shrink-0 flex flex-wrap gap-x-4 gap-y-1" style={{ fontSize: 12, lineHeight: 1.5, color: "var(--muted)", borderTop: "1px solid var(--divider-2)" }}>
+          {rows.some((t) => !isReplayTrader(t.trader)) && (
+            <span><span style={{ color: "var(--green-label)", fontWeight: 700 }} aria-hidden="true">•</span> Live trade, at its execution time.</span>
+          )}
+          <span><span style={{ color: "var(--lav-ink)", fontWeight: 600 }} aria-hidden="true">◦</span> Earlier market activity, shown at its original trade time.</span>
         </div>
       )}
 
