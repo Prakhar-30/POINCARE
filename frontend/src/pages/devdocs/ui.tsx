@@ -79,7 +79,7 @@ function useCopy(text: string) {
 function CodeFrame({ head, code, panel }: { head: ReactNode; code: string; panel: { role: "tabpanel" | "region"; id?: string; "aria-labelledby"?: string; "aria-label"?: string } }) {
   const { copied, copy } = useCopy(code);
   return (
-    <div className="overflow-hidden" style={{ marginTop: 16, borderRadius: 14, background: "var(--lx-card)", boxShadow: "inset 0 0 0 1px var(--lx-card-line)" }}>
+    <div className="min-w-0 max-w-full overflow-hidden" style={{ marginTop: 16, borderRadius: 14, background: "var(--lx-card)", boxShadow: "inset 0 0 0 1px var(--lx-card-line)" }}>
       <div className="flex items-center justify-between gap-2 pl-2 pr-2" style={{ minHeight: 42, borderBottom: "1px solid var(--lx-line)", background: "var(--lx-tint-soft)" }}>
         {head}
         <button type="button" onClick={() => void copy()} className="lx-link inline-flex items-center gap-1.5 rounded-full px-2.5 shrink-0"
@@ -98,7 +98,7 @@ function CodeFrame({ head, code, panel }: { head: ReactNode; code: string; panel
 export function CodeBlock({ code, lang, title }: { code: string; lang: string; title?: string }) {
   return (
     <CodeFrame code={code} panel={{ role: "region", "aria-label": `${title ?? lang} code` }} head={
-      <span className="px-2 lx-meta">{title ?? lang}</span>
+      <span className="min-w-0 truncate px-2 lx-meta">{title ?? lang}</span>
     } />
   );
 }
@@ -127,7 +127,7 @@ export function CodeTabs({ tabs }: { tabs: { label: string; lang: string; code: 
   };
   return (
     <CodeFrame code={t.code} panel={{ role: "tabpanel", id: `${uid}-panel`, "aria-labelledby": `${uid}-tab-${i}` }} head={
-      <div role="tablist" aria-label="Language" className="flex items-center gap-1 overflow-x-auto" onKeyDown={onKeyDown}>
+      <div role="tablist" aria-label="Language" className="flex min-w-0 items-center gap-1 overflow-x-auto" onKeyDown={onKeyDown}>
         {tabs.map((x, j) => (
           <button key={x.label} ref={(el) => { refs.current[j] = el; }} type="button" role="tab" id={`${uid}-tab-${j}`}
             aria-selected={j === i} aria-controls={`${uid}-panel`} tabIndex={j === i ? 0 : -1} onClick={() => pick(j)}

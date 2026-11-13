@@ -293,7 +293,7 @@ function Article({ page, titleRef }: { page: DocPage; titleRef: RefObject<HTMLHe
         <div className="xl:hidden mt-5"><PageActions page={page} /></div>
         <div style={{ marginTop: 12, paddingTop: 4, borderTop: "1px solid var(--lx-line)" }}>{page.body()}</div>
 
-        <nav aria-label="Pagination" className="grid gap-3 sm:grid-cols-2" style={{ marginTop: 56 }}>
+        <nav aria-label="Pagination" className="grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ marginTop: 56 }}>
           {prev ? <Pager page={prev} dir="prev" /> : <span className="hidden sm:block" />}
           {next ? <Pager page={next} dir="next" /> : <span />}
         </nav>
@@ -455,8 +455,8 @@ function DocsHome({ titleRef }: { titleRef: RefObject<HTMLHeadingElement> }) {
   return (
     <main id="doc" className="min-w-0" style={{ padding: "40px 0 80px", maxWidth: 1080 }}>
       {/* hero: the title and two ways in, with the quick start beside it */}
-      <section className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]" aria-labelledby="docs-title">
-        <div>
+      <section className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]" aria-labelledby="docs-title">
+        <div className="min-w-0">
           <h1 id="docs-title" ref={titleRef} tabIndex={-1} className="lx-h" style={{ fontSize: "clamp(40px, 5vw, 60px)", lineHeight: 1.02, outline: "none" }}>
             Poincaré documentation
           </h1>
@@ -468,7 +468,7 @@ function DocsHome({ titleRef }: { titleRef: RefObject<HTMLHeadingElement> }) {
             <Link to="/docs/mcp" className="lx-btn lx-btn-tonal">Agent tools</Link>
           </div>
         </div>
-        <div>
+        <div className="min-w-0">
           <p style={{ fontSize: 13, fontWeight: 600, color: "var(--lx-sub)", marginBottom: -4 }}>Quick start</p>
           <CodeTabs tabs={[
             { label: "SDK", lang: "sh", code: "npm i @poincaretrade/sdk viem" },
@@ -482,7 +482,7 @@ ${SKILL_INSTALL}` },
 
       <section style={{ marginTop: 72 }} aria-labelledby="guides-title">
         <SectionTitle id="guides-title">Guides</SectionTitle>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {guides.map((g) => {
             const t = TINTS[g.tint];
             return (
@@ -503,7 +503,7 @@ ${SKILL_INSTALL}` },
 
       <section style={{ marginTop: 64 }} aria-labelledby="usecases-title">
         <SectionTitle id="usecases-title">Use cases</SectionTitle>
-        <ul className="grid gap-3 md:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {useCases.map((u) => (
             <li key={u.title} className="lx-card flex flex-col p-6">
               <span className="inline-flex items-center justify-center" aria-hidden="true"
@@ -526,7 +526,7 @@ ${SKILL_INSTALL}` },
 
       <section style={{ marginTop: 64 }} aria-labelledby="methods-title">
         <SectionTitle id="methods-title">Integration methods</SectionTitle>
-        <ul className="grid gap-3 md:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {methods.map((m) => (
             <li key={m.title}>
               <Link to={`/docs/${m.to}`} className="lx-card flex items-center gap-4" style={{ padding: "16px 18px" }}>
