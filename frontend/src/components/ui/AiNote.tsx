@@ -28,7 +28,7 @@ export function AiNote({
    */
   skeletonLines?: number;
 }) {
-  const { text, source, model, cached, loading, reason, attempts, stalled } = explained;
+  const { text, source, model, cached, loading, reason, attempts, stalled, ask } = explained;
   // Stalled is not waiting. A skeleton says "this is coming"; if the deployed function has no
   // answer for this question, that is a promise the panel cannot keep.
   const waiting = skeletonLines > 0 && source !== "model" && !stalled;
@@ -73,7 +73,11 @@ export function AiNote({
               border: "1px solid var(--lav-dim)",
             }}
             title={
-              source === "model" ? "Generated from the pool's on-chain detector state" : localTitle
+              source === "model"
+                ? "Generated from the pool's on-chain detector state"
+                : stalled && reason
+                  ? `Summary service error: ${reason}`
+                  : localTitle
             }
           >
             {source === "model"
@@ -107,8 +111,8 @@ export function AiNote({
             ))}
           </div>
           {reason && (
-            <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginTop: 12 }}>
-              Waiting on the model — {reason}. Retrying automatically.
+            <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginTop: 12 }} title={reason}>
+              This is taking longer than usual. Retrying automatically.
             </p>
           )}
         </>
@@ -117,15 +121,17 @@ export function AiNote({
           className="rounded-md p-3"
           style={{ background: "var(--surface)", border: "1px dashed var(--lav-dim)" }}
         >
-          <p style={{ fontSize: 12, lineHeight: 1.65, color: "var(--text-2)", margin: 0 }}>
-            The report could not be generated: <b>{reason}</b>.
+          <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text-2)", fontWeight: 600, margin: 0 }}>
+            The written summary isn&rsquo;t available right now.
           </p>
           <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", margin: "6px 0 0" }}>
-            This will not resolve on its own — the deployed <code>explain</code> function does not
-            have the task this page is asking for. Redeploy it with{" "}
-            <code>supabase functions deploy explain --no-verify-jwt</code>. Every figure on the
-            rest of this page is measured on-chain and unaffected.
+            Every number and chart on this page is read live from the chain and isn&rsquo;t
+            affected. We&rsquo;ll keep checking in the background.
           </p>
+          <button type="button" className="btn btn-secondary btn-sm mt-3" onClick={ask} disabled={loading} aria-busy={loading}>
+            <Icon name={loading ? "spinner" : "play"} size={14} aria-hidden="true" />
+            {loading ? "Checking…" : "Try again"}
+          </button>
         </div>
       ) : (
         <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-2)", whiteSpace: "pre-wrap", maxWidth: "75ch", textWrap: "pretty" }}>{text}</p>

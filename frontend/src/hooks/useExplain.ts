@@ -3,6 +3,9 @@ import { isExplanation, isPermanentFailure, requestExplanation, type ExplainKind
 
 export type ExplainSource = "model" | "local" | "pending";
 
+/** How often a panel re-checks after a failure only a backend fix can clear. */
+const PERMANENT_RETRY_MS = 5 * 60_000;
+
 export type Explained = {
   text: string;
   source: ExplainSource;
@@ -90,11 +93,15 @@ export function useExplain(opts: {
       setState((s) => ({ ...s, reason: res.reason }));
       askedFor.current = null;
 
-      // A permanent failure cannot be waited out. Surface it and stop, rather than re-asking a
-      // question the deployed function has no answer for every thirty seconds forever.
-      if (retry && !isPermanentFailure(res.reason)) {
+      // A transient failure (cooldown, quota) clears on its own: back off fast, capped at 30s.
+      // A "permanent" one (retired model, missing key, undeployed task) only clears when the
+      // backend is fixed, so check quietly every few minutes instead: a page left open then
+      // recovers by itself once it is, without hammering a function that cannot answer yet.
+      if (retry) {
         attempts.current += 1;
-        const delay = Math.min(30_000, 2000 * 2 ** (attempts.current - 1));
+        const delay = isPermanentFailure(res.reason)
+          ? PERMANENT_RETRY_MS
+          : Math.min(30_000, 2000 * 2 ** (attempts.current - 1));
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => {
           // Only chase the question still on screen; a newer cacheKey supersedes this one.
@@ -126,7 +133,10 @@ export function useExplain(opts: {
   }, [cacheKey]);
 
   const ask = useCallback(() => {
-    if (cacheKey && askedFor.current !== cacheKey) void run(cacheKey);
+    if (!cacheKey || askedFor.current === cacheKey) return;
+    // A manual ask replaces any scheduled one, so the two never race.
+    if (timer.current) clearTimeout(timer.current);
+    void run(cacheKey);
   }, [cacheKey, run]);
 
   return {

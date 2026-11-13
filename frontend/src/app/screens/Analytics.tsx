@@ -261,7 +261,7 @@ export function Analytics() {
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{a.samples} samples · {totals?.swap_count ?? 0} swaps</span>
       </PanelHead>
       <div className="px-5 pt-4 pb-5 flex-1">
-        <ReportBody tall={!narrow} open={reportOpen === "open"} onToggle={() => setReportOpen(reportOpen === "open" ? "closed" : "open")}>
+        <ReportBody tall={!narrow} hideToggle={report.stalled} open={reportOpen === "open"} onToggle={() => setReportOpen(reportOpen === "open" ? "closed" : "open")}>
           <AiNote explained={report} title="Pool report" skeletonLines={reportOpen === "open" ? 12 : 4} />
         </ReportBody>
       </div>
@@ -406,7 +406,7 @@ function Line({ label, value, ink }: { label: string; value: string; ink?: strin
 /** The model's report, previewed to its first lines until the reader asks for the rest. */
 /** The model's report, previewed to its first lines. Opening it never grows the panel: the full
  *  text scrolls inside the box the preview already occupied, so the layout around it holds still. */
-function ReportBody({ open, onToggle, children, tall }: { open: boolean; onToggle: () => void; children: ReactNode; tall?: boolean }) {
+function ReportBody({ open, onToggle, children, tall, hideToggle }: { open: boolean; onToggle: () => void; children: ReactNode; tall?: boolean; hideToggle?: boolean }) {
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const [closedH, setClosedH] = useState(0);
@@ -431,10 +431,12 @@ function ReportBody({ open, onToggle, children, tall }: { open: boolean; onToggl
       >
         {children}
       </div>
-      <button type="button" className="btn btn-soft btn-sm mt-3" aria-expanded={open} aria-controls={id} onClick={onToggle}>
-        <Icon name={open ? "minus" : "plus"} size={14} aria-hidden="true" />
-        {open ? "Collapse report" : "Read full report"}
-      </button>
+      {!hideToggle && (
+        <button type="button" className="btn btn-soft btn-sm mt-3" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+          <Icon name={open ? "minus" : "plus"} size={14} aria-hidden="true" />
+          {open ? "Collapse report" : "Read full report"}
+        </button>
+      )}
     </>
   );
 }
