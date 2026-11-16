@@ -4,7 +4,6 @@ import { useAccount } from "wagmi";
 import { ACTIVE_CHAIN_ID, LIVE_CHAIN_IDS, setActiveChain } from "@/config/contracts";
 import { TopNav, BottomNav, TABS, type Tab } from "./TopNav";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { WalletGate } from "./WalletGate";
 import { Dashboard } from "./screens/Dashboard";
 import { Trade } from "./screens/Trade";
 import { Pool } from "./screens/Pool";
@@ -57,7 +56,6 @@ function useTabParam(): [Tab, (t: Tab) => void] {
 }
 
 export function AppShell() {
-  const { isConnected } = useAccount();
   const [tab, setTab] = useTabParam();
   const [menu, setMenu] = useState(false);
   const mobile = useIsMobile();
@@ -65,8 +63,6 @@ export function AppShell() {
   useFlushPendingRecords();
   useChainSync();
   useConnectedEvent();
-
-  if (!isConnected) return <WalletGate />;
 
   return (
     <div className="app-shell min-h-screen flex flex-col" style={{ background: "var(--app-bg)", backgroundAttachment: "fixed" }}>

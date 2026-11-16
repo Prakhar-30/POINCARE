@@ -24,6 +24,8 @@ import { Icon } from "@/components/ui/Icon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { track } from "@/lib/telemetry";
+import { useAccount } from "wagmi";
+import { ConnectCta } from "@/components/ui/ConnectCta";
 
 /**
  * The DCA ticket, in the shape exchanges taught users: set up -> review -> confirm.
@@ -105,7 +107,9 @@ export function DcaTicket({
   const totalNum = plan.ok ? Number(formatAmount(plan.p.amountIn)) : 0;
   const perNum = plan.ok ? totalNum / plan.p.slices : 0;
   const empty = !(totalNum > 0);
-  const insufficient = !empty && totalNum > payBal + 1e-9;
+  const { isConnected } = useAccount();
+  // signed out there is no balance to be short of: the plan can still be built and reviewed
+  const insufficient = isConnected && !empty && totalNum > payBal + 1e-9;
   const setupBlocked = empty || insufficient || !plan.ok;
 
   const setupCta = empty ? "Enter an amount" : insufficient ? `Insufficient ${paySym}` : !plan.ok ? "Check the plan" : "Review plan";
@@ -275,6 +279,7 @@ function Review({
   protection: Protection; catchUp: boolean; slip: number; limit: string; s: PoolState; perNum: number; totalNum: number;
   paySym: string; getSym: string; busy: boolean; onBack: () => void; onConfirm: () => void;
 }) {
+  const { isConnected } = useAccount();
   const dp = (sym: string) => (sym === "WETH" ? 4 : 2);
   const one = side === "buy" ? "buy" : "sell";
   const sideSpread = side === "buy" ? s.spreadZeroForOne : s.spreadOneForZero;
@@ -347,10 +352,14 @@ function Review({
       </div>
 
       <div className="flex flex-col shrink-0" style={{ gap: 8, padding: "10px 16px 14px", borderTop: "1px solid var(--divider)", background: "var(--surface)", borderRadius: "0 0 var(--r-card) var(--r-card)" }}>
-        <button type="button" onClick={onConfirm} disabled={!hasDca || busy} aria-busy={busy} className={`btn btn-lg btn-block ${side === "buy" ? "btn-positive" : "btn-negative"}`}>
-          {busy && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
-          {!hasDca ? "DCA not live yet" : busy ? "Confirming…" : "Confirm & start plan"}
-        </button>
+        {!isConnected && hasDca ? (
+          <ConnectCta label="Connect wallet to start the plan" />
+        ) : (
+          <button type="button" onClick={onConfirm} disabled={!hasDca || busy} aria-busy={busy} className={`btn btn-lg btn-block ${side === "buy" ? "btn-positive" : "btn-negative"}`}>
+            {busy && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
+            {!hasDca ? "DCA not live yet" : busy ? "Confirming…" : "Confirm & start plan"}
+          </button>
+        )}
         <button type="button" onClick={onBack} className="link-quiet w-full" style={{ fontSize: 12, fontWeight: 650, minHeight: 28 }}>Edit plan</button>
       </div>
     </div>

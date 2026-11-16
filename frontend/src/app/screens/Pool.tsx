@@ -19,6 +19,8 @@ import { PanelHead, SourceTag, Seg } from "@/components/ui/Panel";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { TxSteps } from "@/components/ui/TxSteps";
 import { track } from "@/lib/telemetry";
+import { useAccount } from "wagmi";
+import { ConnectCta } from "@/components/ui/ConnectCta";
 import { useIsMobile, useIsNarrow } from "@/hooks/useMediaQuery";
 
 /**
@@ -420,8 +422,10 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
   const u = Number(usdc) || 0;
   const w = Number(weth) || 0;
   const valueUsdc = u + w * price;
-  const shortUsdc = u > bal.usdc + 1e-6;
-  const shortWeth = w > bal.weth + 1e-9;
+  // signed out there is no balance to be short of: the amounts and the preview still work
+  const { isConnected } = useAccount();
+  const shortUsdc = isConnected && u > bal.usdc + 1e-6;
+  const shortWeth = isConnected && w > bal.weth + 1e-9;
   const insufficient = shortUsdc || shortWeth;
   const busy = lp.status === "busy";
   const disabled = busy || u <= 0 || w <= 0 || insufficient;
@@ -440,7 +444,9 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
     <TicketBody
       pinned={pinned}
       footer={
-        <>
+        !isConnected ? (
+          <ConnectCta label="Connect wallet to add liquidity" />
+        ) : <>
           <button type="submit" disabled={disabled} aria-busy={busy} className="btn btn-positive btn-lg btn-block">
             {busy && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
             {lp.status === "success" && <Icon name="check" size={17} aria-hidden="true" />}
@@ -472,6 +478,7 @@ function AddPanel({ price, bal, lp, pinned }: { price: number; bal: ReturnType<t
 
 function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>; lp: ReturnType<typeof useLiquidity>; pinned: boolean }) {
   const [pct, setPct] = useState(50);
+  const { isConnected } = useAccount();
 
   const out0 = pos.underlying0 * (pct / 100);
   const out1 = pos.underlying1 * (pct / 100);
@@ -489,6 +496,14 @@ function RemovePanel({ pos, lp, pinned }: { pos: ReturnType<typeof usePosition>;
     setTimeout(lp.reset, 2500);
   }
 
+  if (!isConnected) {
+    return (
+      <div style={{ padding: "20px 18px" }}>
+        <p style={{ fontSize: 14, color: "var(--text-3)", lineHeight: 1.7, marginBottom: 14 }}>Connect a wallet to see and withdraw your liquidity.</p>
+        <ConnectCta label="Connect wallet" />
+      </div>
+    );
+  }
   if (pos.shares <= 0) {
     return <p style={{ fontSize: 14, color: "var(--text-3)", lineHeight: 1.7, padding: "20px 18px" }}>No liquidity to withdraw yet. Switch to Deposit to make your first one.</p>;
   }

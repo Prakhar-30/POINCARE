@@ -1,3 +1,5 @@
+import { useAccount } from "wagmi";
+import { ConnectCta } from "@/components/ui/ConnectCta";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { usePoolState } from "@/hooks/usePoolState";
@@ -220,10 +222,12 @@ function AccountBar({
           {addr ? <WalletAvatar address={addr} size={52} /> : <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: 999, background: "var(--surface-2)" }} />}
           <div className="min-w-0">
             <div className="flex items-center gap-1">
-              <span className="font-display truncate" translate="no" title={addr} style={{ fontSize: 18, fontWeight: 650, color: "var(--text)" }}>{addr ? shorten(addr) : "—"}</span>
-              <button type="button" className="icon-btn icon-btn-plain" onClick={copy} aria-label={copied ? "Address copied" : "Copy wallet address"} title="Copy address" style={{ color: copied ? "var(--up-ink)" : "var(--text-3)" }}>
-                <Icon name={copied ? "check" : "copy"} size={15} aria-hidden="true" />
-              </button>
+              <span className="font-display truncate" translate="no" title={addr || undefined} style={{ fontSize: 18, fontWeight: 650, color: "var(--text)" }}>{addr ? shorten(addr) : "Not connected"}</span>
+              {addr && (
+                <button type="button" className="icon-btn icon-btn-plain" onClick={copy} aria-label={copied ? "Address copied" : "Copy wallet address"} title="Copy address" style={{ color: copied ? "var(--up-ink)" : "var(--text-3)" }}>
+                  <Icon name={copied ? "check" : "copy"} size={15} aria-hidden="true" />
+                </button>
+              )}
               {addr && (
                 <a className="icon-btn icon-btn-plain" href={`${EXPLORER}/address/${addr}`} target="_blank" rel="noreferrer" title="View on explorer" aria-label="View wallet on the block explorer (opens in a new tab)" style={{ color: "var(--text-3)" }}>
                   <Icon name="external" size={15} aria-hidden="true" />
@@ -232,7 +236,7 @@ function AccountBar({
               <span className="sr-only" aria-live="polite">{copied ? "Address copied" : ""}</span>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 12, color: "var(--text-3)" }}>
-              <span>{firstSeen ? `Member since ${dateFmt.format(new Date(firstSeen))}` : "Welcome to Poincaré"}</span>
+              <span>{!addr ? "Browsing the live pool. Connect to see your balances and positions." : firstSeen ? `Member since ${dateFmt.format(new Date(firstSeen))}` : "Welcome to Poincaré"}</span>
               {visits && visits > 1 ? <><span aria-hidden="true">·</span><span>{visits} visits</span></> : null}
               <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5" style={{ fontWeight: 600, color: "var(--text-2)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "var(--up)" }} />
@@ -243,13 +247,15 @@ function AccountBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {empty ? (
+          {!addr ? (
+            <ConnectCta size="sm" block={false} />
+          ) : empty ? (
             <button type="button" className="btn btn-primary btn-sm" onClick={onFaucet} disabled={minting} aria-busy={minting}>
               {minting && <Icon name="spinner" size={14} className="animate-spin" aria-hidden="true" />}
               {minting ? "Minting…" : "Get test tokens"}
             </button>
           ) : null}
-          <Link to={{ search: "?tab=trade" }} onClick={goTop} className="btn btn-primary btn-sm">
+          <Link to={{ search: "?tab=trade" }} onClick={goTop} className={`btn btn-sm ${addr ? "btn-primary" : "btn-secondary"}`}>
             <Icon name="swap" size={14} aria-hidden="true" /> Trade
           </Link>
           <Link to={{ search: "?tab=pool" }} onClick={goTop} className="btn btn-secondary btn-sm">
@@ -497,6 +503,7 @@ const HISTORY_PAGE = 50;
 function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; lpEvents: LpEvent[]; stats: ReturnType<typeof tradeStatsOf>; loading: boolean }) {
   // in the URL (#/app?activity=dca), like every other view switch, so a shared link opens on it
   const [tab, setTab] = useParam("activity", ["trades", "liquidity", "dca"] as const, "trades");
+  const { isConnected } = useAccount();
   const [shown, setShown] = useState(HISTORY_PAGE);
   // DCA fills are trades too: the keeper sends them, so they are merged in from the DCA index
   const plans = useDcaOrders();
@@ -541,6 +548,11 @@ function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; l
       <div className="overflow-auto flex-1" style={{ maxHeight: 420 }} tabIndex={0} role="region" aria-label={tab === "trades" ? "Your trades" : tab === "dca" ? "Your DCA plans" : "Your liquidity events"}>
         {tab === "dca" ? (
           <DcaOrders startLink />
+        ) : !isConnected ? (
+          <div className="flex flex-col items-center gap-3 text-center" style={{ padding: "32px 20px" }}>
+            <p style={{ fontSize: 13, color: "var(--text-3)" }}>Connect a wallet to see your {tab === "trades" ? "trades" : "liquidity history"} here.</p>
+            <ConnectCta size="sm" block={false} />
+          </div>
         ) : loading ? (
           <p style={{ padding: 24, fontSize: 13, color: "var(--muted)", textAlign: "center" }}>Loading your history…</p>
         ) : tab === "trades" ? (

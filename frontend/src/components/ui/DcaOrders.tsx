@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useAccount } from "wagmi";
 import { hasDca } from "@/config/contracts";
+import { ConnectCta } from "@/components/ui/ConnectCta";
 import { useDcaActions, useDcaOrders, type DcaOrderWithNext } from "@/hooks/useDca";
 import {
   DcaParamError,
@@ -27,6 +29,7 @@ import { Chips, paramHint } from "@/components/ui/DcaTicket";
 export function DcaOrders({ maxHeight, startLink }: { maxHeight?: number; startLink?: boolean }) {
   const q = useDcaOrders();
   const actions = useDcaActions();
+  const { isConnected } = useAccount();
   const start = startLink ? (
     <Link to={{ search: "?tab=trade&mode=dca" }} onClick={() => window.scrollTo({ top: 0 })} className="btn btn-soft btn-sm" style={{ marginTop: 10 }}>
       <Icon name="layers" size={14} aria-hidden="true" /> Start a DCA plan
@@ -35,6 +38,9 @@ export function DcaOrders({ maxHeight, startLink }: { maxHeight?: number; startL
 
   if (!hasDca) {
     return <Empty action={start}>DCA goes live once its contract is deployed on this network. You can already plan one on the Trade screen.</Empty>;
+  }
+  if (!isConnected) {
+    return <Empty action={<div style={{ marginTop: 10 }}><ConnectCta size="sm" block={false} /></div>}>Connect a wallet to see your DCA plans. You can already build and review one on the Trade screen.</Empty>;
   }
   if (q.isLoading) return <Empty>Loading your DCA plans…</Empty>;
   if (q.isError) return <Empty>Couldn't read your plans. Retrying…</Empty>;

@@ -21,6 +21,7 @@ import { CurveDepth, depthOf } from "@/components/ui/CurveDepth";
 import { useIsNarrow, useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useParam } from "@/hooks/useParam";
 import { DcaTicket, type DcaPrefill } from "@/components/ui/DcaTicket";
+import { ConnectCta } from "@/components/ui/ConnectCta";
 import { track } from "@/lib/telemetry";
 import { DcaOrders } from "@/components/ui/DcaOrders";
 
@@ -118,7 +119,7 @@ export function Trade() {
   const cfg = useDetectorConfig();
   const series = useDetectorSeries();
   const bal = useBalances();
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { swap, status, stepper, reset } = useSwap();
   const faucet = useFaucet();
   const tape = useOnchainTape();
@@ -194,7 +195,7 @@ export function Trade() {
   const empty = invalid || !amt || amtNum <= 0;
   const disabled = busy || empty || q.out <= 0 || insufficient || (highImpact && !impactAck);
   // With nothing to trade, the faucet is the next step, so it takes the primary slot.
-  const faucetFirst = payBal < 1 && insufficient;
+  const faucetFirst = isConnected && payBal < 1 && insufficient;
 
   const round = (v: number, sym: string) => {
     const f = sym === "WETH" ? 1e6 : 1e2;
@@ -358,7 +359,7 @@ export function Trade() {
               </span>
             </div>
           }
-          error={invalid ? "Use digits and one decimal point, e.g. 1250.5" : insufficient && amtNum > 0 && !faucetFirst ? `More than your ${fmtNum(payBal, 4)} ${paySym}` : null}>
+          error={invalid ? "Use digits and one decimal point, e.g. 1250.5" : isConnected && insufficient && amtNum > 0 && !faucetFirst ? `More than your ${fmtNum(payBal, 4)} ${paySym}` : null}>
           <input
             id="ticket-amount"
             name="amount"
@@ -430,7 +431,12 @@ export function Trade() {
           </label>
         )}
 
-        {faucetFirst ? (
+        {!isConnected ? (
+          <div>
+            <ConnectCta label={`Connect wallet to ${verb.toLowerCase()}`} />
+            <p className="mt-1.5 text-center" style={{ fontSize: 12, color: "var(--text-3)" }}>The quote above is live. Connecting only lets you sign.</p>
+          </div>
+        ) : faucetFirst ? (
           <div>
             <button type="button" onClick={onFaucet} disabled={faucet.minting} aria-busy={faucet.minting} className="btn btn-primary btn-lg btn-block">
               {faucet.minting && <Icon name="spinner" size={17} className="animate-spin" aria-hidden="true" />}
@@ -496,7 +502,7 @@ export function Trade() {
           <Tape bare fill={!narrow} title="Trades" rows={listRows.slice(0, visible)} onLoadMore={onTapeLoadMore}
             hasMore={visible < listRows.length || tape.hasMore} loadingMore={tape.loadingMore}
             maxHeight={narrow ? 360 : Math.max(160, panelBox.h - 130)}
-            empty={mine ? "No trades from this wallet in the loaded history." : "No trades yet. Be the first to swap."} />
+            empty={mine ? (isConnected ? "No trades from this wallet in the loaded history." : "Connect a wallet to see your own trades here.") : "No trades yet. Be the first to swap."} />
         )}
       </div>
     </section>

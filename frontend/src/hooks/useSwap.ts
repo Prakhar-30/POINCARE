@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { CONTRACTS, ERC20_ABI, EXPLORER, FAUCET_ABI, POOL_KEY, ROUTER_ABI, hasFaucet } from "@/config/contracts";
 import { recordSwap } from "@/lib/db";
 import { resolveGas, GAS, nextNonce, waitForSuccess } from "@/lib/gas";
@@ -133,6 +134,7 @@ export function useFaucet() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const toast = useToast();
+  const { openConnectModal } = useConnectModal();
   const [minting, setMinting] = useState(false);
 
   const USDC_AMT = "50000";
@@ -144,7 +146,9 @@ export function useFaucet() {
 
   async function mint() {
     if (!address || !walletClient || !publicClient) {
-      toast.error("Connect a wallet", "Connect your wallet to get test tokens.");
+      // Signed out: every "Get test tokens" button doubles as a way in.
+      if (openConnectModal) openConnectModal();
+      else toast.error("Connect a wallet", "Connect your wallet to get test tokens.");
       return;
     }
     if (inFlight.current) return;
