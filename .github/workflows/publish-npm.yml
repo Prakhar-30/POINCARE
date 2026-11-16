@@ -1,0 +1,43 @@
+name: Publish npm packages
+
+# Publishes @poincaretrade/sdk and @poincaretrade/mcp at the versions in their package.json.
+# Started by hand only (Actions tab, "Run workflow"); it never runs on a push.
+# Needs one repository secret, NPM_TOKEN: an npm granular access token with read and write
+# access to the two packages. Each package builds, type-checks and tests itself before it is
+# published (its prepublishOnly script), so a failing test stops the release.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: packages/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+          cache-dependency-path: packages/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # pnpm, not npm: it rewrites the MCP server's workspace dependency on the SDK to the real version.
+      - name: Publish
+        run: pnpm publish:npm --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
