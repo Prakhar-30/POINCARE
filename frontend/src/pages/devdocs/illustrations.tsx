@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
  * that scrolls sideways on narrow screens rather than shrinking below legibility.
  */
 
-function Figure({ caption, children }: { caption: ReactNode; children: ReactNode }) {
+export function Figure({ caption, children }: { caption: ReactNode; children: ReactNode }) {
   return (
     <figure style={{ marginTop: 20, marginBottom: 0 }}>
       <div style={{ borderRadius: 16, padding: "clamp(14px, 2.4vw, 22px)", background: "var(--lx-tint-soft)", boxShadow: "inset 0 0 0 1px var(--lx-card-line)" }}>
@@ -18,7 +18,7 @@ function Figure({ caption, children }: { caption: ReactNode; children: ReactNode
   );
 }
 
-type Node = { icon: IconName; title: string; body: string; tone?: "accent" | "green" | "honey" };
+export type Node = { icon: IconName; title: string; body: string; tone?: "accent" | "green" | "honey" };
 const TONE = {
   accent: { bg: "var(--lav-soft)", ink: "var(--lx-accent-ink)" },
   green: { bg: "var(--green-bg)", ink: "var(--green-label)" },
@@ -26,7 +26,7 @@ const TONE = {
 } as const;
 
 /** A left-to-right chain of steps (a column on phones), joined by arrows. */
-function Chain({ nodes, label }: { nodes: Node[]; label: string }) {
+export function Chain({ nodes, label }: { nodes: Node[]; label: string }) {
   return (
     <ol className="flex flex-col md:flex-row md:items-stretch" style={{ gap: 6 }} aria-label={label}>
       {nodes.map((n, i) => {

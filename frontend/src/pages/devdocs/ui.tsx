@@ -32,6 +32,10 @@ export const A = ({ href, children }: { href: string; children: ReactNode }) => 
 export const DocLink = ({ to, children }: { to: string; children: ReactNode }) => (
   <Link to={`/docs/${to}`} style={linkStyle}>{children}</Link>
 );
+/** A link into the app or the landing page (same tab, client-side). */
+export const SiteLink = ({ to, children }: { to: string; children: ReactNode }) => (
+  <Link to={to} style={linkStyle}>{children}</Link>
+);
 /** Inline code, lavender on a lavender tint, as Aave's docs set identifiers apart from prose. */
 export const Code = ({ children }: { children: ReactNode }) => (
   <code translate="no" style={{ fontFamily: "var(--font-mono)", fontSize: "0.85em", padding: "1px 6px", borderRadius: 6, background: "var(--lav-soft)", color: "var(--lx-accent-ink)", overflowWrap: "anywhere" }}>{children}</code>
@@ -143,7 +147,7 @@ export function CodeTabs({ tabs }: { tabs: { label: string; lang: string; code: 
 
 export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
   return (
-    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`${head.join(", ")} table`}
+    <div className="relative overflow-x-auto" tabIndex={0} role="region" aria-label={`${head.join(", ")} table`}
       style={{ marginTop: 16, borderRadius: 14, background: "var(--lx-card)", boxShadow: "inset 0 0 0 1px var(--lx-card-line)" }}>
       <table className="w-full" style={{ borderCollapse: "collapse", fontSize: 14.5 }}>
         <thead>

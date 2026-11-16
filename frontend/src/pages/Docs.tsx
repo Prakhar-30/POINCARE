@@ -494,7 +494,11 @@ ${SKILL_INSTALL}` },
       </section>
 
       <section style={{ marginTop: 72 }} aria-labelledby="guides-title">
-        <SectionTitle id="guides-title">Guides</SectionTitle>
+        <SectionTitle id="guides-title" aside={
+          <Link to="/docs/how-it-works" className="lx-link inline-flex items-center gap-1.5" style={{ fontSize: 14.5, fontWeight: 550 }}>
+            New here? How Poincaré works <Icon name="arrowRight" size={14} aria-hidden="true" />
+          </Link>
+        }>Guides</SectionTitle>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {guides.map((g) => {
             const t = TINTS[g.tint];

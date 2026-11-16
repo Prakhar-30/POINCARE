@@ -3,6 +3,7 @@ import { CONTRACTS, EXPLORER } from "@/config/contracts";
 import { Icon } from "@/components/ui/Icon";
 import { A, B, Callout, CardGrid, Code, CodeBlock, CodeTabs, DocLink, H2, P, Steps, Table, Ul } from "./ui";
 import { DcaFlowIllustration, DcaTimelineIllustration, LpStrategyIllustration } from "./illustrations";
+import { UNDERSTAND_PAGES } from "./understand";
 
 /** One command that installs the Poincaré skill for Claude (and other agents the skills CLI supports). */
 export const SKILL_INSTALL = "npx skills add https://github.com/Prakhar-30/POINCARE --skill poincare";
@@ -36,7 +37,8 @@ Everything stays unsigned: do not send anything.`;
  * (sdk, mcp, api), PoincareDCA.sol and the edge functions: keep them in step when those change.
  */
 
-export const REPO = "https://github.com/Prakhar-30/POINCARE";
+import { REPO } from "./links";
+export { REPO };
 export const API_BASE = "https://gogjpdgluflntcgsarhn.supabase.co/functions/v1/poincare-api";
 
 export type DocPage = { slug: string; group: string; title: string; lede: string; keywords?: string; body: () => ReactNode };
@@ -54,6 +56,8 @@ export const PAGES: DocPage[] = [
     body: () => (
       <>
         <CardGrid items={[
+          { to: "how-it-works", title: "How Poincaré works", body: "New here? The problem, the idea and the parts, in plain words with figures.", icon: "eye" },
+          { to: "detector", title: "The trend detector", body: "How the pool decides a trend is real, with a worked example.", icon: "gauge" },
           { to: "quickstart", title: "Quickstart", body: "Read the regime, quote a swap and plan a DCA order in five minutes.", icon: "spark" },
           { to: "sdk", title: "TypeScript SDK", body: "@poincaretrade/sdk: one client for regime, quotes and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
           { to: "mcp", title: "MCP server", body: "15 tools for Claude and any MCP client. Unsigned by default; sends only with your key and send: true.", icon: "curve" },
@@ -140,6 +144,9 @@ const txs = await poincare.dca.build.create(owner, input);   // [approve, create
       </>
     ),
   },
+
+  // ------------------------------------------------------------------ Understand Poincaré
+  ...UNDERSTAND_PAGES,
 
   // ------------------------------------------------------------------ Guides
   {
