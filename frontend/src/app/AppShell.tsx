@@ -26,15 +26,16 @@ function useChainSync() {
   }, [chain?.id]);
 }
 
-/** One `wallet_connected` event per session: the chain id only, never the address. */
+/** One `wallet_connected` event per page load: the chain id only, never the address.
+ *  Per page load, not per browser session, because that is what a visitor is to the analytics
+ *  (nothing is stored on the device, so every load is a new anonymous visitor). A session-wide
+ *  guard left reloaded visits looking as if they had no wallet, even when they went on to swap. */
+let connectedTracked = false;
 function useConnectedEvent() {
   const { isConnected, chain } = useAccount();
   useEffect(() => {
-    if (!isConnected) return;
-    try {
-      if (sessionStorage.getItem("poincare-connected-tracked")) return;
-      sessionStorage.setItem("poincare-connected-tracked", "1");
-    } catch { /* storage blocked: still record it once for this page */ }
+    if (!isConnected || connectedTracked) return;
+    connectedTracked = true;
     track("wallet_connected", { chain_id: chain?.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);

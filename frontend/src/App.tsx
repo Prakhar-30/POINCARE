@@ -4,7 +4,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { Landing } from "@/pages/Landing";
 import { loadAppRoute } from "@/app/preload";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { trackPageview } from "@/lib/telemetry";
+import { publicSearch, trackPageview } from "@/lib/telemetry";
 
 // /app (screens, wallet connectors, RainbowKit) is its own chunk: the landing page does not
 // download it. The fallback is the app's own background, so the hand-off shows no flash.
@@ -33,7 +33,10 @@ function OldDocsRedirect() {
 /** One PostHog page view per route change (client-side navigation never reloads the page). */
 function PageviewTracker() {
   const { pathname, search } = useLocation();
-  useEffect(() => trackPageview(pathname, search), [pathname, search]);
+  // without the private parameters: typing an amount on the trade ticket rewrites the URL, and
+  // that must neither be sent nor count as a new page view
+  const shown = publicSearch(search);
+  useEffect(() => trackPageview(pathname, shown), [pathname, shown]);
   return null;
 }
 

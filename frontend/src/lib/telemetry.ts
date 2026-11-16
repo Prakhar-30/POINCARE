@@ -10,7 +10,8 @@ import type { PostHog } from "posthog-js";
  *   anonymous profile (a random ID, no identify() call), so a visit's journey can be followed.
  * - Respects Do Not Track; no session recording; no remote scripts (surveys, toolbar) are pulled
  *   in, which also keeps the content-security policy simple.
- * - Never sends wallet addresses, balances or amounts: events carry only coarse, non-identifying
+ * - Never sends wallet addresses, balances or amounts (the amount in the trade URL is stripped
+ *   before anything is sent): events carry only coarse, non-identifying
  *   properties (side, plan kind, slice count).
  *
  * Vercel Analytics (page views, Web Vitals) keeps running alongside; PostHog adds product events.
@@ -51,6 +52,12 @@ export async function initAnalytics(): Promise<void> {
       disable_external_dependency_loading: true,
       advanced_disable_flags: true, // no feature flags in use: skip that request
       respect_dnt: true,
+      // every event carries the page URL; keep the trade amount out of it
+      before_send: (event) => {
+        const url = event?.properties?.$current_url;
+        if (event && typeof url === "string") event.properties.$current_url = publicUrl(url);
+        return event;
+      },
     });
     ph = posthog;
     for (const [e, p] of queue.splice(0)) ph.capture(e, p);
@@ -66,10 +73,33 @@ export function track(event: string, props?: Props): void {
   else if (queue.length < 50) queue.push([event, props]);
 }
 
-/** A page view for the route (`/app?tab=trade` → path "/app", query "tab=trade"). */
+/** URL parameters that never go to analytics. `amt` is the amount typed on the trade ticket,
+ *  which lives in the URL so a link can carry a trade. */
+const PRIVATE_PARAMS = ["amt"];
+
+/** The query string without the private parameters ("?tab=trade&amt=5" → "?tab=trade"). */
+export function publicSearch(search: string): string {
+  const p = new URLSearchParams(search);
+  for (const k of PRIVATE_PARAMS) p.delete(k);
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+function publicUrl(href: string): string {
+  try {
+    const u = new URL(href);
+    u.search = publicSearch(u.search);
+    return u.toString();
+  } catch {
+    return href;
+  }
+}
+
+/** A page view for the route (`/app?tab=trade` → path "/app", query "tab=trade"). `search` is
+ *  expected already stripped of private parameters (see `publicSearch`). */
 export function trackPageview(pathname: string, search: string): void {
   track("$pageview", {
-    $current_url: typeof window !== "undefined" ? window.location.href : undefined,
+    $current_url: typeof window !== "undefined" ? publicUrl(window.location.href) : undefined,
     path: pathname,
     query: search.replace(/^\?/, "") || undefined,
   });
