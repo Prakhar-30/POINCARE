@@ -40,7 +40,7 @@ function useConnectedEvent() {
   }, [isConnected]);
 }
 
-/** The open tab lives in the URL (#/app?tab=trade) so refresh, Back/Forward and shared links all
+/** The open tab lives in the URL (/app?tab=trade) so refresh, Back/Forward and shared links all
  *  land on the same screen. Anything unrecognised falls back to the dashboard. */
 function useTabParam(): [Tab, (t: Tab) => void] {
   const [params, setParams] = useSearchParams();

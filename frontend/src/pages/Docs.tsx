@@ -35,11 +35,24 @@ export function Docs() {
 
   useEffect(() => {
     document.title = home ? "Poincaré docs" : `${page.title} · Poincaré docs`;
+    // each page is its own URL: keep its description and canonical link in step when navigating
+    // inside the app (a direct visit already has them, from the prerendered HTML)
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href", `https://www.poincaretrade.in/docs${home ? "" : `/${page.slug}`}`);
+    if (!home) document.querySelector('meta[name="description"]')?.setAttribute("content", page.lede);
     window.scrollTo({ top: 0 });
     setMenu(false);
     if (slug) title.current?.focus({ preventScroll: true });
   }, [home, page.slug, page.title, slug]);
-  useEffect(() => () => void (document.title = "Poincaré"), []);
+  // leaving the docs: hand the document head back to the rest of the site
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="description"]');
+    const siteDescription = meta?.getAttribute("content") ?? "";
+    return () => {
+      document.title = "Poincaré";
+      document.querySelector('link[rel="canonical"]')?.setAttribute("href", "https://www.poincaretrade.in/");
+      if (siteDescription) meta?.setAttribute("content", siteDescription);
+    };
+  }, []);
 
   // Ctrl/⌘ K and "/" open search, as on most docs sites
   useEffect(() => {
@@ -346,7 +359,7 @@ function PageActions({ page, stacked }: { page: DocPage; stacked?: boolean }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     const body = document.getElementById("doc")?.querySelector(":scope > div:nth-of-type(2)") as HTMLElement | null;
-    const text = `# ${page.title}\n\n${page.lede}\n\n${body?.innerText ?? ""}\n\nSource: https://www.poincaretrade.in/#/docs/${page.slug}\n`;
+    const text = `# ${page.title}\n\n${page.lede}\n\n${body?.innerText ?? ""}\n\nSource: https://www.poincaretrade.in/docs/${page.slug}\n`;
     try {
       await navigator.clipboard.writeText(text);
       track("docs_copied_for_llms", { page: page.slug });

@@ -139,4 +139,4 @@ comes; stop when the user's condition is met.
   delegating. Never ask the user to paste a key into the chat.
 - PoincareDCA is unaudited periphery code on a testnet; the hook and Lens it reads were reviewed
   (SFS-Labs scoped review, Olympix pre-audit scan). Say this if the user treats it as production.
-- Docs: https://www.poincaretrade.in/#/docs
+- Docs: https://www.poincaretrade.in/docs

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Fallback only: the build (scripts/prerender.mjs) replaces this with one entry per page. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.poincaretrade.in/</loc>
-    <lastmod>2026-10-31</lastmod>
+  </url>
+  <url>
+    <loc>https://www.poincaretrade.in/docs</loc>
   </url>
 </urlset>

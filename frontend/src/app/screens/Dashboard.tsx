@@ -501,7 +501,7 @@ function hookTag(t: SwapRow) {
 const HISTORY_PAGE = 50;
 
 function ActivityCard({ swaps, lpEvents, stats, loading }: { swaps: SwapRow[]; lpEvents: LpEvent[]; stats: ReturnType<typeof tradeStatsOf>; loading: boolean }) {
-  // in the URL (#/app?activity=dca), like every other view switch, so a shared link opens on it
+  // in the URL (/app?activity=dca), like every other view switch, so a shared link opens on it
   const [tab, setTab] = useParam("activity", ["trades", "liquidity", "dca"] as const, "trades");
   const { isConnected } = useAccount();
   const [shown, setShown] = useState(HISTORY_PAGE);

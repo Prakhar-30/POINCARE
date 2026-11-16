@@ -43,7 +43,7 @@ export async function initAnalytics(): Promise<void> {
       api_host: HOST,
       persistence: "memory",
       person_profiles: "always",
-      capture_pageview: false, // the HashRouter changes only the hash; pageviews are sent from the router
+      capture_pageview: false, // client-side navigation: pageviews are sent from the router
       capture_pageleave: true,
       autocapture: true, // clicks on buttons and links; input values are never captured
       disable_session_recording: true,
@@ -66,7 +66,7 @@ export function track(event: string, props?: Props): void {
   else if (queue.length < 50) queue.push([event, props]);
 }
 
-/** A page view for the hash route (`/#/app?tab=trade` → path "/app", query "tab=trade"). */
+/** A page view for the route (`/app?tab=trade` → path "/app", query "tab=trade"). */
 export function trackPageview(pathname: string, search: string): void {
   track("$pageview", {
     $current_url: typeof window !== "undefined" ? window.location.href : undefined,

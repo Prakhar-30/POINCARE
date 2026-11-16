@@ -42,7 +42,7 @@ const enter = (delay = 0) => ({
   transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay },
 });
 
-// In-page scroll (HashRouter owns the URL hash, so these are buttons, not href="#id").
+// In-page scroll, as buttons rather than href="#id", so the URL stays clean.
 const scrollToId = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: scrollBehavior() });
 const scrollTop = () => window.scrollTo({ top: 0, behavior: scrollBehavior() });
 /** Read by screen readers after a link that opens a new tab (the icon beside it is decorative). */

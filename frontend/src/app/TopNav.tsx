@@ -11,7 +11,7 @@ import { MOD } from "@/lib/platform";
 
 export type Tab = "dashboard" | "trade" | "pool" | "analytics";
 
-/** Each section is a real link (#/app?tab=…), so Cmd/Ctrl-click and middle-click open it in a new
+/** Each section is a real link (/app?tab=…), so Cmd/Ctrl-click and middle-click open it in a new
  *  tab. A plain click still goes through setTab, which also scrolls back to the top. */
 const tabHref = (t: Tab) => ({ search: t === "dashboard" ? "" : `?tab=${t}` });
 const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
