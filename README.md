@@ -14,6 +14,9 @@ It then took **1st place in Uniswap's Continuity track at ETHGlobal Mumbai 2026*
 what was built during the hackathon, and how AI tools were used are documented in
 [`SUBMISSION.md`](./SUBMISSION.md).
 
+For a short, non-technical summary of what Poincaré does, why it matters and how it performs, see the
+[product overview (PDF)](./pitch/Poincare-Product-Overview.pdf).
+
 The repository was scaffolded from Uniswap's official
 [`v4-template`](https://github.com/Uniswap/v4-template), and the detector, control law, curve,
 hook and Lens are original work. It depends on no oracle, keeper, AVS, relayer or cross-chain
