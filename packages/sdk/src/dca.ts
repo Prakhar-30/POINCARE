@@ -344,10 +344,17 @@ export async function planSliceQuoted(
   o: DcaOrder,
   ctx: { now: bigint; spreadBps: number; trendWithSide: boolean },
   quoteOut: (amountIn: bigint) => Promise<bigint>,
-): Promise<SlicePlan> {
+): Promise<SlicePlan & { quoteError?: string }> {
   const first = planSlice(o, ctx);
   if (first.status !== "ready" || first.amountIn === 0n) return first;
-  return planSlice(o, { ...ctx, quoteOut: await quoteOut(first.amountIn) });
+  let out: bigint;
+  try {
+    out = await quoteOut(first.amountIn);
+  } catch (e) {
+    // A failed quote (e.g. a slice larger than the pool can fill) must not sink the whole plan.
+    return { ...first, quoteError: e instanceof Error ? e.message.split("\n")[0].slice(0, 200) : String(e) };
+  }
+  return planSlice(o, { ...ctx, quoteOut: out });
 }
 
 /** Input actually swapped so far: the budget minus what is left and what was refunded. */

@@ -243,6 +243,12 @@ describe("planSliceQuoted", () => {
     expect(above.minOut > 0n).toBe(true);
   });
 
+  it("falls back to the unquoted plan when the quote fails", async () => {
+    const r = await planSliceQuoted(order(), ctx, async () => { throw new Error("Lens reverted\nmore detail"); });
+    expect(r.status).toBe("ready");
+    expect(r.quoteError).toBe("Lens reverted");
+  });
+
   it("does not quote a slice that is not ready", async () => {
     let quoted = 0;
     const r = await planSliceQuoted(order({ paused: true }), ctx, async () => { quoted++; return 1n; });

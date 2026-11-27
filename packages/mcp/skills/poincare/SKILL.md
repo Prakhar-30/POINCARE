@@ -88,7 +88,7 @@ DCA that waits the spread out.
 - **`get_position`** (`owner`): shares, share of the pool, what they redeem for now, and value.
 - **`lp_add_build`** (`owner`, and exactly one of `usdc` or `weth`): the other side is sized from
   the pool's ratio. Returns exact approvals where short, then `addLiquidity` with real minimums.
-- **`lp_remove_build`** (`owner`, and exactly one of `percent` 1-100 or `shares`): returns
+- **`lp_remove_build`** (`owner`, and exactly one of `percent` (above 0, at most 100) or `shares`): returns
   `removeLiquidity` with minimums from the current reserves. `percent: 100` burns the exact balance.
 
 A trend is when LPs **earn** on Poincaré: with-trend swaps pay a spread the pool keeps. Do not

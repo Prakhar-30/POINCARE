@@ -152,8 +152,11 @@ export function createServer(opts: ServerOptions): McpServer {
         const head = await poincare.publicClient.getBlockNumber();
         let span = BigInt(blocks ?? 3000);
         let samples = await poincare.history(head > span ? head - span : 0n, head);
-        // The hook samples only on swaps: a quiet window is empty, so look as far back as allowed once.
-        if (samples.length === 0 && span < 20_000n) {
+        // The hook samples only on swaps. With the default window, a quiet pool is looked at once
+        // more over the widest window; an explicit `blocks` is always honoured as asked.
+        let widened = false;
+        if (samples.length === 0 && blocks === undefined) {
+          widened = true;
           span = 20_000n;
           samples = await poincare.history(head > span ? head - span : 0n, head);
         }
@@ -164,6 +167,7 @@ export function createServer(opts: ServerOptions): McpServer {
           sampleCount: samples.length,
           onsets: trendOnsets(samples),
           latest: samples.slice(-10),
+          ...(widened ? { widened: "No samples in the default window, so the full 20,000 blocks were scanned." } : {}),
           ...(samples.length === 0
             ? { note: `No swaps in the last ${span} blocks, so the detector recorded no samples (it samples only when someone trades). Call get_regime for the current state.` }
             : {}),
@@ -320,10 +324,10 @@ export function createServer(opts: ServerOptions): McpServer {
     {
       title: "Build a liquidity withdrawal (unsigned)",
       description:
-        "Plan a withdrawal of a percentage of the position (1-100) or an exact share count, and return the UNSIGNED removeLiquidity transaction with minimums from the current reserves. Never sends. Moving capital is the user's decision: build only when they asked to withdraw.",
+        "Plan a withdrawal of a percentage of the position (above 0, at most 100) or an exact share count, and return the UNSIGNED removeLiquidity transaction with minimums from the current reserves. Never sends. Moving capital is the user's decision: build only when they asked to withdraw.",
       inputSchema: {
         owner: address.describe("The LP's wallet, which will sign"),
-        percent: z.number().gt(0).max(100).optional().describe("Share of the position to withdraw, e.g. 50"),
+        percent: z.number().gt(0).max(100).optional().describe("Share of the position to withdraw, above 0 and at most 100, e.g. 50 or 0.5"),
         shares: z.string().regex(/^\d+$/).optional().describe("Exact LP shares to burn, in base units (18 decimals)"),
         slippageBps: lpSlippage,
       },
@@ -383,7 +387,11 @@ export function createServer(opts: ServerOptions): McpServer {
           perSlice: `${formatAmount(p.amountIn / BigInt(p.slices))} ${args.side === "buy" ? "USDC" : "WETH"}`,
           schedule,
           deadlineAt: new Date(Number(p.deadline) * 1000).toISOString(),
-          firstFillNow: { status: first.status, meaning: DCA_STATUS_TEXT[first.status] },
+          firstFillNow: {
+            status: first.status,
+            meaning: DCA_STATUS_TEXT[first.status],
+            ...(first.quoteError ? { quoteError: `Could not quote the first slice, so the limit and slippage were not checked: ${first.quoteError}` } : {}),
+          },
           regime: describeRegime(r),
         });
       } catch (e) {

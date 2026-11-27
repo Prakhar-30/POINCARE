@@ -2215,7 +2215,7 @@ async function readPosition(client, dep, owner) {
     sharePct: ratio(shares, supply),
     usdc,
     weth,
-    valueUsdc: Number(usdc) / 1e18 + Number(weth) / 1e18 * price,
+    valueUsdc: Number(formatAmount(usdc, TOKEN_DECIMALS)) + Number(formatAmount(weth, TOKEN_DECIMALS)) * price,
     reserves: { usdc: r0, weth: r1 },
     price
   };
@@ -2235,7 +2235,7 @@ async function planAddLiquidity(client, dep, from, amount, opts = {}) {
   ]);
   if (supply === 0n || r0 === 0n || r1 === 0n) throw new LpParamError("the pool has not been seeded; the first deposit sets the curve and is not done through this tool");
   const usdc = hasUsdc ? given : given * r0 / r1;
-  const weth = hasWeth ? given : given * r1 / r0;
+  const weth = usdc * r1 / r0;
   if (usdc === 0n || weth === 0n) throw new LpParamError("too small: one side rounds to zero at the pool's ratio");
   const expectedShares = [usdc * supply / r0, weth * supply / r1].reduce((a, b) => a < b ? a : b);
   if (expectedShares === 0n) throw new LpParamError("too small: the deposit would mint no shares");
@@ -2489,7 +2489,13 @@ function planSlice(o, ctx) {
 async function planSliceQuoted(o, ctx, quoteOut) {
   const first = planSlice(o, ctx);
   if (first.status !== "ready" || first.amountIn === 0n) return first;
-  return planSlice(o, { ...ctx, quoteOut: await quoteOut(first.amountIn) });
+  let out;
+  try {
+    out = await quoteOut(first.amountIn);
+  } catch (e) {
+    return { ...first, quoteError: e instanceof Error ? e.message.split("\n")[0].slice(0, 200) : String(e) };
+  }
+  return planSlice(o, { ...ctx, quoteOut: out });
 }
 var spentOf = (o) => o.amountIn - o.remaining - o.refunded;
 var progressOf = (o) => o.amountIn === 0n ? 0 : Number(spentOf(o) * 10000n / o.amountIn) / 1e4;

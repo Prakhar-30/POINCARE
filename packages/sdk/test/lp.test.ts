@@ -68,6 +68,17 @@ describe("planAddLiquidity", () => {
   });
 });
 
+describe("planAddLiquidity rounding", () => {
+  it("from the WETH side, sizes WETH exactly as the hook will take it", async () => {
+    const odd = E18 + 7n; // floor(floor(odd*R0/R1)*R1/R0) is below odd
+    const p = await planAddLiquidity(fake(), dep, FROM, { weth: odd }, { slippageBps: 0 });
+    expect(p.weth).toBe((p.usdc * R1) / R0);
+    expect(p.weth <= odd).toBe(true);
+    const add = decodeFunctionData({ abi: liquidityAbi, data: p.transactions.at(-1)!.data });
+    expect(add.args[0]).toMatchObject({ amount1Desired: p.weth, amount1Min: p.weth });
+  });
+});
+
 describe("planRemoveLiquidity", () => {
   it("burns a percentage with minimums from the reserves", async () => {
     const p = await planRemoveLiquidity(fake({ balance: 100n * E18 }), dep, FROM, { percent: 50 }, { now: NOW });

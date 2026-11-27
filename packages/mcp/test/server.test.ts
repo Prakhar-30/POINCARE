@@ -209,10 +209,19 @@ describe("plan and history fixes", () => {
     expect(r.structuredContent!.firstFillNow.status).toBe("below-limit");
   });
 
-  it("get_regime_history explains an empty window", async () => {
-    const r = await call(await connect(), "get_regime_history", { blocks: 500 });
+  it("get_regime_history explains an empty window and honours an explicit range", async () => {
+    const c = await connect();
+    const r = await call(c, "get_regime_history", { blocks: 500 });
     expect(r.structuredContent!.sampleCount).toBe(0);
     expect(r.structuredContent!.note).toMatch(/samples only when someone trades/);
+    expect(r.structuredContent!.fromBlock).toBe("500"); // head 1000 - 500, not widened
+    expect(r.structuredContent!.widened).toBeUndefined();
+    const d = await call(c, "get_regime_history");
+    expect(d.structuredContent!.widened).toMatch(/20,000 blocks/);
+  });
+
+  it("limit_buy refuses more days than an order can hold", async () => {
+    await expect((await connect()).getPrompt({ name: "limit_buy", arguments: { usdc: "100", maxPrice: "2200", days: "3000", owner: OWNER } })).rejects.toThrow();
   });
 });
 

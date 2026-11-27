@@ -66,7 +66,13 @@ ${RULES}`),
     {
       title: "Limit-price buying",
       description: "Accumulate ETH only at or below your price, checked every few hours, without paying the trend spread.",
-      argsSchema: { usdc: num("Total USDC to spend"), maxPrice: num("Highest price to pay, in USDC per ETH"), days: int("Days the order stays open"), owner: addr },
+      // 4 checks a day, and an order holds at most 10,000 slices: 2,500 days.
+      argsSchema: {
+        usdc: num("Total USDC to spend"),
+        maxPrice: num("Highest price to pay, in USDC per ETH"),
+        days: int("Days the order stays open (at most 2500)").refine((d) => Number(d) <= 2500, "days must be at most 2500"),
+        owner: addr,
+      },
     },
     ({ usdc, maxPrice, days, owner }) =>
       text(`Set up a limit-price buy on Poincaré for my wallet ${owner}: spend up to ${usdc} USDC on ETH over ${days} days, only at ${maxPrice} USDC per ETH or lower, never paying the trend spread.

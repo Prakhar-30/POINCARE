@@ -4,7 +4,8 @@ import { liquidityAbi } from "./abi/liquidity.js";
 import type { TxRequest } from "./dcaClient.js";
 import type { PoincareDeployment } from "./deployments.js";
 import { DEFAULT_SWAP_DEADLINE_SEC, DEFAULT_SWAP_SLIPPAGE_BPS, MAX_SWAP_DEADLINE_SEC, MAX_SWAP_SLIPPAGE_BPS, minOutFor } from "./swap.js";
-import { WAD } from "./units.js";
+import { TOKEN_DECIMALS } from "./deployments.js";
+import { WAD, formatAmount } from "./units.js";
 
 /** Explicit gas limits: testnet eth_estimateGas mis-simulates calls that run through the hook. */
 export const LP_GAS = { approve: 80_000n, add: 3_000_000n, remove: 2_500_000n } as const;
@@ -106,7 +107,7 @@ export async function readPosition(client: PublicClient, dep: PoincareDeployment
     sharePct: ratio(shares, supply),
     usdc,
     weth,
-    valueUsdc: Number(usdc) / 1e18 + (Number(weth) / 1e18) * price,
+    valueUsdc: Number(formatAmount(usdc, TOKEN_DECIMALS)) + Number(formatAmount(weth, TOKEN_DECIMALS)) * price,
     reserves: { usdc: r0, weth: r1 },
     price,
   };
@@ -139,9 +140,10 @@ export async function planAddLiquidity(
   ]);
   if (supply === 0n || r0 === 0n || r1 === 0n) throw new LpParamError("the pool has not been seeded; the first deposit sets the curve and is not done through this tool");
 
-  // Same rounding as the hook: the counterpart floors, so the desired pair is taken in full.
+  // Same rounding as the hook: it derives the WETH leg from the USDC leg (floor), so the desired
+  // pair is exactly what it takes. From the WETH side, size USDC first, then re-derive WETH from it.
   const usdc = hasUsdc ? given : (given * r0) / r1;
-  const weth = hasWeth ? given : (given * r1) / r0;
+  const weth = (usdc * r1) / r0;
   if (usdc === 0n || weth === 0n) throw new LpParamError("too small: one side rounds to zero at the pool's ratio");
   const expectedShares = [(usdc * supply) / r0, (weth * supply) / r1].reduce((a, b) => (a < b ? a : b));
   if (expectedShares === 0n) throw new LpParamError("too small: the deposit would mint no shares");

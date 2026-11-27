@@ -127,7 +127,12 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
         { now: BigInt(t), spreadBps: wadToBpsUp(input.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell), trendWithSide: r.withTrendSide === input.side },
         async (amountIn) => (await poincare.quote(input.side, amountIn)).amountOut,
       );
-      return { params: p, deadline: p.deadline, firstFillNow: { status: first.status, meaning: DCA_STATUS_TEXT[first.status] }, regime: summarize(r) };
+      return {
+        params: p,
+        deadline: p.deadline,
+        firstFillNow: { status: first.status, meaning: DCA_STATUS_TEXT[first.status], ...(first.quoteError ? { quoteError: first.quoteError } : {}) },
+        regime: summarize(r),
+      };
     }],
     ["POST", /^\/dca\/tx\/create$/, async (_m, _u, body) => {
       const owner = addressParam(body?.owner, "owner");

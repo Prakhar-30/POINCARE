@@ -1969,7 +1969,9 @@ declare function planSliceQuoted(o: DcaOrder, ctx: {
     now: bigint;
     spreadBps: number;
     trendWithSide: boolean;
-}, quoteOut: (amountIn: bigint) => Promise<bigint>): Promise<SlicePlan>;
+}, quoteOut: (amountIn: bigint) => Promise<bigint>): Promise<SlicePlan & {
+    quoteError?: string;
+}>;
 /** Input actually swapped so far: the budget minus what is left and what was refunded. */
 declare const spentOf: (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">) => bigint;
 /** Share of the budget actually swapped, 0..1 (a refunded order stops short of 1). */
