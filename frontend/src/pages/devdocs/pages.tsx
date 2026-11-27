@@ -60,7 +60,7 @@ export const PAGES: DocPage[] = [
           { to: "detector", title: "The trend detector", body: "How the pool decides a trend is real, with a worked example.", icon: "gauge" },
           { to: "quickstart", title: "Quickstart", body: "Read the regime, quote a swap and plan a DCA order in five minutes.", icon: "spark" },
           { to: "sdk", title: "TypeScript SDK", body: "@poincaretrade/sdk: one client for regime, quotes and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
-          { to: "mcp", title: "MCP server", body: "15 tools for Claude and any MCP client. Unsigned by default; sends only with your key and send: true.", icon: "curve" },
+          { to: "mcp", title: "MCP server", body: "19 tools and 4 strategy prompts for Claude and any MCP client. Unsigned by default; swaps and liquidity are never sent.", icon: "curve" },
           { to: "http-api", title: "HTTP API", body: "Stateless JSON over HTTPS. Reads from the chain, returns unsigned transactions, never holds keys.", icon: "chart" },
         ]} />
         <H2>What you can build</H2>
@@ -270,7 +270,7 @@ curl -X POST ${API_BASE}/dca/tx/edit   -H 'content-type: application/json' -d '{
   }
 }` },
         ]} />
-        <P>That alone gives Claude 15 tools. Details and configuration: <DocLink to="mcp">MCP server</DocLink>.</P>
+        <P>That alone gives Claude 19 tools and 4 strategy prompts. Details and configuration: <DocLink to="mcp">MCP server</DocLink>.</P>
         <H2>2. Add the Poincaré skill</H2>
         <P>
           A skill is a short playbook Claude loads when a request matches it. The Poincaré skill covers orientation (USDC per
@@ -647,15 +647,28 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
           ["get_regime_history", "Detector samples and trend onsets over recent blocks", "–"],
           ["wait_for_regime_change", "Waits until a trend starts, ends or flips, or the spread engages", "–"],
           ["quote", "Exact-input quote with this side's spread and fee", "–"],
-          ["dca_plan_order", "Validates an order like the contract; says what its first fill would do now", "–"],
+          ["swap_build", "Unsigned swap: exact approve if short, router swap with a minimum-received floor", "unsigned only"],
+          ["get_position", "An LP's shares, pool share and what they redeem for now", "–"],
+          ["lp_add_build · lp_remove_build", "Unsigned deposit at the pool's ratio, or withdrawal by percent or shares, with real minimums", "unsigned only"],
+          ["dca_plan_order", "Validates an order like the contract, limit price included; says what its first fill would do now", "–"],
           ["dca_create_order", "Approve + createOrder", "yes"],
           ["dca_get_order · dca_list_orders · dca_preview_slice", "Order state and the contract's verdict on the next fill", "–"],
           ["dca_pause_order · dca_resume_order · dca_edit_order", "Owner controls; edit re-plans what is left", "yes"],
           ["dca_execute_slice · dca_cancel_order · dca_close_expired", "Fill now (refused unless ready), cancel, refund after the deadline", "yes"],
         ] as const).map(([a, b, c]) => [mono(a), b, c])} />
+        <H2>Strategy prompts</H2>
+        <P>Each sets up one strategy as the right sequence of tools, with the safety rules built in. In Claude they appear in the prompt menu.</P>
+        <Table head={["Prompt", "Does"]} rows={([
+          ["spread_aware_dca", "Buy over time without ever paying the trend spread"],
+          ["lp_guard", "Watch the pool for an LP and say when trimming is worth it"],
+          ["limit_buy", "Buy only at or below your price, checked every 6 hours"],
+          ["patient_swap", "Check the spread, wait out a trend if needed, then build the swap"],
+        ] as const).map(([a, b]) => [mono(a), b])} />
         <H2>Try asking</H2>
         <Ul>
           <li>“Is the Poincaré pool trending right now, and which side pays?”</li>
+          <li>“Sell 0.5 WETH, but not while sellers pay the trend spread. Build the transaction when it's clear.”</li>
+          <li>“How much is my LP position worth?”</li>
           <li>“Plan a DCA that buys 500 USDC of WETH over a day without ever paying the trend spread.”</li>
           <li>“Wait for the next trend onset, then tell me the spread.”</li>
           <li>“Pause my DCA order 4 and stretch what is left over the next 12 hours.”</li>
@@ -680,6 +693,10 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
           ["GET", "/regime", "The regime and a one-line summary"],
           ["GET", "/regime/history?blocks=3000", "Detector samples and trend onsets (100 to 20,000 blocks)"],
           ["GET", "/quote?side=buy&amount=100", "Exact-input quote with spread and fee"],
+          ["GET", "/swap/build?owner=0x…&side=sell&amount=2", "Unsigned exact approve (if short) + router swap with a minimum-received floor"],
+          ["GET", "/lp/position?owner=0x…", "LP shares, pool share and what they redeem for"],
+          ["GET", "/lp/add/build?owner=0x…&usdc=100", "Unsigned deposit at the pool's ratio (give usdc or weth), real minimums"],
+          ["GET", "/lp/remove/build?owner=0x…&percent=50", "Unsigned withdrawal by percent or shares, real minimums"],
           ["GET", "/dca/orders?owner=0x…", "An address's orders, each with spent, progress and next-fill status"],
           ["GET", "/dca/orders/:id", "One order and the contract's verdict on its next fill"],
           ["POST", "/dca/plan", "Validates an order and previews its first fill"],

@@ -1,7 +1,7 @@
 # @poincaretrade/mcp
 
 An [MCP](https://modelcontextprotocol.io) server that gives Claude, or any MCP client, **Poincaré**'s trend
-regime, swap quotes and spread-aware DCA orders as 15 tools. It reads the live pool on Unichain Sepolia and
+regime, swaps, liquidity positions and spread-aware DCA orders as 19 tools and 4 strategy prompts. It reads the live pool on Unichain Sepolia and
 returns **unsigned** transactions; nothing is ever sent unless you add your own key and the agent calls a
 tool with `send: true`.
 
@@ -33,9 +33,18 @@ claude mcp add poincare -- npx -y @poincaretrade/mcp
 
 ## Tools
 
-`get_regime` · `get_regime_history` · `wait_for_regime_change` · `quote` · `dca_plan_order` ·
-`dca_create_order` · `dca_get_order` · `dca_list_orders` · `dca_preview_slice` · `dca_pause_order` ·
-`dca_resume_order` · `dca_edit_order` · `dca_execute_slice` · `dca_cancel_order` · `dca_close_expired`
+`get_regime` · `get_regime_history` · `wait_for_regime_change` · `quote` · `swap_build` ·
+`get_position` · `lp_add_build` · `lp_remove_build` · `dca_plan_order` · `dca_create_order` ·
+`dca_get_order` · `dca_list_orders` · `dca_preview_slice` · `dca_pause_order` · `dca_resume_order` ·
+`dca_edit_order` · `dca_execute_slice` · `dca_cancel_order` · `dca_close_expired`
+
+`swap_build`, `lp_add_build` and `lp_remove_build` only ever return unsigned transactions, with
+exact-amount approvals and real minimums. They never send, even with a key configured.
+
+## Prompts
+
+`spread_aware_dca` · `lp_guard` · `limit_buy` · `patient_swap`: each sets up one strategy as the
+right sequence of tools, with the safety rules built in.
 
 Try: *"Is the Poincaré pool trending right now, and which side pays?"* or *"Plan a DCA that buys 500 USDC
 of WETH over a day without ever paying the trend spread."*

@@ -20,6 +20,14 @@ const r = await poincare.regime();
 
 const q = await poincare.quote("buy", "100");          // 100 USDC -> WETH, to the wei
 
+// Unsigned swap: exact approve (only if short) + router swap with a minimum-received floor
+const swap = await poincare.swap.plan("0xYourWallet", "sell", "0.5", { slippageBps: 50 });
+
+// LP: position, and unsigned deposit / withdrawal with real minimums
+const pos = await poincare.lp.position("0xYourWallet");
+const add = await poincare.lp.planAdd("0xYourWallet", { usdc: "1000" }); // WETH side sized for you
+const rm = await poincare.lp.planRemove("0xYourWallet", { percent: 50 });
+
 // With a viem walletClient: 100 USDC of WETH every hour, 10 times, never paying the trend spread
 const dca = createPoincareClient({ walletClient });
 const id = await dca.dca.create(recurringOrder({ side: "buy", amountPerBuy: "100", frequency: "1h", count: 10 }));

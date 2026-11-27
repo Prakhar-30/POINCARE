@@ -98,7 +98,7 @@ function orderView(o: DcaOrder) {
 export function createServer(opts: ServerOptions): McpServer {
   const { poincare, signer } = opts;
   const now = opts.now ?? (() => Math.floor(Date.now() / 1000));
-  const server = new McpServer({ name: "poincare", version: "0.1.2" });
+  const server = new McpServer({ name: "poincare", version: "0.1.3" });
   registerPrompts(server);
 
   type RunResult =

@@ -1424,6 +1424,160 @@ declare const erc20Abi: readonly [{
     }];
 }];
 
+/** The one function the SDK calls on the Uniswap v4 router: a single-pool exact-input swap. */
+declare const routerAbi: readonly [{
+    readonly type: "function";
+    readonly name: "swapExactTokensForTokens";
+    readonly stateMutability: "payable";
+    readonly inputs: readonly [{
+        readonly name: "amountIn";
+        readonly type: "uint256";
+    }, {
+        readonly name: "amountOutMin";
+        readonly type: "uint256";
+    }, {
+        readonly name: "zeroForOne";
+        readonly type: "bool";
+    }, {
+        readonly name: "poolKey";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "currency0";
+            readonly type: "address";
+        }, {
+            readonly name: "currency1";
+            readonly type: "address";
+        }, {
+            readonly name: "fee";
+            readonly type: "uint24";
+        }, {
+            readonly name: "tickSpacing";
+            readonly type: "int24";
+        }, {
+            readonly name: "hooks";
+            readonly type: "address";
+        }];
+    }, {
+        readonly name: "hookData";
+        readonly type: "bytes";
+    }, {
+        readonly name: "receiver";
+        readonly type: "address";
+    }, {
+        readonly name: "deadline";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "delta";
+        readonly type: "int256";
+    }];
+}];
+
+/** The hook's liquidity surface: hook-owned, full-range, with its own ERC-20 LP share token. */
+declare const liquidityAbi: readonly [{
+    readonly type: "function";
+    readonly name: "reserves";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly name: "r0";
+        readonly type: "uint256";
+    }, {
+        readonly name: "r1";
+        readonly type: "uint256";
+    }];
+}, {
+    readonly type: "function";
+    readonly name: "totalSupply";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly type: "function";
+    readonly name: "balanceOf";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly name: "account";
+        readonly type: "address";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly type: "function";
+    readonly name: "addLiquidity";
+    readonly stateMutability: "payable";
+    readonly inputs: readonly [{
+        readonly name: "params";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "amount0Desired";
+            readonly type: "uint256";
+        }, {
+            readonly name: "amount1Desired";
+            readonly type: "uint256";
+        }, {
+            readonly name: "amount0Min";
+            readonly type: "uint256";
+        }, {
+            readonly name: "amount1Min";
+            readonly type: "uint256";
+        }, {
+            readonly name: "deadline";
+            readonly type: "uint256";
+        }, {
+            readonly name: "tickLower";
+            readonly type: "int24";
+        }, {
+            readonly name: "tickUpper";
+            readonly type: "int24";
+        }, {
+            readonly name: "userInputSalt";
+            readonly type: "bytes32";
+        }];
+    }];
+    readonly outputs: readonly [{
+        readonly name: "delta";
+        readonly type: "int256";
+    }];
+}, {
+    readonly type: "function";
+    readonly name: "removeLiquidity";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly name: "params";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "liquidity";
+            readonly type: "uint256";
+        }, {
+            readonly name: "amount0Min";
+            readonly type: "uint256";
+        }, {
+            readonly name: "amount1Min";
+            readonly type: "uint256";
+        }, {
+            readonly name: "deadline";
+            readonly type: "uint256";
+        }, {
+            readonly name: "tickLower";
+            readonly type: "int24";
+        }, {
+            readonly name: "tickUpper";
+            readonly type: "int24";
+        }, {
+            readonly name: "userInputSalt";
+            readonly type: "bytes32";
+        }];
+    }];
+    readonly outputs: readonly [{
+        readonly name: "delta";
+        readonly type: "int256";
+    }];
+}];
+
 /** Every address the SDK needs for one Poincaré deployment. */
 type PoincareDeployment = {
     chainId: number;
@@ -1806,85 +1960,20 @@ declare function planSlice(o: DcaOrder, ctx: {
     trendWithSide: boolean;
     quoteOut?: bigint;
 }): SlicePlan;
-/** Fraction of the budget filled so far (0..1). */
+/**
+ * planSlice with the quote filled in: when the slice would otherwise be ready, quote its exact input
+ * and re-plan, so a limit price above the market reports "below-limit" (as the contract would)
+ * instead of "ready", and minOut is the real floor.
+ */
+declare function planSliceQuoted(o: DcaOrder, ctx: {
+    now: bigint;
+    spreadBps: number;
+    trendWithSide: boolean;
+}, quoteOut: (amountIn: bigint) => Promise<bigint>): Promise<SlicePlan>;
 /** Input actually swapped so far: the budget minus what is left and what was refunded. */
 declare const spentOf: (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">) => bigint;
 /** Share of the budget actually swapped, 0..1 (a refunded order stops short of 1). */
 declare const progressOf: (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">) => number;
-
-/**
- * Exchange-style plan builders. Centralised exchanges describe DCA in two ways, and users arrive
- * expecting one of them:
- *
- *  - a RECURRING buy: a fixed amount every period, N times (Coinbase, Kraken, Binance Auto-Invest,
- *    OKX recurring buy, Bybit DCA bot);
- *  - a TWAP: one total spread evenly over a duration (Binance Spot TWAP, 5 min to 24 h).
- *
- * Both compile to the same PoincareDCA order. The Poincaré part is the PROTECTION preset: whether
- * a buy may pay the trend spread the pool charges the with-trend side.
- */
-declare const FREQUENCIES: {
-    readonly "5m": 300;
-    readonly "15m": 900;
-    readonly "1h": 3600;
-    readonly "4h": 14400;
-    readonly "1d": 86400;
-    readonly "1w": 604800;
-};
-type Frequency = keyof typeof FREQUENCIES;
-declare const FREQUENCY_LABEL: Record<Frequency, string>;
-declare const PROTECTIONS: {
-    /** Skip a buy while this side pays the trend spread; later buys make it up. The Poincaré default. */
-    readonly "spread-guard": {
-        readonly maxSpreadBps: 0;
-        readonly pauseOnTrend: false;
-        readonly catchUp: true;
-    };
-    /** Also hold while a trend runs with this side, before the spread has even ramped. */
-    readonly "trend-pause": {
-        readonly maxSpreadBps: 0;
-        readonly pauseOnTrend: true;
-        readonly catchUp: true;
-    };
-    /** Buy every period whatever the spread, like a plain recurring buy. */
-    readonly always: {
-        readonly maxSpreadBps: 10000;
-        readonly pauseOnTrend: false;
-        readonly catchUp: true;
-    };
-};
-type Protection = keyof typeof PROTECTIONS;
-declare const PROTECTION_TEXT: Record<Protection, {
-    title: string;
-    detail: string;
-}>;
-type Common = {
-    side: Side;
-    protection?: Protection;
-    /** USDC per WETH: the most a buy pays / the least a sell accepts. */
-    limitPrice?: string | number;
-    maxSlippageBps?: number;
-    /** Unix seconds; omit to start now. */
-    startTime?: number | bigint;
-    recipient?: Address;
-};
-/** A fixed amount every period, `count` times. The budget escrowed is amountPerBuy × count. */
-declare function recurringOrder(r: Common & {
-    amountPerBuy: string | number | bigint;
-    frequency: Frequency | number;
-    count: number;
-}): DcaOrderInput;
-/**
- * One total, spread evenly over `durationSec`. Slices default to one every five minutes (2..48);
- * the deadline is the end of the window, so a TWAP never runs past the duration you chose.
- */
-declare function twapOrder(t: Common & {
-    total: string | number | bigint;
-    durationSec: number;
-    slices?: number;
-}): DcaOrderInput;
-/** Default TWAP slicing: one buy every ~5 minutes, at least 2 and at most 48 buys. */
-declare function twapSlices(durationSec: number): number;
 
 /**
  * Explicit gas limits. Testnet eth_estimateGas mis-simulates calls that run through the hook,
@@ -1962,6 +2051,232 @@ declare function sendTx(wallet: WalletClient, client: PublicClient, tx: TxReques
 }): Promise<TransactionReceipt>;
 /** The order id from a createOrder receipt. */
 declare function orderIdFromReceipt(dep: PoincareDeployment, receipt: TransactionReceipt): bigint;
+
+/** Explicit gas limits: testnet eth_estimateGas mis-simulates calls that run through the hook. */
+declare const SWAP_GAS: {
+    readonly approve: 80000n;
+    readonly swap: 3000000n;
+};
+/** Slippage above this is refused: past 10% a "swap" is more likely a mistake than a trade. */
+declare const MAX_SWAP_SLIPPAGE_BPS = 1000;
+declare const DEFAULT_SWAP_SLIPPAGE_BPS = 50;
+/** How long the signed swap stays valid. Kept short so a stale transaction cannot be replayed later. */
+declare const DEFAULT_SWAP_DEADLINE_SEC = 1200;
+declare const MAX_SWAP_DEADLINE_SEC = 3600;
+type PoolKey = {
+    currency0: Address;
+    currency1: Address;
+    fee: number;
+    tickSpacing: number;
+    hooks: Address;
+};
+declare class SwapParamError extends Error {
+    constructor(message: string);
+}
+type SwapOptions = {
+    /** Max shortfall vs the quote, in bps. Default 50 (0.5%), at most 1000. */
+    slippageBps?: number;
+    /** Who receives the output. Defaults to the sender; anything else is flagged in `warnings`. */
+    recipient?: Address;
+    /** Seconds the swap stays valid. Default 1200, at most 3600. */
+    deadlineSec?: number;
+    /** Unix seconds "now" (tests). */
+    now?: number;
+};
+type SwapPlan = {
+    side: Side;
+    from: Address;
+    recipient: Address;
+    tokenIn: Address;
+    tokenOut: Address;
+    amountIn: bigint;
+    quote: Quote;
+    /** The floor the router enforces: the quote less the slippage allowance. */
+    minOut: bigint;
+    slippageBps: number;
+    deadline: bigint;
+    /** The sender's current allowance to the router for the input token. */
+    allowance: bigint;
+    /** Things the signer should read before sending. */
+    warnings: string[];
+    /** In order: an exact-amount approve (only if the allowance is short), then the swap. */
+    transactions: TxRequest[];
+};
+/** The pool key, read from the hook itself so fee and tick spacing never drift from the deployment. */
+declare function readPoolKey(client: PublicClient, dep: PoincareDeployment): Promise<PoolKey>;
+declare function swapTokens(dep: PoincareDeployment, side: Side): {
+    tokenIn: Address;
+    tokenOut: Address;
+};
+/** Floor = quote * (1 - slippage), rounded down. */
+declare function minOutFor(amountOut: bigint, slippageBps: number): bigint;
+/** Approve exactly `amount` of the input token to the router. Never an unlimited allowance. */
+declare function buildSwapApproveTx(dep: PoincareDeployment, side: Side, amount: bigint): TxRequest;
+declare function buildSwapTx(dep: PoincareDeployment, key: PoolKey, p: {
+    side: Side;
+    amountIn: bigint;
+    minOut: bigint;
+    recipient: Address;
+    deadline: bigint;
+}): TxRequest;
+/**
+ * Plan an exact-input swap: quote it through the Lens, set a slippage floor, and return the
+ * unsigned transactions (an exact approve only when the allowance is short, then the swap).
+ * Nothing is sent and no key is needed.
+ */
+declare function planSwap(client: PublicClient, dep: PoincareDeployment, from: Address, side: Side, amountIn: bigint, opts?: SwapOptions): Promise<SwapPlan>;
+
+/** Explicit gas limits: testnet eth_estimateGas mis-simulates calls that run through the hook. */
+declare const LP_GAS: {
+    readonly approve: 80000n;
+    readonly add: 3000000n;
+    readonly remove: 2500000n;
+};
+declare class LpParamError extends Error {
+    constructor(message: string);
+}
+type Position = {
+    owner: Address;
+    /** LP shares held (the hook's own 18-decimal ERC-20). */
+    shares: bigint;
+    totalShares: bigint;
+    /** Share of the pool, 0..1. */
+    sharePct: number;
+    /** What the shares redeem for right now (USDC, WETH). */
+    usdc: bigint;
+    weth: bigint;
+    /** Both legs marked at the pool's reserve price, in USDC (display only). */
+    valueUsdc: number;
+    reserves: {
+        usdc: bigint;
+        weth: bigint;
+    };
+    /** USDC per WETH implied by the reserves. */
+    price: number;
+};
+type LpOptions = {
+    slippageBps?: number;
+    deadlineSec?: number;
+    now?: number;
+};
+type AddLiquidityPlan = {
+    from: Address;
+    usdc: bigint;
+    weth: bigint;
+    usdcMin: bigint;
+    wethMin: bigint;
+    /** Shares the deposit should mint at today's reserves (the contract rounds against the depositor). */
+    expectedShares: bigint;
+    slippageBps: number;
+    deadline: bigint;
+    warnings: string[];
+    transactions: TxRequest[];
+};
+type RemoveLiquidityPlan = {
+    from: Address;
+    shares: bigint;
+    usdc: bigint;
+    weth: bigint;
+    usdcMin: bigint;
+    wethMin: bigint;
+    slippageBps: number;
+    deadline: bigint;
+    warnings: string[];
+    transactions: TxRequest[];
+};
+/** An address's LP position, read from the hook's share token and reserves. */
+declare function readPosition(client: PublicClient, dep: PoincareDeployment, owner: Address): Promise<Position>;
+/**
+ * Plan a deposit at the pool's current ratio. Give the USDC side or the WETH side; the other is
+ * sized from the reserves, exactly as the hook sizes it. Returns exact-amount approvals (only where
+ * short, never unlimited) and the addLiquidity call with real minimums, not zero.
+ */
+declare function planAddLiquidity(client: PublicClient, dep: PoincareDeployment, from: Address, amount: {
+    usdc?: bigint;
+    weth?: bigint;
+}, opts?: LpOptions): Promise<AddLiquidityPlan>;
+/**
+ * Plan a withdrawal: a percentage of the position (1..100) or an exact share count. Minimums come
+ * from the current reserves less the slippage allowance, so the burn cannot be sandwiched for free.
+ */
+declare function planRemoveLiquidity(client: PublicClient, dep: PoincareDeployment, from: Address, amount: {
+    percent?: number;
+    shares?: bigint;
+}, opts?: LpOptions): Promise<RemoveLiquidityPlan>;
+
+/**
+ * Exchange-style plan builders. Centralised exchanges describe DCA in two ways, and users arrive
+ * expecting one of them:
+ *
+ *  - a RECURRING buy: a fixed amount every period, N times (Coinbase, Kraken, Binance Auto-Invest,
+ *    OKX recurring buy, Bybit DCA bot);
+ *  - a TWAP: one total spread evenly over a duration (Binance Spot TWAP, 5 min to 24 h).
+ *
+ * Both compile to the same PoincareDCA order. The Poincaré part is the PROTECTION preset: whether
+ * a buy may pay the trend spread the pool charges the with-trend side.
+ */
+declare const FREQUENCIES: {
+    readonly "5m": 300;
+    readonly "15m": 900;
+    readonly "1h": 3600;
+    readonly "4h": 14400;
+    readonly "1d": 86400;
+    readonly "1w": 604800;
+};
+type Frequency = keyof typeof FREQUENCIES;
+declare const FREQUENCY_LABEL: Record<Frequency, string>;
+declare const PROTECTIONS: {
+    /** Skip a buy while this side pays the trend spread; later buys make it up. The Poincaré default. */
+    readonly "spread-guard": {
+        readonly maxSpreadBps: 0;
+        readonly pauseOnTrend: false;
+        readonly catchUp: true;
+    };
+    /** Also hold while a trend runs with this side, before the spread has even ramped. */
+    readonly "trend-pause": {
+        readonly maxSpreadBps: 0;
+        readonly pauseOnTrend: true;
+        readonly catchUp: true;
+    };
+    /** Buy every period whatever the spread, like a plain recurring buy. */
+    readonly always: {
+        readonly maxSpreadBps: 10000;
+        readonly pauseOnTrend: false;
+        readonly catchUp: true;
+    };
+};
+type Protection = keyof typeof PROTECTIONS;
+declare const PROTECTION_TEXT: Record<Protection, {
+    title: string;
+    detail: string;
+}>;
+type Common = {
+    side: Side;
+    protection?: Protection;
+    /** USDC per WETH: the most a buy pays / the least a sell accepts. */
+    limitPrice?: string | number;
+    maxSlippageBps?: number;
+    /** Unix seconds; omit to start now. */
+    startTime?: number | bigint;
+    recipient?: Address;
+};
+/** A fixed amount every period, `count` times. The budget escrowed is amountPerBuy × count. */
+declare function recurringOrder(r: Common & {
+    amountPerBuy: string | number | bigint;
+    frequency: Frequency | number;
+    count: number;
+}): DcaOrderInput;
+/**
+ * One total, spread evenly over `durationSec`. Slices default to one every five minutes (2..48);
+ * the deadline is the end of the window, so a TWAP never runs past the duration you chose.
+ */
+declare function twapOrder(t: Common & {
+    total: string | number | bigint;
+    durationSec: number;
+    slices?: number;
+}): DcaOrderInput;
+/** Default TWAP slicing: one buy every ~5 minutes, at least 2 and at most 48 buys. */
+declare function twapSlices(durationSec: number): number;
 
 type VerifySiweMessageParameters = Prettify<Pick<VerifyHashParameters, 'blockNumber' | 'blockTag'> & Pick<ValidateSiweMessageParameters, 'address' | 'domain' | 'nonce' | 'scheme' | 'time'> & {
     /**
@@ -3770,6 +4085,26 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
     history: (fromBlock: bigint, toBlock?: bigint) => Promise<DetectorSample[]>;
     /** Exact-input quote; `amount` in input-token units (USDC to buy, WETH to sell). */
     quote: (side: Side, amount: string | number | bigint) => Promise<Quote>;
+    /** The pool key, read from the hook. */
+    poolKey: () => Promise<PoolKey>;
+    swap: {
+        /** Quote + slippage floor + unsigned transactions (exact approve if needed, then the swap). Sends nothing. */
+        plan: (from: Address, side: Side, amount: string | number | bigint, opts?: SwapOptions) => Promise<SwapPlan>;
+    };
+    lp: {
+        /** An address's LP shares and what they redeem for right now. */
+        position: (owner: Address) => Promise<Position>;
+        /** Unsigned deposit at the pool's ratio: give one side (usdc or weth), the other is sized for you. */
+        planAdd: (from: Address, amount: {
+            usdc?: string | number | bigint;
+            weth?: string | number | bigint;
+        }, opts?: LpOptions) => Promise<AddLiquidityPlan>;
+        /** Unsigned withdrawal: a percentage (1..100) or an exact share count. */
+        planRemove: (from: Address, amount: {
+            percent?: number;
+            shares?: bigint;
+        }, opts?: LpOptions) => Promise<RemoveLiquidityPlan>;
+    };
     dca: {
         order: (id: bigint) => Promise<DcaOrder | null>;
         ordersOf: (address: Address) => Promise<DcaOrder[]>;
@@ -3799,4 +4134,4 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;
 
-export { BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, MAX_SLICES, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type Side, type SlicePlan, type SlicePreview, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, marketTrend, minPriceWadToLimit, orderIdFromReceipt, planCreateOrder, planSlice, previewSlice, progressOf, quoteExactInput, readRegime, recurringOrder, regimeHistory, requireDca, sendTx, sideToZeroForOne, sliceAmount, slotInfo, spentOf, statusOf, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
+export { type AddLiquidityPlan, BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DEFAULT_SWAP_DEADLINE_SEC, DEFAULT_SWAP_SLIPPAGE_BPS, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, LP_GAS, type LpOptions, LpParamError, MAX_SLICES, MAX_SWAP_DEADLINE_SEC, MAX_SWAP_SLIPPAGE_BPS, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type PoolKey, type Position, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type RemoveLiquidityPlan, SWAP_GAS, type Side, type SlicePlan, type SlicePreview, type SwapOptions, SwapParamError, type SwapPlan, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, buildSwapApproveTx, buildSwapTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, liquidityAbi, marketTrend, minOutFor, minPriceWadToLimit, orderIdFromReceipt, planAddLiquidity, planCreateOrder, planRemoveLiquidity, planSlice, planSliceQuoted, planSwap, previewSlice, progressOf, quoteExactInput, readPoolKey, readPosition, readRegime, recurringOrder, regimeHistory, requireDca, routerAbi, sendTx, sideToZeroForOne, sliceAmount, slotInfo, spentOf, statusOf, swapTokens, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
