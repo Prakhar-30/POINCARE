@@ -14,7 +14,11 @@ import {
   buildOrderParams,
   dcaAbi,
   erc20Abi,
+  planAddLiquidity,
+  planRemoveLiquidity,
   planSwap,
+  readPosition,
+  liquidityAbi,
   routerAbi,
   toRegime,
   withDca,
@@ -64,6 +68,9 @@ const swapReads = {
       case "previewSpread": return [0n, 3n * 10n ** 15n];
       case "poolKey": return { currency0: dep.usdc, currency1: dep.weth, fee: 8388608, tickSpacing: 60, hooks: dep.hook };
       case "allowance": return 0n;
+      case "reserves": return [225_000n * W, 100n * W];
+      case "totalSupply": return 1_000n * W;
+      case "balanceOf": return 100n * W;
       default: throw new Error(`unexpected read ${functionName}`);
     }
   },
@@ -78,6 +85,12 @@ const fake = {
   swap: {
     plan: (from: Address, side: "buy" | "sell", amount: string, opts?: Parameters<typeof planSwap>[5]) =>
       planSwap(swapReads, dep, from, side, BigInt(Number(amount)) * W, opts),
+  },
+  lp: {
+    position: (owner: Address) => readPosition(swapReads, dep, owner),
+    planAdd: (from: Address, a: { usdc?: string; weth?: string }, opts?: Parameters<typeof planAddLiquidity>[4]) =>
+      planAddLiquidity(swapReads, dep, from, { usdc: a.usdc === undefined ? undefined : BigInt(Number(a.usdc)) * W, weth: a.weth === undefined ? undefined : BigInt(Number(a.weth)) * W }, opts),
+    planRemove: (from: Address, a: { percent?: number; shares?: bigint }, opts?: Parameters<typeof planRemoveLiquidity>[4]) => planRemoveLiquidity(swapReads, dep, from, a, opts),
   },
   dca: {
     order: async (id: bigint) => (id === 7n ? order : null),
@@ -135,9 +148,9 @@ describe("tool surface", () => {
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(Object.keys(byName).sort()).toEqual([
       "dca_cancel_order", "dca_close_expired", "dca_create_order", "dca_edit_order", "dca_execute_slice", "dca_get_order",
-      "dca_list_orders", "dca_pause_order", "dca_plan_order", "dca_preview_slice", "dca_resume_order", "get_regime", "get_regime_history", "quote", "swap_build", "wait_for_regime_change",
+      "dca_list_orders", "dca_pause_order", "dca_plan_order", "dca_preview_slice", "dca_resume_order", "get_position", "get_regime", "get_regime_history", "lp_add_build", "lp_remove_build", "quote", "swap_build", "wait_for_regime_change",
     ]);
-    for (const n of ["get_regime", "get_regime_history", "quote", "swap_build", "dca_plan_order", "dca_get_order", "dca_list_orders", "dca_preview_slice", "wait_for_regime_change"]) {
+    for (const n of ["get_regime", "get_regime_history", "quote", "swap_build", "get_position", "lp_add_build", "lp_remove_build", "dca_plan_order", "dca_get_order", "dca_list_orders", "dca_preview_slice", "wait_for_regime_change"]) {
       expect(byName[n].annotations?.readOnlyHint, n).toBe(true);
     }
     expect(byName.dca_cancel_order.annotations?.destructiveHint).toBe(true);
@@ -185,6 +198,32 @@ describe("swap_build", () => {
     expect(r.structuredContent!.warnings.join(" ")).toMatch(/not to the sender/);
     const bad = await call(c, "swap_build", { owner: OWNER, side: "sell", amount: "1", slippageBps: 5000 });
     expect(bad.isError).toBe(true);
+  });
+});
+
+describe("liquidity", () => {
+  it("reads a position in plain English", async () => {
+    const r = await call(await connect(), "get_position", { owner: OWNER });
+    expect(r.structuredContent!.summary).toContain("10.0000% of the pool");
+    expect(r.structuredContent!.position.usdc).toBe(String(22_500n * W));
+  });
+
+  it("builds a deposit with exact approvals and real minimums", async () => {
+    const r = await call(await connect(), "lp_add_build", { owner: OWNER, usdc: "2250" });
+    expect(r.structuredContent!.sent).toBe(false);
+    const txs = r.structuredContent!.plan.transactions;
+    expect(txs).toHaveLength(3);
+    const add = decodeFunctionData({ abi: liquidityAbi, data: txs[2].data });
+    expect(add.args[0]).toMatchObject({ amount0Desired: 2_250n * W, amount1Desired: W, amount0Min: (2_250n * W * 9_950n) / 10_000n });
+  });
+
+  it("builds a withdrawal and refuses an ambiguous one", async () => {
+    const c = await connect();
+    const r = await call(c, "lp_remove_build", { owner: OWNER, percent: 50 });
+    const rm = decodeFunctionData({ abi: liquidityAbi, data: r.structuredContent!.plan.transactions[0].data });
+    expect(rm.args[0]).toMatchObject({ liquidity: 50n * W });
+    expect((await call(c, "lp_remove_build", { owner: OWNER, percent: 50, shares: "1" })).isError).toBe(true);
+    expect((await call(c, "lp_add_build", { owner: OWNER })).isError).toBe(true);
   });
 });
 

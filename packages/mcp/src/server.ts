@@ -240,6 +240,94 @@ export function createServer(opts: ServerOptions): McpServer {
     },
   );
 
+  // ---------------------------------------------------------------- liquidity
+
+  server.registerTool(
+    "get_position",
+    {
+      title: "LP position",
+      description: "An address's Poincaré LP shares, its share of the pool, what the shares redeem for right now (USDC and WETH), and their value at the pool's reserve price.",
+      inputSchema: { owner: address.describe("The LP's address") },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner }) => {
+      try {
+        const p = await poincare.lp.position(getAddress(owner));
+        return ok({
+          summary: p.shares === 0n
+            ? "This address holds no Poincaré LP shares."
+            : `${(p.sharePct * 100).toFixed(4)}% of the pool: redeems for ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH, about ${p.valueUsdc.toFixed(2)} USDC at ${p.price.toFixed(2)} USDC per WETH.`,
+          position: p,
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  const lpSlippage = z.number().int().min(0).max(MAX_SWAP_SLIPPAGE_BPS).optional().describe("Max shortfall on each side in bps (default 50, max 1000)");
+  const decimal = z.string().regex(/^\d+(\.\d+)?$/);
+
+  server.registerTool(
+    "lp_add_build",
+    {
+      title: "Build a liquidity deposit (unsigned)",
+      description:
+        "Plan a deposit at the pool's current ratio and return UNSIGNED transactions: exact-amount approvals only where short (never unlimited), then addLiquidity with real minimums. Give exactly one side (usdc or weth); the other is sized from the reserves. Never sends. Moving capital is the user's decision: build only when they asked to add liquidity.",
+      inputSchema: {
+        owner: address.describe("The wallet that will sign and deposit"),
+        usdc: decimal.optional().describe("USDC to deposit (the WETH side is sized for you)"),
+        weth: decimal.optional().describe("WETH to deposit (the USDC side is sized for you)"),
+        slippageBps: lpSlippage,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, usdc, weth, slippageBps }) => {
+      try {
+        const p = await poincare.lp.planAdd(getAddress(owner), { usdc, weth }, { slippageBps, now: now() });
+        return ok({
+          sent: false,
+          summary: `Deposit ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH (at least ${formatAmount(p.usdcMin)} and ${formatAmount(p.wethMin)}), for about ${formatAmount(p.expectedShares)} LP shares.`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send these in order from the owner's wallet before the deadline.",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "lp_remove_build",
+    {
+      title: "Build a liquidity withdrawal (unsigned)",
+      description:
+        "Plan a withdrawal of a percentage of the position (1-100) or an exact share count, and return the UNSIGNED removeLiquidity transaction with minimums from the current reserves. Never sends. Moving capital is the user's decision: build only when they asked to withdraw.",
+      inputSchema: {
+        owner: address.describe("The LP's wallet, which will sign"),
+        percent: z.number().gt(0).max(100).optional().describe("Share of the position to withdraw, e.g. 50"),
+        shares: z.string().regex(/^\d+$/).optional().describe("Exact LP shares to burn, in base units (18 decimals)"),
+        slippageBps: lpSlippage,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, percent, shares, slippageBps }) => {
+      try {
+        const p = await poincare.lp.planRemove(getAddress(owner), { percent, shares: shares === undefined ? undefined : BigInt(shares) }, { slippageBps, now: now() });
+        return ok({
+          sent: false,
+          summary: `Burn ${formatAmount(p.shares)} LP shares for about ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH (at least ${formatAmount(p.usdcMin)} and ${formatAmount(p.wethMin)}).`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send it from the LP's wallet before the deadline.",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
   // ---------------------------------------------------------------- DCA
 
   server.registerTool(

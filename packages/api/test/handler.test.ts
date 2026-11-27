@@ -10,7 +10,11 @@ import {
   buildOrderParams,
   dcaAbi,
   erc20Abi,
+  planAddLiquidity,
+  planRemoveLiquidity,
   planSwap,
+  readPosition,
+  liquidityAbi,
   routerAbi,
   toRegime,
   withDca,
@@ -55,6 +59,9 @@ const swapReads = {
       case "previewSpread": return [0n, 3n * 10n ** 15n];
       case "poolKey": return { currency0: dep.usdc, currency1: dep.weth, fee: 8388608, tickSpacing: 60, hooks: dep.hook };
       case "allowance": return 0n;
+      case "reserves": return [225_000n * W, 100n * W];
+      case "totalSupply": return 1_000n * W;
+      case "balanceOf": return 100n * W;
       default: throw new Error(`unexpected read ${functionName}`);
     }
   },
@@ -72,6 +79,12 @@ const poincare = {
   swap: {
     plan: (from: Address, side: "buy" | "sell", amount: string, opts?: Parameters<typeof planSwap>[5]) =>
       planSwap(swapReads, dep, from, side, BigInt(Math.round(Number(amount))) * W, opts),
+  },
+  lp: {
+    position: (owner: Address) => readPosition(swapReads, dep, owner),
+    planAdd: (from: Address, a: { usdc?: string; weth?: string }, opts?: Parameters<typeof planAddLiquidity>[4]) =>
+      planAddLiquidity(swapReads, dep, from, { usdc: a.usdc === undefined ? undefined : BigInt(Number(a.usdc)) * W, weth: a.weth === undefined ? undefined : BigInt(Number(a.weth)) * W }, opts),
+    planRemove: (from: Address, a: { percent?: number; shares?: bigint }, opts?: Parameters<typeof planRemoveLiquidity>[4]) => planRemoveLiquidity(swapReads, dep, from, a, opts),
   },
   dca: {
     order: async (id: bigint) => (id === 7n ? order : null),
@@ -174,6 +187,26 @@ describe("swap build", () => {
   it("flags a different recipient in the warnings", async () => {
     const body = await (await get(`/swap/build?owner=${OWNER}&side=sell&amount=2&recipient=0x00000000000000000000000000000000000000b2`)).json();
     expect(body.warnings.join(" ")).toMatch(/not to the sender/);
+  });
+});
+
+describe("liquidity", () => {
+  it("reads a position", async () => {
+    const body = await (await get(`/lp/position?owner=${OWNER}`)).json();
+    expect(body.shares).toBe(String(100n * W));
+    expect(body.usdc).toBe(String(22_500n * W));
+  });
+
+  it("builds deposits and withdrawals, validating inputs", async () => {
+    const add = await (await get(`/lp/add/build?owner=${OWNER}&usdc=2250`)).json();
+    expect(add.transactions).toHaveLength(3);
+    expect(add.weth).toBe(String(W));
+    const rm = await (await get(`/lp/remove/build?owner=${OWNER}&percent=25`)).json();
+    expect(decodeFunctionData({ abi: liquidityAbi, data: rm.transactions[0].data as Hex }).args[0]).toMatchObject({ liquidity: 25n * W });
+    expect((await get(`/lp/add/build?owner=${OWNER}`)).status).toBe(400);
+    expect((await get(`/lp/add/build?owner=${OWNER}&usdc=1&weth=1`)).status).toBe(400);
+    expect((await get(`/lp/remove/build?owner=${OWNER}&percent=150`)).status).toBe(400);
+    expect((await get(`/lp/remove/build?owner=${OWNER}&shares=1.5`)).status).toBe(400);
   });
 });
 
