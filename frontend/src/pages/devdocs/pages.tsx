@@ -59,7 +59,7 @@ export const PAGES: DocPage[] = [
           { to: "how-it-works", title: "How Poincaré works", body: "New here? The problem, the idea and the parts, in plain words with figures.", icon: "eye" },
           { to: "detector", title: "The trend detector", body: "How the pool decides a trend is real, with a worked example.", icon: "gauge" },
           { to: "quickstart", title: "Quickstart", body: "Read the regime, quote a swap and plan a DCA order in five minutes.", icon: "spark" },
-          { to: "sdk", title: "TypeScript SDK", body: "@poincaretrade/sdk: one client for regime, quotes and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
+          { to: "sdk", title: "TypeScript SDK", body: "@poincaretrade/sdk: one client for regime, quotes, swaps, liquidity and DCA orders, with unsigned transactions for any signer.", icon: "layers" },
           { to: "mcp", title: "MCP server", body: "19 tools and 4 strategy prompts for Claude and any MCP client. Unsigned by default; swaps and liquidity are never sent.", icon: "curve" },
           { to: "http-api", title: "HTTP API", body: "Stateless JSON over HTTPS. Reads from the chain, returns unsigned transactions, never holds keys.", icon: "chart" },
         ]} />
@@ -274,8 +274,9 @@ curl -X POST ${API_BASE}/dca/tx/edit   -H 'content-type: application/json' -d '{
         <H2>2. Add the Poincaré skill</H2>
         <P>
           A skill is a short playbook Claude loads when a request matches it. The Poincaré skill covers orientation (USDC per
-          WETH, buy vs sell), mapping a request like “hourly for a day” to an order, the status glossary, error reasons, and
-          the safety rules: unsigned by default, confirm before cancelling, never ask for a key in chat.
+          WETH, buy vs sell), mapping a request like “hourly for a day” to an order, the swap and liquidity flows, the four
+          strategy playbooks, the status glossary, error reasons, and the safety rules: unsigned by default, exact approvals
+          only, the output always goes to you, confirm before cancelling, never ask for a key in chat.
         </P>
         <CodeTabs tabs={[
           { label: "skills CLI", lang: "sh", code: SKILL_INSTALL },
@@ -291,8 +292,112 @@ mkdir -p ~/.claude/skills && cp -r package/skills/poincare ~/.claude/skills/` },
           ["“Buy 500 USDC of WETH over a day without paying the trend spread.”", <>{mono("dca_plan_order")}, then {mono("dca_create_order")} after you confirm</>],
           ["“Why isn't my order filling?”", <>{mono("dca_list_orders")}, {mono("dca_preview_slice")}</>],
           ["“Tell me when a trend starts.”", mono("wait_for_regime_change")],
+          ["“Sell 0.2 WETH for me.”", <>{mono("quote")}, then {mono("swap_build")} (unsigned)</>],
+          ["“How's my LP position? Add 1,000 USDC.”", <>{mono("get_position")}, then {mono("lp_add_build")} (unsigned)</>],
+          ["A one-tap strategy", <>The four strategy prompts: see <DocLink to="playbooks">Strategy playbooks</DocLink></>],
         ]} />
-        <Callout kind="warning" title="Sending">Every write comes back unsigned for you to sign. To let Claude broadcast, give the server your own testnet key as <Code>POINCARE_PRIVATE_KEY</Code>; it then sends only when you ask for that action, and only for orders that key owns.</Callout>
+        <Callout kind="warning" title="Sending">Every write comes back unsigned for you to sign. Swaps and liquidity are never sent by the server, whatever key it has. For DCA orders only, you can let Claude broadcast by giving the server your own testnet key as <Code>POINCARE_PRIVATE_KEY</Code>; it then sends only when you ask for that action, and only for orders that key owns.</Callout>
+      </>
+    ),
+  },
+  {
+    slug: "playbooks",
+    group: "Guides",
+    title: "Strategy playbooks",
+    lede: "Four ready-made strategies for Claude: spread-aware DCA, LP guard, limit-price buying and patient swap. Each is one prompt that runs the right tools in the right order, and every transaction comes back unsigned for you.",
+    keywords: "strategy playbook prompt claude mcp lp guard limit buy patient swap dca example",
+    body: () => (
+      <>
+        <P>
+          The MCP server ships each strategy as a prompt. In Claude Code it appears as a slash command
+          ({mono("/mcp__poincare__limit_buy")} and so on); in other clients, pick it from the prompt menu. You can also just
+          ask in plain words: with the <DocLink to="claude">Poincaré skill</DocLink> installed, Claude follows the same steps.
+        </P>
+        <Table head={["Prompt", "For", "Arguments"]} rows={[
+          [mono("spread_aware_dca"), "Buying over time without ever paying the trend spread", "usdc, days, owner"],
+          [mono("lp_guard"), "Liquidity providers who want to be told when (and only when) to trim", "owner"],
+          [mono("limit_buy"), "Buying only at or below your price, for days, without a bot", "usdc, maxPrice, days (up to 2500), owner"],
+          [mono("patient_swap"), "A one-off swap that avoids the trend tax", "side, amount, owner"],
+        ]} />
+        <Callout kind="note" title="The rules every playbook follows">Read the pool first. Every transaction is unsigned. Approvals are for exact amounts. Nothing is built that moves your funds until you say yes, and the output always goes to your own address.</Callout>
+
+        <H2>Spread-aware DCA</H2>
+        <P>Buy ETH a little at a time, and skip any fill that would pay the trend spread. Later fills grow to catch up.</P>
+        <CodeBlock lang="text" title="Start it" code={`/mcp__poincare__spread_aware_dca usdc 1000 · days 10 · owner 0xYourWallet
+
+or just ask: "Buy 1,000 USDC of ETH over 10 days on Poincaré, and never pay the trend spread."`} />
+        <Ul>
+          <li>{mono("get_regime")}: what the pool is doing right now.</li>
+          <li>{mono("dca_plan_order")} with {mono("maxSpreadBps: 0")} and {mono("pauseOnTrend: true")}: the schedule, and what the first fill would do now.</li>
+          <li>After your yes, {mono("dca_create_order")}: an exact approve and the order, unsigned.</li>
+        </Ul>
+        <CodeBlock lang="text" title="Example · live testnet pool, 27 Nov 2026" code={`● get_regime
+  ⎿ up-trend · buyers pay 4.83% · sells free · price 2,296.80
+
+● dca_plan_order  buy · 1000 USDC · 10 slices · daily · maxSpreadBps 0 · pauseOnTrend
+  ⎿ 10 fills of 100 USDC · first fill now: held (buyers pay the spread)
+
+Claude: Planned. Buyers are paying a 4.83% spread right now, so the
+first fill waits it out instead of buying into the push. Create it?`} />
+
+        <H2>LP guard</H2>
+        <P>
+          On Poincaré a trend is when LPs earn: with-trend swaps pay a spread the pool keeps. This playbook keeps you in through
+          trends and only raises trimming if the spread sits at its cap for a while.
+        </P>
+        <CodeBlock lang="text" title="Start it" code={`/mcp__poincare__lp_guard owner 0xYourWallet
+
+or: "I provide liquidity on Poincaré. Watch the pool and tell me if I should pull out."`} />
+        <Ul>
+          <li>{mono("get_position")} and {mono("get_regime")}: where you stand.</li>
+          <li>{mono("wait_for_regime_change")} on {mono("spread-engaged")} and {mono("spread-released")}, in a loop.</li>
+          <li>While the spread is below its cap: stay in. Only if it sits at the cap for about 20 blocks, and you agree, {mono("lp_remove_build")} (unsigned).</li>
+          <li>When the spread is released, {mono("lp_add_build")} to put back what you trimmed.</li>
+        </Ul>
+        <CodeBlock lang="text" title="Example · live testnet pool, 27 Nov 2026" code={`● get_regime
+  ⎿ up-trend · buyers pay 4.83% to LPs · cap 5.00%
+
+Claude: Stay in. Buyers pushing this trend pay a 4.83% spread, and it
+goes to the pool you are in. It is below the 5% cap, so there is
+nothing to trim. I'll keep watching.`} />
+
+        <H2>Limit-price buying</H2>
+        <P>A limit order that waits all week: every 6 hours the contract checks the pool and buys only at or under your price, with no spread. Whatever is not spent can be refunded after the deadline.</P>
+        <CodeBlock lang="text" title="Start it" code={`/mcp__poincare__limit_buy usdc 1000 · maxPrice 2200 · days 7 · owner 0xYourWallet
+
+or: "Accumulate 1,000 USDC of ETH this week, only under 2,200, never paying the trend spread."`} />
+        <Ul>
+          <li>{mono("get_regime")}: the price compared with your limit.</li>
+          <li>{mono("dca_plan_order")} with {mono("limitPrice")}, {mono("maxSpreadBps: 0")}, every 6 hours ({mono("days × 4")} checks).</li>
+          <li>After your yes, {mono("dca_create_order")}, unsigned.</li>
+        </Ul>
+        <CodeBlock lang="text" title="Example · live testnet pool, 27 Nov 2026" code={`● get_regime
+  ⎿ price 2,296.80 · up-trend · buyers pay 4.83%
+
+● dca_plan_order  buy · 1000 USDC · 28 slices · every 6 h · limitPrice 2200 · maxSpreadBps 0
+  ⎿ 28 checks of 35.71 USDC · until 4 Dec · first fill now: held
+
+Claude: ETH is 2,296.80, above your 2,200, and buyers pay a spread
+right now, so nothing fills yet. The contract checks again every
+6 hours. Shall I build it?`} />
+
+        <H2>Patient swap</H2>
+        <P>Check what your side pays before you swap. If a trend is charging you, wait for it to end, quote again, then build the swap.</P>
+        <CodeBlock lang="text" title="Start it" code={`/mcp__poincare__patient_swap side buy · amount 500 · owner 0xYourWallet
+
+or: "Buy 500 USDC of ETH, but tell me if it's a bad time."`} />
+        <Ul>
+          <li>{mono("quote")}: what you get, and the spread on your side.</li>
+          <li>If you pay a spread and want to wait: {mono("wait_for_regime_change")} on {mono("spread-released")}, then {mono("quote")} again.</li>
+          <li>{mono("swap_build")}: an exact approve if needed, and the swap with a minimum-received floor, unsigned.</li>
+        </Ul>
+        <CodeBlock lang="text" title="Example · live testnet pool, 27 Nov 2026" code={`● swap_build  side: buy · amount: 500
+  ⎿ about 0.2065 WETH · at least 0.2055
+  ⎿ warning: this side pays a 4.83% trend spread
+
+Claude: Heads up: buyers pay a 4.83% spread right now, about 24 USDC
+on this buy. Selling is free. Want me to wait for the trend to end?`} />
+        <Callout kind="warning" title="Waiting is not free">Prices can keep moving while a trend runs. On 12 November, waiting about 3 hours for a down-trend to end got the same 2 WETH 184.43 USDC more, with the price barely moved; it will not always go that way.</Callout>
       </>
     ),
   },
@@ -393,21 +498,28 @@ poincare.watchRegime({
         <P>The minimum amounts are left at zero to keep the example short; a real bot should set them from a quote.</P>
         <H2>With the HTTP API</H2>
         <P>
-          The API reads the regime but never holds keys, and it has no liquidity routes: a scheduled job reads{" "}
-          <Code>/regime</Code>, keeps the same counters, and sends the two hook calls from its own signer, exactly as above.
+          The API never holds keys: a scheduled job reads <Code>/regime</Code>, keeps the same counters, and when it is time
+          to act, asks <Code>/lp/remove/build</Code> (or <Code>/lp/add/build</Code>) for the unsigned transaction, with
+          minimums from the live reserves, and signs it with its own key.
         </P>
-        <CodeBlock lang="sh" title="every minute" code={`curl -s ${API_BASE}/regime | jq '{trend: .regime.trend, kappa: .regime.kappa, kappaMax: .regime.kappaMax, block: .regime.blockNumber}'`} />
+        <CodeBlock lang="sh" title="every minute" code={`curl -s ${API_BASE}/regime | jq '{trend: .regime.trend, kappa: .regime.kappa, kappaMax: .regime.kappaMax, block: .regime.blockNumber}'
+
+# when the rule fires: the unsigned withdrawal, with real minimums
+curl -s "${API_BASE}/lp/remove/build?owner=0xYourWallet&percent=50"`} />
         <H2>With Claude</H2>
         <P>
-          The MCP server has no liquidity tools, on purpose: Claude watches and tells you; you act in the app's Pool screen. That
-          keeps a person in the loop for the one decision that moves your capital.
+          Run the <Code>lp_guard</Code> strategy prompt (see <DocLink to="playbooks">Strategy playbooks</DocLink>). Claude
+          watches and tells you; when you agree to trim, it builds the withdrawal with <Code>lp_remove_build</Code> and hands
+          it to you unsigned. The server never sends liquidity transactions, so a person stays in the loop for the one
+          decision that moves your capital.
         </P>
-        <CodeBlock lang="text" code={`"Watch the Poincaré pool. If the spread sits at its cap
-for about 20 blocks, tell me and suggest how much liquidity
-to take out. When the trend ends, remind me to add it back."
+        <CodeBlock lang="text" code={`/mcp__poincare__lp_guard owner 0xYourWallet
 
-→ wait_for_regime_change (spread-engaged, trend-ended)
-→ get_regime, to check kappa against kappaMax`} />
+→ get_position and get_regime: where you stand
+→ wait_for_regime_change (spread-engaged, spread-released), in a loop
+→ get_regime, to check kappa against kappaMax
+→ lp_remove_build, only if the spread sits at its cap and you agree
+→ lp_add_build when the spread is released, if you trimmed`} />
         <Callout kind="note" title="Test the rule first">The backtest harness in the repository replays real prices through the pool; run the rule there before trusting <Code>PIN_BLOCKS</Code> and <Code>TRIM</Code>.</Callout>
       </>
     ),
@@ -536,7 +648,7 @@ to take out. When the trend ends, remind me to add it back."
     slug: "sdk",
     group: "Build",
     title: "TypeScript SDK",
-    lede: "@poincaretrade/sdk is a typed, viem-based ESM package. One client covers the regime, quotes and DCA orders; reads need no wallet.",
+    lede: "@poincaretrade/sdk is a typed, viem-based ESM package. One client covers the regime, quotes, swaps, liquidity and DCA orders; reads need no wallet.",
     keywords: "typescript viem client createPoincareClient recurringOrder twapOrder watchRegime",
     body: () => (
       <>
@@ -558,6 +670,27 @@ const stop = poincare.watchRegime({
   },
 });
 const samples = await poincare.history(fromBlock);   // the hook's DetectorSample trace`} />
+        <H2>Build a swap</H2>
+        <P>
+          {mono("swap.plan")} quotes through the Lens, sets a minimum-received floor (slippage capped at 10%) and returns the
+          unsigned transactions: an exact-amount approve only if the allowance is short, then the router swap. It sends
+          nothing and needs no key. {mono("warnings")} flags an unlimited approval, a recipient other than the sender, and a
+          trend spread on your side.
+        </P>
+        <CodeBlock lang="ts" code={`const plan = await poincare.swap.plan("0xYourWallet", "sell", "0.2", { slippageBps: 50 });
+// plan.quote.amountOut, plan.minOut, plan.deadline, plan.warnings
+for (const tx of plan.transactions) await wallet.sendTransaction(tx);   // in order, before the deadline`} />
+        <H2>Liquidity</H2>
+        <P>
+          Read a position, and build deposits and withdrawals with real minimums from the live reserves. Give a deposit one
+          side; the other is sized from the pool's ratio exactly as the hook sizes it. Approvals are exact and only where short.
+        </P>
+        <CodeBlock lang="ts" code={`const pos = await poincare.lp.position("0xYourWallet");
+// { shares, sharePct, usdc, weth, valueUsdc, price, ... }
+
+const add = await poincare.lp.planAdd("0xYourWallet", { usdc: "1000" });    // or { weth: "0.5" }
+const rm  = await poincare.lp.planRemove("0xYourWallet", { percent: 50 });  // or { shares }
+// add.transactions: [approve USDC?, approve WETH?, addLiquidity]; rm.transactions: [removeLiquidity]`} />
         <H2>Open a DCA order</H2>
         <P>{mono("create")} approves exactly the budget (never an unlimited allowance) and resolves to the order id.</P>
         <CodeBlock lang="ts" code={`import { createPoincareClient, recurringOrder, twapOrder } from "@poincaretrade/sdk";
@@ -590,14 +723,17 @@ const edit = await poincare.dca.build.edit(id, { slices: 8 });`} />
         <Callout kind="warning" title="Gas and RPC lag">Every built transaction carries an explicit gas limit: testnet estimation mis-simulates calls through the hook. After a transaction, the client pins its next allowance read to that block, so a lagging public RPC replica cannot make it skip an approval.</Callout>
         <H2>Reference</H2>
         <Table head={["Export", "What it is"]} rows={[
-          [mono("createPoincareClient"), "regime, watchRegime, history, quote, and dca.{order, ordersOf, openOrderIds, preview, create, execute, pause, resume, edit, cancel, closeExpired, build.*}"],
+          [mono("createPoincareClient"), "regime, watchRegime, history, quote, poolKey, swap.plan, lp.{position, planAdd, planRemove}, and dca.{order, ordersOf, openOrderIds, preview, create, execute, pause, resume, edit, cancel, closeExpired, build.*}"],
+          [mono("planSwap · readPoolKey · minOutFor"), "Unsigned swaps; the pool key read from the hook; the slippage floor"],
+          [mono("readPosition · planAddLiquidity · planRemoveLiquidity"), "LP position and unsigned deposits and withdrawals"],
+          [mono("depositTaken · withdrawalOut"), "Offline mirror of what the hook takes on a deposit and returns on a withdrawal"],
           [mono("recurringOrder · twapOrder"), "Plan builders; FREQUENCIES 5m 15m 1h 4h 1d 1w; PROTECTIONS spread-guard · trend-pause · always"],
           [mono("buildOrderParams · buildEditParams"), "Validate like createOrder / editOrder; throw DcaParamError with the contract's reason"],
-          [mono("planSlice · sliceAmount · slotInfo"), "Offline mirror of the contract's slice rules"],
+          [mono("planSlice · planSliceQuoted · sliceAmount · slotInfo"), "Offline mirror of the contract's slice rules; planSliceQuoted also checks the limit price"],
           [mono("spentOf · progressOf · statusOf"), "Order helpers; DCA_STATUS_TEXT explains every status"],
           [mono("readRegime · diffRegime · trendOnsets"), "Lower-level regime reads and event diffing"],
           [mono("build*Tx · sendTx · DCA_GAS"), "Unsigned transactions with explicit gas, and a sender that fails loudly on a revert"],
-          [mono("hookAbi · lensAbi · dcaAbi · erc20Abi"), "Typed ABIs generated from the contracts"],
+          [mono("hookAbi · lensAbi · dcaAbi · erc20Abi · routerAbi · liquidityAbi"), "Typed ABIs for the contracts the SDK calls"],
           [mono("UNICHAIN_SEPOLIA · withDca"), "The live deployment, and a helper to point at another PoincareDCA"],
         ]} />
       </>
