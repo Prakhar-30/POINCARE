@@ -1763,6 +1763,85 @@ var erc20Abi = [
   { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] }
 ];
 
+// src/abi/router.ts
+var routerAbi = [
+  {
+    type: "function",
+    name: "swapExactTokensForTokens",
+    stateMutability: "payable",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      { name: "zeroForOne", type: "bool" },
+      {
+        name: "poolKey",
+        type: "tuple",
+        components: [
+          { name: "currency0", type: "address" },
+          { name: "currency1", type: "address" },
+          { name: "fee", type: "uint24" },
+          { name: "tickSpacing", type: "int24" },
+          { name: "hooks", type: "address" }
+        ]
+      },
+      { name: "hookData", type: "bytes" },
+      { name: "receiver", type: "address" },
+      { name: "deadline", type: "uint256" }
+    ],
+    outputs: [{ name: "delta", type: "int256" }]
+  }
+];
+
+// src/abi/liquidity.ts
+var liquidityAbi = [
+  { type: "function", name: "reserves", stateMutability: "view", inputs: [], outputs: [{ name: "r0", type: "uint256" }, { name: "r1", type: "uint256" }] },
+  { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "function",
+    name: "addLiquidity",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "amount0Desired", type: "uint256" },
+          { name: "amount1Desired", type: "uint256" },
+          { name: "amount0Min", type: "uint256" },
+          { name: "amount1Min", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "tickLower", type: "int24" },
+          { name: "tickUpper", type: "int24" },
+          { name: "userInputSalt", type: "bytes32" }
+        ]
+      }
+    ],
+    outputs: [{ name: "delta", type: "int256" }]
+  },
+  {
+    type: "function",
+    name: "removeLiquidity",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "liquidity", type: "uint256" },
+          { name: "amount0Min", type: "uint256" },
+          { name: "amount1Min", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "tickLower", type: "int24" },
+          { name: "tickUpper", type: "int24" },
+          { name: "userInputSalt", type: "bytes32" }
+        ]
+      }
+    ],
+    outputs: [{ name: "delta", type: "int256" }]
+  }
+];
+
 // src/deployments.ts
 import { getAddress } from "viem";
 var TOKEN_DECIMALS = 18;
@@ -1997,8 +2076,257 @@ async function quoteExactInput(client, dep, side, amountIn) {
   };
 }
 
+// src/swap.ts
+import { encodeFunctionData, getAddress as getAddress2, isAddress, maxUint256, zeroAddress } from "viem";
+var SWAP_GAS = { approve: 80000n, swap: 3000000n };
+var MAX_SWAP_SLIPPAGE_BPS = 1e3;
+var DEFAULT_SWAP_SLIPPAGE_BPS = 50;
+var DEFAULT_SWAP_DEADLINE_SEC = 1200;
+var MAX_SWAP_DEADLINE_SEC = 3600;
+var SwapParamError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "SwapParamError";
+  }
+};
+async function readPoolKey(client, dep) {
+  const k = await client.readContract({ address: dep.hook, abi: hookAbi, functionName: "poolKey" });
+  return { currency0: k.currency0, currency1: k.currency1, fee: Number(k.fee), tickSpacing: Number(k.tickSpacing), hooks: k.hooks };
+}
+function swapTokens(dep, side) {
+  return side === "buy" ? { tokenIn: dep.usdc, tokenOut: dep.weth } : { tokenIn: dep.weth, tokenOut: dep.usdc };
+}
+function minOutFor(amountOut, slippageBps) {
+  return amountOut * (BPS - BigInt(slippageBps)) / BPS;
+}
+function buildSwapApproveTx(dep, side, amount) {
+  const { tokenIn } = swapTokens(dep, side);
+  return {
+    to: tokenIn,
+    data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [dep.router, amount] }),
+    value: 0n,
+    gas: SWAP_GAS.approve,
+    description: `Approve exactly this swap's ${side === "buy" ? "USDC" : "WETH"} for the router`
+  };
+}
+function buildSwapTx(dep, key, p) {
+  return {
+    to: dep.router,
+    data: encodeFunctionData({
+      abi: routerAbi,
+      functionName: "swapExactTokensForTokens",
+      args: [p.amountIn, p.minOut, sideToZeroForOne(p.side), key, "0x", p.recipient, p.deadline]
+    }),
+    value: 0n,
+    gas: SWAP_GAS.swap,
+    description: `Swap on the Poincar\xE9 pool (${p.side === "buy" ? "USDC \u2192 WETH" : "WETH \u2192 USDC"})`
+  };
+}
+async function planSwap(client, dep, from, side, amountIn, opts = {}) {
+  if (side !== "buy" && side !== "sell") throw new SwapParamError("side must be buy or sell");
+  if (!isAddress(from, { strict: false }) || getAddress2(from) === zeroAddress) throw new SwapParamError("from must be a non-zero address");
+  if (amountIn <= 0n) throw new SwapParamError("amount must be greater than zero");
+  const slippageBps = opts.slippageBps ?? DEFAULT_SWAP_SLIPPAGE_BPS;
+  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > MAX_SWAP_SLIPPAGE_BPS) {
+    throw new SwapParamError(`slippageBps must be an integer in 0..${MAX_SWAP_SLIPPAGE_BPS}`);
+  }
+  const deadlineSec = opts.deadlineSec ?? DEFAULT_SWAP_DEADLINE_SEC;
+  if (!Number.isInteger(deadlineSec) || deadlineSec < 60 || deadlineSec > MAX_SWAP_DEADLINE_SEC) {
+    throw new SwapParamError(`deadlineSec must be an integer in 60..${MAX_SWAP_DEADLINE_SEC}`);
+  }
+  const sender = getAddress2(from);
+  let recipient = sender;
+  if (opts.recipient !== void 0) {
+    if (!isAddress(opts.recipient, { strict: false }) || getAddress2(opts.recipient) === zeroAddress) {
+      throw new SwapParamError("recipient must be a non-zero address");
+    }
+    recipient = getAddress2(opts.recipient);
+  }
+  const { tokenIn, tokenOut } = swapTokens(dep, side);
+  const [quote, key, allowance] = await Promise.all([
+    quoteExactInput(client, dep, side, amountIn),
+    readPoolKey(client, dep),
+    client.readContract({ address: tokenIn, abi: erc20Abi, functionName: "allowance", args: [sender, dep.router] })
+  ]);
+  if (quote.amountOut === 0n) throw new SwapParamError("this amount quotes to zero output; try a larger amount");
+  const minOut = minOutFor(quote.amountOut, slippageBps);
+  if (minOut === 0n) throw new SwapParamError("the slippage floor rounds to zero; try a larger amount or lower slippage");
+  const now = BigInt(opts.now ?? Math.floor(Date.now() / 1e3));
+  const deadline = now + BigInt(deadlineSec);
+  const warnings = [];
+  if (recipient !== sender) warnings.push(`The output goes to ${recipient}, not to the sender ${sender}. Only sign if you meant that.`);
+  if (allowance === maxUint256) {
+    warnings.push("This wallet has an UNLIMITED approval to the router for the input token. It is not needed: consider revoking it and approving exact amounts.");
+  }
+  if (quote.spread > 0) {
+    warnings.push(`This side pays a trend spread of ${(quote.spread * 100).toFixed(2)}% right now. Waiting for the trend to end avoids it.`);
+  }
+  const transactions = [];
+  if (allowance < amountIn) transactions.push(buildSwapApproveTx(dep, side, amountIn));
+  transactions.push(buildSwapTx(dep, key, { side, amountIn, minOut, recipient, deadline }));
+  return { side, from: sender, recipient, tokenIn, tokenOut, amountIn, quote, minOut, slippageBps, deadline, allowance, warnings, transactions };
+}
+
+// src/lp.ts
+import { encodeFunctionData as encodeFunctionData2, getAddress as getAddress3, isAddress as isAddress2, maxUint256 as maxUint2562, zeroAddress as zeroAddress2, zeroHash } from "viem";
+var LP_GAS = { approve: 80000n, add: 3000000n, remove: 2500000n };
+var LpParamError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "LpParamError";
+  }
+};
+function depositTaken(r0, r1, usdcDesired, wethDesired) {
+  if (r0 === 0n || r1 === 0n) return { usdc: usdcDesired, weth: wethDesired };
+  const wethOptimal = usdcDesired * r1 / r0;
+  if (wethOptimal <= wethDesired) return { usdc: usdcDesired, weth: wethOptimal };
+  return { usdc: wethDesired * r0 / r1, weth: wethDesired };
+}
+function withdrawalOut(shares, r0, r1, supply) {
+  if (supply === 0n) return { usdc: 0n, weth: 0n };
+  return { usdc: shares * r0 / supply, weth: shares * r1 / supply };
+}
+var ratio = (a, b) => b === 0n ? 0 : Number(a * WAD / b) / 1e18;
+async function readPool(client, dep) {
+  const [[r0, r1], supply] = await Promise.all([
+    client.readContract({ address: dep.hook, abi: liquidityAbi, functionName: "reserves" }),
+    client.readContract({ address: dep.hook, abi: liquidityAbi, functionName: "totalSupply" })
+  ]);
+  return { r0, r1, supply };
+}
+function checkAddress(v, name) {
+  if (!isAddress2(v, { strict: false }) || getAddress3(v) === zeroAddress2) throw new LpParamError(`${name} must be a non-zero address`);
+  return getAddress3(v);
+}
+function checkOptions(opts) {
+  const slippageBps = opts.slippageBps ?? DEFAULT_SWAP_SLIPPAGE_BPS;
+  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > MAX_SWAP_SLIPPAGE_BPS) {
+    throw new LpParamError(`slippageBps must be an integer in 0..${MAX_SWAP_SLIPPAGE_BPS}`);
+  }
+  const deadlineSec = opts.deadlineSec ?? DEFAULT_SWAP_DEADLINE_SEC;
+  if (!Number.isInteger(deadlineSec) || deadlineSec < 60 || deadlineSec > MAX_SWAP_DEADLINE_SEC) {
+    throw new LpParamError(`deadlineSec must be an integer in 60..${MAX_SWAP_DEADLINE_SEC}`);
+  }
+  return { slippageBps, deadline: BigInt(opts.now ?? Math.floor(Date.now() / 1e3)) + BigInt(deadlineSec) };
+}
+async function readPosition(client, dep, owner) {
+  const who = checkAddress(owner, "owner");
+  const [{ r0, r1, supply }, shares] = await Promise.all([
+    readPool(client, dep),
+    client.readContract({ address: dep.hook, abi: liquidityAbi, functionName: "balanceOf", args: [who] })
+  ]);
+  const usdc = supply === 0n ? 0n : shares * r0 / supply;
+  const weth = supply === 0n ? 0n : shares * r1 / supply;
+  const price = ratio(r0, r1);
+  return {
+    owner: who,
+    shares,
+    totalShares: supply,
+    sharePct: ratio(shares, supply),
+    usdc,
+    weth,
+    valueUsdc: Number(formatAmount(usdc, TOKEN_DECIMALS)) + Number(formatAmount(weth, TOKEN_DECIMALS)) * price,
+    reserves: { usdc: r0, weth: r1 },
+    price
+  };
+}
+async function planAddLiquidity(client, dep, from, amount, opts = {}) {
+  const sender = checkAddress(from, "from");
+  const hasUsdc = amount.usdc !== void 0;
+  const hasWeth = amount.weth !== void 0;
+  if (hasUsdc === hasWeth) throw new LpParamError("give exactly one side: usdc or weth; the other is sized from the pool's ratio");
+  const given = hasUsdc ? amount.usdc : amount.weth;
+  if (given <= 0n) throw new LpParamError("amount must be greater than zero");
+  const { slippageBps, deadline } = checkOptions(opts);
+  const [{ r0, r1, supply }, al0, al1] = await Promise.all([
+    readPool(client, dep),
+    client.readContract({ address: dep.usdc, abi: erc20Abi, functionName: "allowance", args: [sender, dep.hook] }),
+    client.readContract({ address: dep.weth, abi: erc20Abi, functionName: "allowance", args: [sender, dep.hook] })
+  ]);
+  if (supply === 0n || r0 === 0n || r1 === 0n) throw new LpParamError("the pool has not been seeded; the first deposit sets the curve and is not done through this tool");
+  const usdc = hasUsdc ? given : given * r0 / r1;
+  const weth = usdc * r1 / r0;
+  if (usdc === 0n || weth === 0n) throw new LpParamError("too small: one side rounds to zero at the pool's ratio");
+  const expectedShares = [usdc * supply / r0, weth * supply / r1].reduce((a, b) => a < b ? a : b);
+  if (expectedShares === 0n) throw new LpParamError("too small: the deposit would mint no shares");
+  const warnings = [];
+  for (const [sym, al] of [["USDC", al0], ["WETH", al1]]) {
+    if (al === maxUint2562) warnings.push(`This wallet has an UNLIMITED ${sym} approval to the hook. It is not needed: consider revoking it.`);
+  }
+  const transactions = [];
+  for (const [token, sym, need, have] of [[dep.usdc, "USDC", usdc, al0], [dep.weth, "WETH", weth, al1]]) {
+    if (have < need) {
+      transactions.push({
+        to: token,
+        data: encodeFunctionData2({ abi: erc20Abi, functionName: "approve", args: [dep.hook, need] }),
+        value: 0n,
+        gas: LP_GAS.approve,
+        description: `Approve exactly this deposit's ${sym} for the Poincar\xE9 hook`
+      });
+    }
+  }
+  const usdcMin = minOutFor(usdc, slippageBps);
+  const wethMin = minOutFor(weth, slippageBps);
+  transactions.push({
+    to: dep.hook,
+    data: encodeFunctionData2({
+      abi: liquidityAbi,
+      functionName: "addLiquidity",
+      args: [{ amount0Desired: usdc, amount1Desired: weth, amount0Min: usdcMin, amount1Min: wethMin, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }]
+    }),
+    value: 0n,
+    gas: LP_GAS.add,
+    description: "Add liquidity to the Poincar\xE9 pool"
+  });
+  return { from: sender, usdc, weth, usdcMin, wethMin, expectedShares, slippageBps, deadline, warnings, transactions };
+}
+async function planRemoveLiquidity(client, dep, from, amount, opts = {}) {
+  const sender = checkAddress(from, "from");
+  const hasPct = amount.percent !== void 0;
+  const hasShares = amount.shares !== void 0;
+  if (hasPct === hasShares) throw new LpParamError("give exactly one of percent or shares");
+  if (hasPct && (!Number.isFinite(amount.percent) || amount.percent <= 0 || amount.percent > 100)) {
+    throw new LpParamError("percent must be greater than 0 and at most 100");
+  }
+  const { slippageBps, deadline } = checkOptions(opts);
+  const [{ r0, r1, supply }, balance] = await Promise.all([
+    readPool(client, dep),
+    client.readContract({ address: dep.hook, abi: liquidityAbi, functionName: "balanceOf", args: [sender] })
+  ]);
+  if (balance === 0n) throw new LpParamError("this address holds no LP shares");
+  const shares = hasShares ? amount.shares : amount.percent === 100 ? balance : balance * BigInt(Math.round(amount.percent * 100)) / 10000n;
+  if (shares <= 0n) throw new LpParamError("too small: that is zero shares");
+  if (shares > balance) throw new LpParamError(`only ${balance} shares are held`);
+  const { usdc, weth } = withdrawalOut(shares, r0, r1, supply);
+  if (usdc === 0n && weth === 0n) throw new LpParamError("too small: the burn would return nothing");
+  const usdcMin = minOutFor(usdc, slippageBps);
+  const wethMin = minOutFor(weth, slippageBps);
+  return {
+    from: sender,
+    shares,
+    usdc,
+    weth,
+    usdcMin,
+    wethMin,
+    slippageBps,
+    deadline,
+    warnings: [],
+    transactions: [{
+      to: dep.hook,
+      data: encodeFunctionData2({
+        abi: liquidityAbi,
+        functionName: "removeLiquidity",
+        args: [{ liquidity: shares, amount0Min: usdcMin, amount1Min: wethMin, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }]
+      }),
+      value: 0n,
+      gas: LP_GAS.remove,
+      description: "Remove liquidity from the Poincar\xE9 pool"
+    }]
+  };
+}
+
 // src/dca.ts
-import { getAddress as getAddress2 } from "viem";
+import { getAddress as getAddress4 } from "viem";
 var DCA_STATUS = [
   "ready",
   "unknown",
@@ -2067,7 +2395,7 @@ function buildOrderParams(input, nowSec = Math.floor(Date.now() / 1e3)) {
     catchUp: input.catchUp ?? true,
     maxSlippageBps: input.maxSlippageBps ?? 50,
     minPriceWad: input.limitPrice === void 0 ? 0n : limitToMinPriceWad(input.side, input.limitPrice),
-    recipient: input.recipient ? getAddress2(input.recipient) : ZERO
+    recipient: input.recipient ? getAddress4(input.recipient) : ZERO
   };
   validateOrderParams(p, now);
   return p;
@@ -2167,6 +2495,17 @@ function planSlice(o, ctx) {
   plan.minOut = limitOut > slipOut ? limitOut : slipOut;
   return plan;
 }
+async function planSliceQuoted(o, ctx, quoteOut) {
+  const first = planSlice(o, ctx);
+  if (first.status !== "ready" || first.amountIn === 0n) return first;
+  let out;
+  try {
+    out = await quoteOut(first.amountIn);
+  } catch (e) {
+    return { ...first, quoteError: e instanceof Error ? e.message.split("\n")[0].slice(0, 200) : String(e) };
+  }
+  return planSlice(o, { ...ctx, quoteOut: out });
+}
 var spentOf = (o) => o.amountIn - o.remaining - o.refunded;
 var progressOf = (o) => o.amountIn === 0n ? 0 : Number(spentOf(o) * 10000n / o.amountIn) / 1e4;
 
@@ -2246,7 +2585,7 @@ function twapSlices(durationSec) {
 
 // src/dcaClient.ts
 import {
-  encodeFunctionData,
+  encodeFunctionData as encodeFunctionData3,
   parseEventLogs
 } from "viem";
 var DCA_GAS = {
@@ -2306,7 +2645,7 @@ async function allowanceFor(client, dep, owner, side, atBlock) {
 function buildApproveTx(dep, side, amount) {
   return {
     to: inputToken(dep, side),
-    data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [requireDca(dep), amount] }),
+    data: encodeFunctionData3({ abi: erc20Abi, functionName: "approve", args: [requireDca(dep), amount] }),
     value: 0n,
     gas: DCA_GAS.approve,
     description: `Approve ${side === "buy" ? "USDC" : "WETH"} for the DCA contract`
@@ -2315,7 +2654,7 @@ function buildApproveTx(dep, side, amount) {
 function buildCreateOrderTx(dep, p) {
   return {
     to: requireDca(dep),
-    data: encodeFunctionData({
+    data: encodeFunctionData3({
       abi: dcaAbi,
       functionName: "createOrder",
       args: [{
@@ -2340,7 +2679,7 @@ function buildCreateOrderTx(dep, p) {
 }
 var simple = (fn, label) => (dep, id) => ({
   to: requireDca(dep),
-  data: encodeFunctionData({ abi: dcaAbi, functionName: fn, args: [id] }),
+  data: encodeFunctionData3({ abi: dcaAbi, functionName: fn, args: [id] }),
   value: 0n,
   gas: DCA_GAS[fn],
   description: `${label} DCA order #${id}`
@@ -2352,7 +2691,7 @@ var buildResumeTx = simple("resume", "Resume");
 function buildEditTx(dep, id, p) {
   return {
     to: requireDca(dep),
-    data: encodeFunctionData({
+    data: encodeFunctionData3({
       abi: dcaAbi,
       functionName: "editOrder",
       args: [id, {
@@ -2441,6 +2780,23 @@ function createPoincareClient(opts = {}) {
     history: (fromBlock, toBlock) => regimeHistory(publicClient, deployment, { fromBlock, toBlock }),
     /** Exact-input quote; `amount` in input-token units (USDC to buy, WETH to sell). */
     quote: (side, amount) => quoteExactInput(publicClient, deployment, side, toAmount(amount)),
+    /** The pool key, read from the hook. */
+    poolKey: () => readPoolKey(publicClient, deployment),
+    swap: {
+      /** Quote + slippage floor + unsigned transactions (exact approve if needed, then the swap). Sends nothing. */
+      plan: (from, side, amount, opts2) => planSwap(publicClient, deployment, from, side, toAmount(amount), opts2)
+    },
+    lp: {
+      /** An address's LP shares and what they redeem for right now. */
+      position: (owner2) => readPosition(publicClient, deployment, owner2),
+      /** Unsigned deposit at the pool's ratio: give one side (usdc or weth), the other is sized for you. */
+      planAdd: (from, amount, opts2) => planAddLiquidity(publicClient, deployment, from, {
+        usdc: amount.usdc === void 0 ? void 0 : toAmount(amount.usdc),
+        weth: amount.weth === void 0 ? void 0 : toAmount(amount.weth)
+      }, opts2),
+      /** Unsigned withdrawal: a percentage (1..100) or an exact share count. */
+      planRemove: (from, amount, opts2) => planRemoveLiquidity(publicClient, deployment, from, amount, opts2)
+    },
     dca: {
       order: (id) => getOrder(publicClient, deployment, id),
       ordersOf: (address) => getOrdersOf(publicClient, deployment, address),
@@ -2487,14 +2843,22 @@ export {
   DCA_GAS,
   DCA_STATUS,
   DCA_STATUS_TEXT,
+  DEFAULT_SWAP_DEADLINE_SEC,
+  DEFAULT_SWAP_SLIPPAGE_BPS,
   DcaNotDeployedError,
   DcaParamError,
   FREQUENCIES,
   FREQUENCY_LABEL,
+  LP_GAS,
+  LpParamError,
   MAX_SLICES,
+  MAX_SWAP_DEADLINE_SEC,
+  MAX_SWAP_SLIPPAGE_BPS,
   MIN_INTERVAL,
   PROTECTIONS,
   PROTECTION_TEXT,
+  SWAP_GAS,
+  SwapParamError,
   TOKEN_DECIMALS,
   TxRevertedError,
   UNICHAIN_SEPOLIA,
@@ -2510,10 +2874,13 @@ export {
   buildOrderParams,
   buildPauseTx,
   buildResumeTx,
+  buildSwapApproveTx,
+  buildSwapTx,
   classify,
   createPoincareClient,
   dcaAbi,
   decimalToWad,
+  depositTaken,
   diffRegime,
   erc20Abi,
   formatAmount,
@@ -2524,24 +2891,34 @@ export {
   hookAbi,
   lensAbi,
   limitToMinPriceWad,
+  liquidityAbi,
   marketTrend,
+  minOutFor,
   minPriceWadToLimit,
   orderIdFromReceipt,
+  planAddLiquidity,
   planCreateOrder,
+  planRemoveLiquidity,
   planSlice,
+  planSliceQuoted,
+  planSwap,
   previewSlice,
   progressOf,
   quoteExactInput,
+  readPoolKey,
+  readPosition,
   readRegime,
   recurringOrder,
   regimeHistory,
   requireDca,
+  routerAbi,
   sendTx,
   sideToZeroForOne,
   sliceAmount,
   slotInfo,
   spentOf,
   statusOf,
+  swapTokens,
   toAmount,
   toDcaOrder,
   toRegime,
@@ -2553,5 +2930,6 @@ export {
   watchRegime,
   withDca,
   withTrendSide,
+  withdrawalOut,
   zeroForOneToSide
 };

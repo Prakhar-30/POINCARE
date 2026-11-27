@@ -4,6 +4,8 @@ import { type DcaEditInput, type DcaOrderInput, buildEditParams, buildOrderParam
 import * as dca from "./dcaClient.js";
 import { type PoincareDeployment, UNICHAIN_SEPOLIA } from "./deployments.js";
 import { quoteExactInput } from "./quote.js";
+import { type SwapOptions, planSwap, readPoolKey } from "./swap.js";
+import { type LpOptions, planAddLiquidity, planRemoveLiquidity, readPosition } from "./lp.js";
 import { type Regime, type RegimeEvent, type Side, readRegime, regimeHistory, watchRegime } from "./regime.js";
 import { toAmount } from "./units.js";
 
@@ -59,6 +61,28 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
     history: (fromBlock: bigint, toBlock?: bigint) => regimeHistory(publicClient, deployment, { fromBlock, toBlock }),
     /** Exact-input quote; `amount` in input-token units (USDC to buy, WETH to sell). */
     quote: (side: Side, amount: string | number | bigint) => quoteExactInput(publicClient, deployment, side, toAmount(amount)),
+    /** The pool key, read from the hook. */
+    poolKey: () => readPoolKey(publicClient, deployment),
+
+    swap: {
+      /** Quote + slippage floor + unsigned transactions (exact approve if needed, then the swap). Sends nothing. */
+      plan: (from: Address, side: Side, amount: string | number | bigint, opts?: SwapOptions) =>
+        planSwap(publicClient, deployment, from, side, toAmount(amount), opts),
+    },
+
+    lp: {
+      /** An address's LP shares and what they redeem for right now. */
+      position: (owner: Address) => readPosition(publicClient, deployment, owner),
+      /** Unsigned deposit at the pool's ratio: give one side (usdc or weth), the other is sized for you. */
+      planAdd: (from: Address, amount: { usdc?: string | number | bigint; weth?: string | number | bigint }, opts?: LpOptions) =>
+        planAddLiquidity(publicClient, deployment, from, {
+          usdc: amount.usdc === undefined ? undefined : toAmount(amount.usdc),
+          weth: amount.weth === undefined ? undefined : toAmount(amount.weth),
+        }, opts),
+      /** Unsigned withdrawal: a percentage (1..100) or an exact share count. */
+      planRemove: (from: Address, amount: { percent?: number; shares?: bigint }, opts?: LpOptions) =>
+        planRemoveLiquidity(publicClient, deployment, from, amount, opts),
+    },
 
     dca: {
       order: (id: bigint) => dca.getOrder(publicClient, deployment, id),

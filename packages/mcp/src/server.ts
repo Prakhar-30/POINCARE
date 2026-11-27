@@ -11,16 +11,18 @@ import {
   diffRegime,
   minPriceWadToLimit,
   orderIdFromReceipt,
-  planSlice,
+  planSliceQuoted,
   progressOf,
   spentOf,
   formatAmount,
+  MAX_SWAP_SLIPPAGE_BPS,
   trendOnsets,
   wadToBpsUp,
 } from "@poincaretrade/sdk";
 import { getAddress, type Address, type TransactionReceipt } from "viem";
 import { z } from "zod";
 import { describeRegime, fail, ok } from "./format.js";
+import { registerPrompts } from "./prompts.js";
 
 /** The user's own key, if they configured one. Without it every write tool returns unsigned txs. */
 export type Signer = { address: Address; send: (tx: TxRequest) => Promise<TransactionReceipt> };
@@ -96,7 +98,8 @@ function orderView(o: DcaOrder) {
 export function createServer(opts: ServerOptions): McpServer {
   const { poincare, signer } = opts;
   const now = opts.now ?? (() => Math.floor(Date.now() / 1000));
-  const server = new McpServer({ name: "poincare", version: "0.1.2" });
+  const server = new McpServer({ name: "poincare", version: "0.1.3" });
+  registerPrompts(server);
 
   type RunResult =
     | { sent: false; transactions: TxRequest[]; note: string }
@@ -147,9 +150,28 @@ export function createServer(opts: ServerOptions): McpServer {
     async ({ blocks }) => {
       try {
         const head = await poincare.publicClient.getBlockNumber();
-        const from = head - BigInt(blocks ?? 3000);
-        const samples = await poincare.history(from > 0n ? from : 0n, head);
-        return ok({ fromBlock: from, toBlock: head, sampleCount: samples.length, onsets: trendOnsets(samples), latest: samples.slice(-10) });
+        let span = BigInt(blocks ?? 3000);
+        let samples = await poincare.history(head > span ? head - span : 0n, head);
+        // The hook samples only on swaps. With the default window, a quiet pool is looked at once
+        // more over the widest window; an explicit `blocks` is always honoured as asked.
+        let widened = false;
+        if (samples.length === 0 && blocks === undefined) {
+          widened = true;
+          span = 20_000n;
+          samples = await poincare.history(head > span ? head - span : 0n, head);
+        }
+        const fromBlock = head > span ? head - span : 0n;
+        return ok({
+          fromBlock,
+          toBlock: head,
+          sampleCount: samples.length,
+          onsets: trendOnsets(samples),
+          latest: samples.slice(-10),
+          ...(widened ? { widened: "No samples in the default window, so the full 20,000 blocks were scanned." } : {}),
+          ...(samples.length === 0
+            ? { note: `No swaps in the last ${span} blocks, so the detector recorded no samples (it samples only when someone trades). Call get_regime for the current state.` }
+            : {}),
+        });
       } catch (e) {
         return fail(e);
       }
@@ -207,6 +229,126 @@ export function createServer(opts: ServerOptions): McpServer {
     },
   );
 
+  server.registerTool(
+    "swap_build",
+    {
+      title: "Build a swap (unsigned)",
+      description:
+        "Plan an exact-input swap on the Poincaré pool and return UNSIGNED transactions for the owner's own wallet: an exact-amount approve (only if the allowance is short, never unlimited), then the router swap with a minimum-received floor from the Lens quote. Never sends, even if a key is configured. Leave `recipient` unset unless the user explicitly asked to send the output to another address.",
+      inputSchema: {
+        owner: address.describe("The wallet that will sign and pay"),
+        side,
+        amount: z.string().regex(/^\d+(\.\d+)?$/).describe("Input amount: USDC to buy, WETH to sell"),
+        slippageBps: z.number().int().min(0).max(MAX_SWAP_SLIPPAGE_BPS).optional().describe("Max shortfall vs the quote in bps (default 50, max 1000)"),
+        recipient: address.optional().describe("Receives the output; defaults to the owner. Only set when the user explicitly asks."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, side: s, amount, slippageBps, recipient }) => {
+      try {
+        const p = await poincare.swap.plan(getAddress(owner), s, amount, { slippageBps, recipient: recipient as Address | undefined, now: now() });
+        const outSym = s === "buy" ? "WETH" : "USDC";
+        return ok({
+          sent: false,
+          summary: `Pay ${formatAmount(p.amountIn)} ${s === "buy" ? "USDC" : "WETH"}, receive about ${formatAmount(p.quote.amountOut)} ${outSym} (at least ${formatAmount(p.minOut)} ${outSym}). Trend spread on this side: ${(p.quote.spread * 100).toFixed(2)}%, fee ${(p.quote.fee * 100).toFixed(2)}%.`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send these in order from the owner's wallet before the deadline.",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------- liquidity
+
+  server.registerTool(
+    "get_position",
+    {
+      title: "LP position",
+      description: "An address's Poincaré LP shares, its share of the pool, what the shares redeem for right now (USDC and WETH), and their value at the pool's reserve price.",
+      inputSchema: { owner: address.describe("The LP's address") },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner }) => {
+      try {
+        const p = await poincare.lp.position(getAddress(owner));
+        return ok({
+          summary: p.shares === 0n
+            ? "This address holds no Poincaré LP shares."
+            : `${(p.sharePct * 100).toFixed(4)}% of the pool: redeems for ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH, about ${p.valueUsdc.toFixed(2)} USDC at ${p.price.toFixed(2)} USDC per WETH.`,
+          position: p,
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  const lpSlippage = z.number().int().min(0).max(MAX_SWAP_SLIPPAGE_BPS).optional().describe("Max shortfall on each side in bps (default 50, max 1000)");
+  const decimal = z.string().regex(/^\d+(\.\d+)?$/);
+
+  server.registerTool(
+    "lp_add_build",
+    {
+      title: "Build a liquidity deposit (unsigned)",
+      description:
+        "Plan a deposit at the pool's current ratio and return UNSIGNED transactions: exact-amount approvals only where short (never unlimited), then addLiquidity with real minimums. Give exactly one side (usdc or weth); the other is sized from the reserves. Never sends. Moving capital is the user's decision: build only when they asked to add liquidity.",
+      inputSchema: {
+        owner: address.describe("The wallet that will sign and deposit"),
+        usdc: decimal.optional().describe("USDC to deposit (the WETH side is sized for you)"),
+        weth: decimal.optional().describe("WETH to deposit (the USDC side is sized for you)"),
+        slippageBps: lpSlippage,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, usdc, weth, slippageBps }) => {
+      try {
+        const p = await poincare.lp.planAdd(getAddress(owner), { usdc, weth }, { slippageBps, now: now() });
+        return ok({
+          sent: false,
+          summary: `Deposit ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH (at least ${formatAmount(p.usdcMin)} and ${formatAmount(p.wethMin)}), for about ${formatAmount(p.expectedShares)} LP shares.`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send these in order from the owner's wallet before the deadline.",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "lp_remove_build",
+    {
+      title: "Build a liquidity withdrawal (unsigned)",
+      description:
+        "Plan a withdrawal of a percentage of the position (above 0, at most 100) or an exact share count, and return the UNSIGNED removeLiquidity transaction with minimums from the current reserves. Never sends. Moving capital is the user's decision: build only when they asked to withdraw.",
+      inputSchema: {
+        owner: address.describe("The LP's wallet, which will sign"),
+        percent: z.number().gt(0).max(100).optional().describe("Share of the position to withdraw, above 0 and at most 100, e.g. 50 or 0.5"),
+        shares: z.string().regex(/^\d+$/).optional().describe("Exact LP shares to burn, in base units (18 decimals)"),
+        slippageBps: lpSlippage,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, percent, shares, slippageBps }) => {
+      try {
+        const p = await poincare.lp.planRemove(getAddress(owner), { percent, shares: shares === undefined ? undefined : BigInt(shares) }, { slippageBps, now: now() });
+        return ok({
+          sent: false,
+          summary: `Burn ${formatAmount(p.shares)} LP shares for about ${formatAmount(p.usdc)} USDC and ${formatAmount(p.weth)} WETH (at least ${formatAmount(p.usdcMin)} and ${formatAmount(p.wethMin)}).`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send it from the LP's wallet before the deadline.",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
   // ---------------------------------------------------------------- DCA
 
   server.registerTool(
@@ -225,7 +367,7 @@ export function createServer(opts: ServerOptions): McpServer {
         const start = p.startTime === 0n ? BigInt(t) : p.startTime;
         const r = await poincare.regime();
         const sideSpread = args.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell;
-        const first = planSlice(
+        const first = await planSliceQuoted(
           {
             id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side: args.side,
             zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
@@ -234,6 +376,7 @@ export function createServer(opts: ServerOptions): McpServer {
             remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0, refunded: 0n,
           },
           { now: BigInt(t), spreadBps: wadToBpsUp(sideSpread), trendWithSide: r.withTrendSide === args.side },
+          async (amountIn) => (await poincare.quote(args.side, amountIn)).amountOut,
         );
         const schedule = Array.from({ length: Math.min(p.slices, 12) }, (_, i) => ({
           slice: i + 1,
@@ -244,7 +387,11 @@ export function createServer(opts: ServerOptions): McpServer {
           perSlice: `${formatAmount(p.amountIn / BigInt(p.slices))} ${args.side === "buy" ? "USDC" : "WETH"}`,
           schedule,
           deadlineAt: new Date(Number(p.deadline) * 1000).toISOString(),
-          firstFillNow: { status: first.status, meaning: DCA_STATUS_TEXT[first.status] },
+          firstFillNow: {
+            status: first.status,
+            meaning: DCA_STATUS_TEXT[first.status],
+            ...(first.quoteError ? { quoteError: `Could not quote the first slice, so the limit and slippage were not checked: ${first.quoteError}` } : {}),
+          },
           regime: describeRegime(r),
         });
       } catch (e) {

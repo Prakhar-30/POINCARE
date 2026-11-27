@@ -335,7 +335,28 @@ export function planSlice(
   return plan;
 }
 
-/** Fraction of the budget filled so far (0..1). */
+/**
+ * planSlice with the quote filled in: when the slice would otherwise be ready, quote its exact input
+ * and re-plan, so a limit price above the market reports "below-limit" (as the contract would)
+ * instead of "ready", and minOut is the real floor.
+ */
+export async function planSliceQuoted(
+  o: DcaOrder,
+  ctx: { now: bigint; spreadBps: number; trendWithSide: boolean },
+  quoteOut: (amountIn: bigint) => Promise<bigint>,
+): Promise<SlicePlan & { quoteError?: string }> {
+  const first = planSlice(o, ctx);
+  if (first.status !== "ready" || first.amountIn === 0n) return first;
+  let out: bigint;
+  try {
+    out = await quoteOut(first.amountIn);
+  } catch (e) {
+    // A failed quote (e.g. a slice larger than the pool can fill) must not sink the whole plan.
+    return { ...first, quoteError: e instanceof Error ? e.message.split("\n")[0].slice(0, 200) : String(e) };
+  }
+  return planSlice(o, { ...ctx, quoteOut: out });
+}
+
 /** Input actually swapped so far: the budget minus what is left and what was refunded. */
 export const spentOf = (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">): bigint => o.amountIn - o.remaining - o.refunded;
 

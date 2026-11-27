@@ -1,6 +1,6 @@
 {
   "name": "@poincaretrade/sdk",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "TypeScript SDK for the Poincaré Uniswap v4 hook: regime and trend-onset signals, quotes, and spread-aware DCA orders.",
   "license": "MIT",
   "author": "Prakhar Srivastava",
