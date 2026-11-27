@@ -1,0 +1,41 @@
+name: Deploy HTTP API
+
+# Redeploys the `poincare-api` Supabase edge function from frontend/supabase/functions.
+# Started by hand only (Actions tab, "Run workflow"); it never runs on a push.
+# Needs one repository secret, SUPABASE_ACCESS_TOKEN: a Supabase personal access token
+# (supabase.com/dashboard/account/tokens). The function's own secrets (POINCARE_DCA_ADDRESS,
+# optional POINCARE_RPC_URL) are already set on the project and are not touched here.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy poincare-api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: gogjpdgluflntcgsarhn
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # --no-verify-jwt: the API is public and keyless; callers send the site's publishable key,
+      # which is not a JWT (see frontend/SECURITY-BACKEND.md).
+      - name: Deploy
+        run: supabase functions deploy poincare-api --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Smoke test
+        run: |
+          curl -fsS "https://$PROJECT_REF.supabase.co/functions/v1/poincare-api/health"
+          echo
+          curl -fsS -o /dev/null -w "lp/position: %{http_code}\n" "https://$PROJECT_REF.supabase.co/functions/v1/poincare-api/lp/position?owner=0x000000000000000000000000000000000000dEaD"

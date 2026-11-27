@@ -7,10 +7,11 @@
  * in ../_shared/poincare.js.
  *
  *   GET  /regime   /regime/history?blocks=   /quote?side=&amount=   /health
+ *   GET  /swap/build?owner=&side=&amount=   /lp/position?owner=   /lp/add/build   /lp/remove/build
  *   GET  /dca/orders?owner=   /dca/orders/:id
  *   POST /dca/plan   /dca/tx/create   /dca/tx/execute   /dca/tx/cancel   /dca/tx/close-expired
  *
- * Deploy:
+ * Deploy: the "Deploy HTTP API" GitHub Actions workflow, or by hand:
  *   supabase functions deploy poincare-api --no-verify-jwt
  *   supabase secrets set POINCARE_DCA_ADDRESS=0x...        # from deployments/unichain-sepolia-dca.json
  *     # optional: POINCARE_RPC_URL=https://...            # defaults to the public Unichain Sepolia RPC
