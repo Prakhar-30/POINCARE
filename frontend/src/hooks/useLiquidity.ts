@@ -9,6 +9,7 @@ import { humanizeError } from "@/lib/errors";
 import { useStepper } from "@/hooks/useStepper";
 import { useToast } from "@/components/ui/Toast";
 import { fmtNum } from "@/lib/format";
+import { DEFAULT_SWAP_SLIPPAGE_BPS, depositTaken, minOutFor, withdrawalOut } from "@/lib/poincare-sdk";
 
 export type LiquidityStatus = "idle" | "busy" | "success" | "error";
 
@@ -36,6 +37,15 @@ export function useLiquidity(onDone?: () => void) {
   };
 
   const hook = CONTRACTS.hook as `0x${string}`;
+
+  /** Reserves and share supply right now, for minimums that mirror the hook's own math. */
+  async function readPool() {
+    const [reserves, supply] = await Promise.all([
+      publicClient!.readContract({ address: hook, abi: HOOK_ABI, functionName: "reserves" }) as Promise<readonly [bigint, bigint]>,
+      publicClient!.readContract({ address: hook, abi: HOOK_ABI, functionName: "totalSupply" }) as Promise<bigint>,
+    ]);
+    return { r0: reserves[0], r1: reserves[1], supply };
+  }
 
   /** Approve exactly what the hook needs for this token, never infinite. */
   async function approveExact(stepKey: string, token: `0x${string}`, need: bigint) {
@@ -84,7 +94,16 @@ export function useLiquidity(onDone?: () => void) {
         (await publicClient.readContract({ address: hook, abi: HOOK_ABI, functionName: "balanceOf", args: [address] })) as bigint;
       const before = await sharesOf().catch(() => null);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
-      const lpArgs = [{ amount0Desired: a0, amount1Desired: a1, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
+      // Minimums from the live reserves (what the hook will actually take, less 0.5%), never zero:
+      // a zero floor lets a sandwich move the ratio against the deposit for free.
+      const { r0, r1 } = await readPool();
+      const taken = depositTaken(r0, r1, a0, a1);
+      if (taken.usdc === 0n || taken.weth === 0n) throw new Error("Amount too small for the pool's ratio.");
+      const lpArgs = [{
+        amount0Desired: a0, amount1Desired: a1,
+        amount0Min: minOutFor(taken.usdc, DEFAULT_SWAP_SLIPPAGE_BPS), amount1Min: minOutFor(taken.weth, DEFAULT_SWAP_SLIPPAGE_BPS),
+        deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash,
+      }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, account: address }, GAS.addLiquidity);
       const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "addLiquidity", args: lpArgs, gas, nonce: await nextNonce(publicClient, address) });
       await waitForSuccess(publicClient, hash);
@@ -112,7 +131,14 @@ export function useLiquidity(onDone?: () => void) {
       current = "remove";
       stepper.activate("remove");
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
-      const rmArgs = [{ liquidity: params.shares, amount0Min: 0n, amount1Min: 0n, deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash }] as const;
+      // Minimums from the live reserves less 0.5%, never zero, so the burn cannot be sandwiched for free.
+      const { r0, r1, supply } = await readPool();
+      const out = withdrawalOut(params.shares, r0, r1, supply);
+      const rmArgs = [{
+        liquidity: params.shares,
+        amount0Min: minOutFor(out.usdc, DEFAULT_SWAP_SLIPPAGE_BPS), amount1Min: minOutFor(out.weth, DEFAULT_SWAP_SLIPPAGE_BPS),
+        deadline, tickLower: 0, tickUpper: 0, userInputSalt: zeroHash,
+      }] as const;
       const gas = await resolveGas(publicClient, { address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, account: address }, GAS.removeLiquidity);
       const hash = await walletClient.writeContract({ address: hook, abi: HOOK_LP_ABI, functionName: "removeLiquidity", args: rmArgs, gas, nonce: await nextNonce(publicClient, address) });
       await waitForSuccess(publicClient, hash);

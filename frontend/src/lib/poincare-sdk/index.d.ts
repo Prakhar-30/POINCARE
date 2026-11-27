@@ -2186,6 +2186,20 @@ type RemoveLiquidityPlan = {
     warnings: string[];
     transactions: TxRequest[];
 };
+/**
+ * What the hook takes for a deposit of (usdcDesired, wethDesired), mirroring PoincareHook._getAmountIn:
+ * the WETH leg is derived from the USDC leg (floor); if that needs more WETH than offered, the USDC
+ * leg is derived from the WETH leg instead. An empty pool takes the desired pair as is.
+ */
+declare function depositTaken(r0: bigint, r1: bigint, usdcDesired: bigint, wethDesired: bigint): {
+    usdc: bigint;
+    weth: bigint;
+};
+/** What burning `shares` redeems for, mirroring PoincareHook._getAmountOut (both legs floor). */
+declare function withdrawalOut(shares: bigint, r0: bigint, r1: bigint, supply: bigint): {
+    usdc: bigint;
+    weth: bigint;
+};
 /** An address's LP position, read from the hook's share token and reserves. */
 declare function readPosition(client: PublicClient, dep: PoincareDeployment, owner: Address): Promise<Position>;
 /**
@@ -4136,4 +4150,4 @@ declare function createPoincareClient(opts?: PoincareClientOptions): {
 };
 type PoincareClient = ReturnType<typeof createPoincareClient>;
 
-export { type AddLiquidityPlan, BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DEFAULT_SWAP_DEADLINE_SEC, DEFAULT_SWAP_SLIPPAGE_BPS, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, LP_GAS, type LpOptions, LpParamError, MAX_SLICES, MAX_SWAP_DEADLINE_SEC, MAX_SWAP_SLIPPAGE_BPS, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type PoolKey, type Position, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type RemoveLiquidityPlan, SWAP_GAS, type Side, type SlicePlan, type SlicePreview, type SwapOptions, SwapParamError, type SwapPlan, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, buildSwapApproveTx, buildSwapTx, classify, createPoincareClient, dcaAbi, decimalToWad, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, liquidityAbi, marketTrend, minOutFor, minPriceWadToLimit, orderIdFromReceipt, planAddLiquidity, planCreateOrder, planRemoveLiquidity, planSlice, planSliceQuoted, planSwap, previewSlice, progressOf, quoteExactInput, readPoolKey, readPosition, readRegime, recurringOrder, regimeHistory, requireDca, routerAbi, sendTx, sideToZeroForOne, sliceAmount, slotInfo, spentOf, statusOf, swapTokens, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, zeroForOneToSide };
+export { type AddLiquidityPlan, BPS, DCA_GAS, DCA_STATUS, DCA_STATUS_TEXT, DEFAULT_SWAP_DEADLINE_SEC, DEFAULT_SWAP_SLIPPAGE_BPS, type DcaEditInput, type DcaEditParams, DcaNotDeployedError, type DcaOrder, type DcaOrderInput, type DcaOrderParams, DcaParamError, type DcaStatus, type DetectorSample, FREQUENCIES, FREQUENCY_LABEL, type Frequency, type HookTrend, LP_GAS, type LpOptions, LpParamError, MAX_SLICES, MAX_SWAP_DEADLINE_SEC, MAX_SWAP_SLIPPAGE_BPS, MIN_INTERVAL, type MarketTrend, PROTECTIONS, PROTECTION_TEXT, type PoincareClient, type PoincareClientOptions, type PoincareDeployment, type PoolKey, type Position, type Protection, type Quote, type Regime, type RegimeEvent, type RegimeLevel, type RemoveLiquidityPlan, SWAP_GAS, type Side, type SlicePlan, type SlicePreview, type SwapOptions, SwapParamError, type SwapPlan, TOKEN_DECIMALS, type TrendOnset, type TxRequest, TxRevertedError, UNICHAIN_SEPOLIA, WAD, allowanceFor, buildApproveTx, buildCancelTx, buildCloseExpiredTx, buildCreateOrderTx, buildEditParams, buildEditTx, buildExecuteSliceTx, buildOrderParams, buildPauseTx, buildResumeTx, buildSwapApproveTx, buildSwapTx, classify, createPoincareClient, dcaAbi, decimalToWad, depositTaken, diffRegime, erc20Abi, formatAmount, fromWad, getOpenOrderIds, getOrder, getOrdersOf, hookAbi, lensAbi, limitToMinPriceWad, liquidityAbi, marketTrend, minOutFor, minPriceWadToLimit, orderIdFromReceipt, planAddLiquidity, planCreateOrder, planRemoveLiquidity, planSlice, planSliceQuoted, planSwap, previewSlice, progressOf, quoteExactInput, readPoolKey, readPosition, readRegime, recurringOrder, regimeHistory, requireDca, routerAbi, sendTx, sideToZeroForOne, sliceAmount, slotInfo, spentOf, statusOf, swapTokens, toAmount, toDcaOrder, toRegime, trendOnsets, twapOrder, twapSlices, validateOrderParams, wadToBpsUp, watchRegime, withDca, withTrendSide, withdrawalOut, zeroForOneToSide };

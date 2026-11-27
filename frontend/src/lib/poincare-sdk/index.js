@@ -2176,6 +2176,16 @@ var LpParamError = class extends Error {
     this.name = "LpParamError";
   }
 };
+function depositTaken(r0, r1, usdcDesired, wethDesired) {
+  if (r0 === 0n || r1 === 0n) return { usdc: usdcDesired, weth: wethDesired };
+  const wethOptimal = usdcDesired * r1 / r0;
+  if (wethOptimal <= wethDesired) return { usdc: usdcDesired, weth: wethOptimal };
+  return { usdc: wethDesired * r0 / r1, weth: wethDesired };
+}
+function withdrawalOut(shares, r0, r1, supply) {
+  if (supply === 0n) return { usdc: 0n, weth: 0n };
+  return { usdc: shares * r0 / supply, weth: shares * r1 / supply };
+}
 var ratio = (a, b) => b === 0n ? 0 : Number(a * WAD / b) / 1e18;
 async function readPool(client, dep) {
   const [[r0, r1], supply] = await Promise.all([
@@ -2287,8 +2297,7 @@ async function planRemoveLiquidity(client, dep, from, amount, opts = {}) {
   const shares = hasShares ? amount.shares : amount.percent === 100 ? balance : balance * BigInt(Math.round(amount.percent * 100)) / 10000n;
   if (shares <= 0n) throw new LpParamError("too small: that is zero shares");
   if (shares > balance) throw new LpParamError(`only ${balance} shares are held`);
-  const usdc = shares * r0 / supply;
-  const weth = shares * r1 / supply;
+  const { usdc, weth } = withdrawalOut(shares, r0, r1, supply);
   if (usdc === 0n && weth === 0n) throw new LpParamError("too small: the burn would return nothing");
   const usdcMin = minOutFor(usdc, slippageBps);
   const wethMin = minOutFor(weth, slippageBps);
@@ -2871,6 +2880,7 @@ export {
   createPoincareClient,
   dcaAbi,
   decimalToWad,
+  depositTaken,
   diffRegime,
   erc20Abi,
   formatAmount,
@@ -2920,5 +2930,6 @@ export {
   watchRegime,
   withDca,
   withTrendSide,
+  withdrawalOut,
   zeroForOneToSide
 };

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { erc20Abi } from "../src/abi/erc20.js";
 import { liquidityAbi } from "../src/abi/liquidity.js";
 import { UNICHAIN_SEPOLIA } from "../src/deployments.js";
-import { LpParamError, planAddLiquidity, planRemoveLiquidity, readPosition } from "../src/lp.js";
+import { LpParamError, depositTaken, planAddLiquidity, planRemoveLiquidity, readPosition, withdrawalOut } from "../src/lp.js";
 
 const dep = UNICHAIN_SEPOLIA;
 const FROM = getAddress("0x00000000000000000000000000000000000000aa");
@@ -102,5 +102,22 @@ describe("planRemoveLiquidity", () => {
     await expect(planRemoveLiquidity(fake({ balance: E18 }), dep, FROM, { percent: 0 })).rejects.toThrow(/percent/);
     await expect(planRemoveLiquidity(fake({ balance: E18 }), dep, FROM, { percent: 101 })).rejects.toThrow(/percent/);
     await expect(planRemoveLiquidity(fake({ balance: E18 }), dep, FROM, { percent: 10, shares: 1n })).rejects.toThrow(/exactly one/);
+  });
+});
+
+describe("hook mirrors", () => {
+  it("depositTaken takes the limiting side, like the hook", () => {
+    // ratio 2,250 USDC per WETH; offering extra WETH: the USDC side limits
+    expect(depositTaken(R0, R1, 2_250n * E18, 5n * E18)).toEqual({ usdc: 2_250n * E18, weth: E18 });
+    // offering extra USDC: the WETH side limits
+    expect(depositTaken(R0, R1, 9_000n * E18, E18)).toEqual({ usdc: 2_250n * E18, weth: E18 });
+    // empty pool: taken as offered
+    expect(depositTaken(0n, 0n, 5n, 7n)).toEqual({ usdc: 5n, weth: 7n });
+  });
+
+  it("withdrawalOut is pro rata and floors", () => {
+    expect(withdrawalOut(100n * E18, R0, R1, SUPPLY)).toEqual({ usdc: 22_500n * E18, weth: 10n * E18 });
+    expect(withdrawalOut(1n, 3n, 3n, 2n)).toEqual({ usdc: 1n, weth: 1n });
+    expect(withdrawalOut(1n, R0, R1, 0n)).toEqual({ usdc: 0n, weth: 0n });
   });
 });

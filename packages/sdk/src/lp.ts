@@ -63,6 +63,24 @@ export type RemoveLiquidityPlan = {
   transactions: TxRequest[];
 };
 
+/**
+ * What the hook takes for a deposit of (usdcDesired, wethDesired), mirroring PoincareHook._getAmountIn:
+ * the WETH leg is derived from the USDC leg (floor); if that needs more WETH than offered, the USDC
+ * leg is derived from the WETH leg instead. An empty pool takes the desired pair as is.
+ */
+export function depositTaken(r0: bigint, r1: bigint, usdcDesired: bigint, wethDesired: bigint): { usdc: bigint; weth: bigint } {
+  if (r0 === 0n || r1 === 0n) return { usdc: usdcDesired, weth: wethDesired };
+  const wethOptimal = (usdcDesired * r1) / r0;
+  if (wethOptimal <= wethDesired) return { usdc: usdcDesired, weth: wethOptimal };
+  return { usdc: (wethDesired * r0) / r1, weth: wethDesired };
+}
+
+/** What burning `shares` redeems for, mirroring PoincareHook._getAmountOut (both legs floor). */
+export function withdrawalOut(shares: bigint, r0: bigint, r1: bigint, supply: bigint): { usdc: bigint; weth: bigint } {
+  if (supply === 0n) return { usdc: 0n, weth: 0n };
+  return { usdc: (shares * r0) / supply, weth: (shares * r1) / supply };
+}
+
 const ratio = (a: bigint, b: bigint): number => (b === 0n ? 0 : Number((a * WAD) / b) / 1e18);
 
 async function readPool(client: PublicClient, dep: PoincareDeployment) {
@@ -216,8 +234,7 @@ export async function planRemoveLiquidity(
   if (shares <= 0n) throw new LpParamError("too small: that is zero shares");
   if (shares > balance) throw new LpParamError(`only ${balance} shares are held`);
 
-  const usdc = (shares * r0) / supply;
-  const weth = (shares * r1) / supply;
+  const { usdc, weth } = withdrawalOut(shares, r0, r1, supply);
   if (usdc === 0n && weth === 0n) throw new LpParamError("too small: the burn would return nothing");
   const usdcMin = minOutFor(usdc, slippageBps);
   const wethMin = minOutFor(weth, slippageBps);
