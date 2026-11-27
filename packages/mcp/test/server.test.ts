@@ -201,6 +201,21 @@ describe("swap_build", () => {
   });
 });
 
+describe("plan and history fixes", () => {
+  it("dca_plan_order reports below-limit when the market is past the limit price", async () => {
+    // the fake quote returns 1 wei out, so any sell limit is above the market
+    const r = await call(await connect(), "dca_plan_order", { side: "buy", amount: "100", slices: 4, intervalSec: 3600, limitPrice: "2200" });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent!.firstFillNow.status).toBe("below-limit");
+  });
+
+  it("get_regime_history explains an empty window", async () => {
+    const r = await call(await connect(), "get_regime_history", { blocks: 500 });
+    expect(r.structuredContent!.sampleCount).toBe(0);
+    expect(r.structuredContent!.note).toMatch(/samples only when someone trades/);
+  });
+});
+
 describe("strategy prompts", () => {
   it("lists the four strategies", async () => {
     const { prompts } = await (await connect()).listPrompts();

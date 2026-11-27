@@ -335,7 +335,21 @@ export function planSlice(
   return plan;
 }
 
-/** Fraction of the budget filled so far (0..1). */
+/**
+ * planSlice with the quote filled in: when the slice would otherwise be ready, quote its exact input
+ * and re-plan, so a limit price above the market reports "below-limit" (as the contract would)
+ * instead of "ready", and minOut is the real floor.
+ */
+export async function planSliceQuoted(
+  o: DcaOrder,
+  ctx: { now: bigint; spreadBps: number; trendWithSide: boolean },
+  quoteOut: (amountIn: bigint) => Promise<bigint>,
+): Promise<SlicePlan> {
+  const first = planSlice(o, ctx);
+  if (first.status !== "ready" || first.amountIn === 0n) return first;
+  return planSlice(o, { ...ctx, quoteOut: await quoteOut(first.amountIn) });
+}
+
 /** Input actually swapped so far: the budget minus what is left and what was refunded. */
 export const spentOf = (o: Pick<DcaOrder, "amountIn" | "remaining" | "refunded">): bigint => o.amountIn - o.remaining - o.refunded;
 

@@ -11,7 +11,7 @@ import {
   diffRegime,
   minPriceWadToLimit,
   orderIdFromReceipt,
-  planSlice,
+  planSliceQuoted,
   progressOf,
   spentOf,
   formatAmount,
@@ -150,9 +150,24 @@ export function createServer(opts: ServerOptions): McpServer {
     async ({ blocks }) => {
       try {
         const head = await poincare.publicClient.getBlockNumber();
-        const from = head - BigInt(blocks ?? 3000);
-        const samples = await poincare.history(from > 0n ? from : 0n, head);
-        return ok({ fromBlock: from, toBlock: head, sampleCount: samples.length, onsets: trendOnsets(samples), latest: samples.slice(-10) });
+        let span = BigInt(blocks ?? 3000);
+        let samples = await poincare.history(head > span ? head - span : 0n, head);
+        // The hook samples only on swaps: a quiet window is empty, so look as far back as allowed once.
+        if (samples.length === 0 && span < 20_000n) {
+          span = 20_000n;
+          samples = await poincare.history(head > span ? head - span : 0n, head);
+        }
+        const fromBlock = head > span ? head - span : 0n;
+        return ok({
+          fromBlock,
+          toBlock: head,
+          sampleCount: samples.length,
+          onsets: trendOnsets(samples),
+          latest: samples.slice(-10),
+          ...(samples.length === 0
+            ? { note: `No swaps in the last ${span} blocks, so the detector recorded no samples (it samples only when someone trades). Call get_regime for the current state.` }
+            : {}),
+        });
       } catch (e) {
         return fail(e);
       }
@@ -348,7 +363,7 @@ export function createServer(opts: ServerOptions): McpServer {
         const start = p.startTime === 0n ? BigInt(t) : p.startTime;
         const r = await poincare.regime();
         const sideSpread = args.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell;
-        const first = planSlice(
+        const first = await planSliceQuoted(
           {
             id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side: args.side,
             zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
@@ -357,6 +372,7 @@ export function createServer(opts: ServerOptions): McpServer {
             remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0, refunded: 0n,
           },
           { now: BigInt(t), spreadBps: wadToBpsUp(sideSpread), trendWithSide: r.withTrendSide === args.side },
+          async (amountIn) => (await poincare.quote(args.side, amountIn)).amountOut,
         );
         const schedule = Array.from({ length: Math.min(p.slices, 12) }, (_, i) => ({
           slice: i + 1,

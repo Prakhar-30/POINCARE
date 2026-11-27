@@ -15,7 +15,7 @@ import {
   buildEditTx,
   buildOrderParams,
   minPriceWadToLimit,
-  planSlice,
+  planSliceQuoted,
   progressOf,
   spentOf,
   trendOnsets,
@@ -116,7 +116,7 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
       const p = buildOrderParams(input, t);
       const start = p.startTime === 0n ? BigInt(t) : p.startTime;
       const r = await poincare.regime();
-      const first = planSlice(
+      const first = await planSliceQuoted(
         {
           id: 0n, owner: "0x0000000000000000000000000000000000000000", recipient: p.recipient, side: input.side,
           zeroForOne: p.zeroForOne, pauseOnTrend: p.pauseOnTrend, catchUp: p.catchUp, cancelled: false, paused: false,
@@ -125,6 +125,7 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
           remaining: p.amountIn, amountOut: 0n, minPriceWad: p.minPriceWad, scheduleBudget: p.amountIn, scheduleFilled: 0, refunded: 0n,
         },
         { now: BigInt(t), spreadBps: wadToBpsUp(input.side === "buy" ? r.raw.spreadBuy : r.raw.spreadSell), trendWithSide: r.withTrendSide === input.side },
+        async (amountIn) => (await poincare.quote(input.side, amountIn)).amountOut,
       );
       return { params: p, deadline: p.deadline, firstFillNow: { status: first.status, meaning: DCA_STATUS_TEXT[first.status] }, regime: summarize(r) };
     }],

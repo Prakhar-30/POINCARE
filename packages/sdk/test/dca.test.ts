@@ -8,6 +8,7 @@ import {
   limitToMinPriceWad,
   minPriceWadToLimit,
   planSlice,
+  planSliceQuoted,
   progressOf,
   sliceAmount,
   slotInfo,
@@ -227,5 +228,25 @@ describe("buildEditParams (mirrors PoincareDCA.editOrder)", () => {
     expect(reason(() => buildEditParams(live, { interval: 30 }, NOW))).toBe("interval");
     expect(reason(() => buildEditParams(live, { slices: 4, deadline: NOW + 60n }, NOW))).toBe("deadline");
     expect(reason(() => buildEditParams(order({ cancelled: true }), {}, NOW))).toBe("closed");
+  });
+});
+
+describe("planSliceQuoted", () => {
+  const ctx = { now: NOW + 10n, spreadBps: 0, trendWithSide: false };
+  it("checks the limit price, as the contract does", async () => {
+    // sell WETH, limit 2,200 USDC per WETH; the market quotes 2,150
+    const o = order({ side: "sell", zeroForOne: false, minPriceWad: 2_200n * E, maxSlippageBps: 50 });
+    const below = await planSliceQuoted(o, ctx, async (amountIn) => (amountIn * 2_150n * E) / E);
+    expect(below.status).toBe("below-limit");
+    const above = await planSliceQuoted(o, ctx, async (amountIn) => (amountIn * 2_300n * E) / E);
+    expect(above.status).toBe("ready");
+    expect(above.minOut > 0n).toBe(true);
+  });
+
+  it("does not quote a slice that is not ready", async () => {
+    let quoted = 0;
+    const r = await planSliceQuoted(order({ paused: true }), ctx, async () => { quoted++; return 1n; });
+    expect(r.status).toBe("paused");
+    expect(quoted).toBe(0);
   });
 });
