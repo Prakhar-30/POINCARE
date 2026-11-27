@@ -4,6 +4,7 @@ import { type DcaEditInput, type DcaOrderInput, buildEditParams, buildOrderParam
 import * as dca from "./dcaClient.js";
 import { type PoincareDeployment, UNICHAIN_SEPOLIA } from "./deployments.js";
 import { quoteExactInput } from "./quote.js";
+import { type SwapOptions, planSwap, readPoolKey } from "./swap.js";
 import { type Regime, type RegimeEvent, type Side, readRegime, regimeHistory, watchRegime } from "./regime.js";
 import { toAmount } from "./units.js";
 
@@ -59,6 +60,14 @@ export function createPoincareClient(opts: PoincareClientOptions = {}) {
     history: (fromBlock: bigint, toBlock?: bigint) => regimeHistory(publicClient, deployment, { fromBlock, toBlock }),
     /** Exact-input quote; `amount` in input-token units (USDC to buy, WETH to sell). */
     quote: (side: Side, amount: string | number | bigint) => quoteExactInput(publicClient, deployment, side, toAmount(amount)),
+    /** The pool key, read from the hook. */
+    poolKey: () => readPoolKey(publicClient, deployment),
+
+    swap: {
+      /** Quote + slippage floor + unsigned transactions (exact approve if needed, then the swap). Sends nothing. */
+      plan: (from: Address, side: Side, amount: string | number | bigint, opts?: SwapOptions) =>
+        planSwap(publicClient, deployment, from, side, toAmount(amount), opts),
+    },
 
     dca: {
       order: (id: bigint) => dca.getOrder(publicClient, deployment, id),

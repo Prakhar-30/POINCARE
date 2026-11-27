@@ -3,6 +3,7 @@ export * from "./deployments.js";
 export * from "./units.js";
 export * from "./regime.js";
 export * from "./quote.js";
+export * from "./swap.js";
 export * from "./dca.js";
 export * from "./plans.js";
 export * from "./dcaClient.js";

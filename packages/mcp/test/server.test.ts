@@ -14,6 +14,8 @@ import {
   buildOrderParams,
   dcaAbi,
   erc20Abi,
+  planSwap,
+  routerAbi,
   toRegime,
   withDca,
   type DcaEditInput,
@@ -22,7 +24,7 @@ import {
   type SlicePreview,
   type TxRequest,
 } from "@poincaretrade/sdk";
-import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, type TransactionReceipt } from "viem";
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, getAddress, type Address, type PublicClient, type TransactionReceipt } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jsonSafe } from "../src/format.js";
 import { createServer, type Signer } from "../src/server.js";
@@ -54,12 +56,29 @@ const order: DcaOrder = {
 
 let preview: SlicePreview;
 
+/** Chain reads planSwap makes, answered locally: no allowance yet, 4,000 out, no spread. */
+const swapReads = {
+  readContract: async ({ functionName }: { functionName: string }) => {
+    switch (functionName) {
+      case "quoteExactInput": return 4_000n * W;
+      case "previewSpread": return [0n, 3n * 10n ** 15n];
+      case "poolKey": return { currency0: dep.usdc, currency1: dep.weth, fee: 8388608, tickSpacing: 60, hooks: dep.hook };
+      case "allowance": return 0n;
+      default: throw new Error(`unexpected read ${functionName}`);
+    }
+  },
+} as unknown as PublicClient;
+
 const fake = {
   deployment: dep,
   publicClient: { getBlockNumber: async () => 1_000n },
   regime: async () => regime,
   history: async () => [],
   quote: async (side: "buy" | "sell", amount: string) => ({ side, amountIn: BigInt(Number(amount)) * W, amountOut: 1n, price: 2300, spread: 0, fee: 0.003 }),
+  swap: {
+    plan: (from: Address, side: "buy" | "sell", amount: string, opts?: Parameters<typeof planSwap>[5]) =>
+      planSwap(swapReads, dep, from, side, BigInt(Number(amount)) * W, opts),
+  },
   dca: {
     order: async (id: bigint) => (id === 7n ? order : null),
     ordersOf: async () => [order],
@@ -116,9 +135,9 @@ describe("tool surface", () => {
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(Object.keys(byName).sort()).toEqual([
       "dca_cancel_order", "dca_close_expired", "dca_create_order", "dca_edit_order", "dca_execute_slice", "dca_get_order",
-      "dca_list_orders", "dca_pause_order", "dca_plan_order", "dca_preview_slice", "dca_resume_order", "get_regime", "get_regime_history", "quote", "wait_for_regime_change",
+      "dca_list_orders", "dca_pause_order", "dca_plan_order", "dca_preview_slice", "dca_resume_order", "get_regime", "get_regime_history", "quote", "swap_build", "wait_for_regime_change",
     ]);
-    for (const n of ["get_regime", "get_regime_history", "quote", "dca_plan_order", "dca_get_order", "dca_list_orders", "dca_preview_slice", "wait_for_regime_change"]) {
+    for (const n of ["get_regime", "get_regime_history", "quote", "swap_build", "dca_plan_order", "dca_get_order", "dca_list_orders", "dca_preview_slice", "wait_for_regime_change"]) {
       expect(byName[n].annotations?.readOnlyHint, n).toBe(true);
     }
     expect(byName.dca_cancel_order.annotations?.destructiveHint).toBe(true);
@@ -134,6 +153,38 @@ describe("regime", () => {
     expect(r.structuredContent!.summary).toContain("sells pay a 4.31% spread");
     expect(r.structuredContent!.regime.chargedSide).toBe("sell");
     expect(r.structuredContent!.regime.raw.spreadSell).toBe("43101328577184966"); // bigints as strings
+  });
+});
+
+describe("swap_build", () => {
+  it("returns an exact approve and the router swap, unsigned", async () => {
+    const r = await call(await connect(), "swap_build", { owner: OWNER, side: "sell", amount: "2" });
+    expect(r.isError).toBeFalsy();
+    const sc = r.structuredContent!;
+    expect(sc.sent).toBe(false);
+    const [approve, swap] = sc.plan.transactions;
+    expect(decodeFunctionData({ abi: erc20Abi, data: approve.data }).args).toEqual([dep.router, 2n * W]);
+    const d = decodeFunctionData({ abi: routerAbi, data: swap.data });
+    expect(d.args[1]).toBe((4_000n * W * 9_950n) / 10_000n);
+    expect(d.args[5]).toBe(getAddress(OWNER));
+    expect(sc.summary).toContain("at least 3980 USDC");
+  });
+
+  it("never sends, even with a key configured", async () => {
+    let sent = 0;
+    const signer: Signer = { address: getAddress(OWNER), send: async () => { sent++; return createdReceipt(); } };
+    const c = await connect(signer);
+    const r = await call(c, "swap_build", { owner: OWNER, side: "sell", amount: "1", send: true });
+    expect(sent).toBe(0);
+    expect(r.structuredContent?.sent ?? false).toBe(false);
+  });
+
+  it("flags a recipient that is not the owner, and refuses unsafe slippage", async () => {
+    const c = await connect();
+    const r = await call(c, "swap_build", { owner: OWNER, side: "sell", amount: "1", recipient: "0x00000000000000000000000000000000000000b2" });
+    expect(r.structuredContent!.warnings.join(" ")).toMatch(/not to the sender/);
+    const bad = await call(c, "swap_build", { owner: OWNER, side: "sell", amount: "1", slippageBps: 5000 });
+    expect(bad.isError).toBe(true);
   });
 });
 

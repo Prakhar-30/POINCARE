@@ -15,6 +15,7 @@ import {
   progressOf,
   spentOf,
   formatAmount,
+  MAX_SWAP_SLIPPAGE_BPS,
   trendOnsets,
   wadToBpsUp,
 } from "@poincaretrade/sdk";
@@ -201,6 +202,38 @@ export function createServer(opts: ServerOptions): McpServer {
       try {
         const q = await poincare.quote(s, amount);
         return ok({ ...q, amountOutFormatted: `${formatAmount(q.amountOut)} ${s === "buy" ? "WETH" : "USDC"}` });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "swap_build",
+    {
+      title: "Build a swap (unsigned)",
+      description:
+        "Plan an exact-input swap on the Poincaré pool and return UNSIGNED transactions for the owner's own wallet: an exact-amount approve (only if the allowance is short, never unlimited), then the router swap with a minimum-received floor from the Lens quote. Never sends, even if a key is configured. Leave `recipient` unset unless the user explicitly asked to send the output to another address.",
+      inputSchema: {
+        owner: address.describe("The wallet that will sign and pay"),
+        side,
+        amount: z.string().regex(/^\d+(\.\d+)?$/).describe("Input amount: USDC to buy, WETH to sell"),
+        slippageBps: z.number().int().min(0).max(MAX_SWAP_SLIPPAGE_BPS).optional().describe("Max shortfall vs the quote in bps (default 50, max 1000)"),
+        recipient: address.optional().describe("Receives the output; defaults to the owner. Only set when the user explicitly asks."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ owner, side: s, amount, slippageBps, recipient }) => {
+      try {
+        const p = await poincare.swap.plan(getAddress(owner), s, amount, { slippageBps, recipient: recipient as Address | undefined, now: now() });
+        const outSym = s === "buy" ? "WETH" : "USDC";
+        return ok({
+          sent: false,
+          summary: `Pay ${formatAmount(p.amountIn)} ${s === "buy" ? "USDC" : "WETH"}, receive about ${formatAmount(p.quote.amountOut)} ${outSym} (at least ${formatAmount(p.minOut)} ${outSym}). Trend spread on this side: ${(p.quote.spread * 100).toFixed(2)}%, fee ${(p.quote.fee * 100).toFixed(2)}%.`,
+          warnings: p.warnings,
+          plan: p,
+          note: "Unsigned. Sign and send these in order from the owner's wallet before the deadline.",
+        });
       } catch (e) {
         return fail(e);
       }

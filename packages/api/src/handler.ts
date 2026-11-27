@@ -2,6 +2,9 @@ import {
   DCA_STATUS_TEXT,
   DcaNotDeployedError,
   DcaParamError,
+  DEFAULT_SWAP_SLIPPAGE_BPS,
+  MAX_SWAP_SLIPPAGE_BPS,
+  SwapParamError,
   type DcaEditInput,
   type DcaOrder,
   type DcaOrderInput,
@@ -29,6 +32,8 @@ import { HttpError, json } from "./json.js";
  *   GET  /regime                         current regime + plain-English summary
  *   GET  /regime/history?blocks=3000     DetectorSample trace + trend onsets
  *   GET  /quote?side=buy&amount=100      exact-input quote (Lens)
+ *   GET  /swap/build?owner=0x..&side=sell&amount=2[&slippageBps=50][&recipient=0x..]
+ *                                        unsigned exact approve (if needed) + router swap
  *   GET  /dca/orders?owner=0x..          an address's orders with next-fill status
  *   GET  /dca/orders/:id                 one order + the contract's verdict on its next fill
  *   POST /dca/plan                       validate an order and preview its first fill
@@ -43,7 +48,7 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
   const base = opts.basePath ?? "/poincare-api";
 
   const routes: Array<[method: string, pattern: RegExp, run: (m: RegExpMatchArray, url: URL, body: any) => Promise<unknown>]> = [
-    ["GET", /^\/?$/, async () => ({ name: "poincare-api", docs: "GET /regime, /regime/history, /quote, /dca/orders; POST /dca/plan, /dca/tx/*" })],
+    ["GET", /^\/?$/, async () => ({ name: "poincare-api", docs: "GET /regime, /regime/history, /quote, /swap/build, /dca/orders; POST /dca/plan, /dca/tx/*" })],
     ["GET", /^\/health$/, async () => {
       const block = await poincare.publicClient.getBlockNumber();
       return { ok: true, chainId: poincare.deployment.chainId, block, dca: poincare.deployment.dca ?? null };
@@ -63,6 +68,15 @@ export function createApiHandler(opts: { poincare: PoincareClient; now?: () => n
       const side = sideParam(url.searchParams.get("side"));
       const amount = amountParam(url.searchParams.get("amount"));
       return poincare.quote(side, amount);
+    }],
+    ["GET", /^\/swap\/build$/, async (_m, url) => {
+      const owner = addressParam(url.searchParams.get("owner"), "owner");
+      const side = sideParam(url.searchParams.get("side"));
+      const amount = amountParam(url.searchParams.get("amount"));
+      const slippageBps = url.searchParams.has("slippageBps") ? intParam(url, "slippageBps", DEFAULT_SWAP_SLIPPAGE_BPS, 0, MAX_SWAP_SLIPPAGE_BPS) : undefined;
+      const r = url.searchParams.get("recipient");
+      const recipient = r === null ? undefined : addressParam(r, "recipient");
+      return poincare.swap.plan(owner, side, amount, { slippageBps, recipient, now: now() });
     }],
     ["GET", /^\/dca\/orders$/, async (_m, url) => {
       const owner = addressParam(url.searchParams.get("owner"), "owner");
@@ -177,6 +191,7 @@ function corsOnly() {
 function errorResponse(e: unknown): Response {
   if (e instanceof HttpError) return json({ error: e.message }, e.status);
   if (e instanceof DcaParamError) return json({ error: e.message, reason: e.reason }, 400);
+  if (e instanceof SwapParamError) return json({ error: e.message }, 400);
   if (e instanceof DcaNotDeployedError) return json({ error: "The DCA contract is not configured on this API (POINCARE_DCA_ADDRESS)." }, 503);
   const msg = e instanceof Error ? e.message : String(e);
   return json({ error: `upstream: ${msg.slice(0, 200)}` }, 502);

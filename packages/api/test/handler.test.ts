@@ -9,13 +9,16 @@ import {
   buildExecuteSliceTx,
   buildOrderParams,
   dcaAbi,
+  erc20Abi,
+  planSwap,
+  routerAbi,
   toRegime,
   withDca,
   type DcaOrder,
   type PoincareClient,
   type SlicePreview,
 } from "@poincaretrade/sdk";
-import { decodeFunctionData, type Hex } from "viem";
+import { decodeFunctionData, getAddress, type Address, type Hex, type PublicClient } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiHandler } from "../src/handler.js";
 
@@ -45,6 +48,18 @@ const order: DcaOrder = {
 
 let preview: SlicePreview;
 
+const swapReads = {
+  readContract: async ({ functionName }: { functionName: string }) => {
+    switch (functionName) {
+      case "quoteExactInput": return 4_000n * W;
+      case "previewSpread": return [0n, 3n * 10n ** 15n];
+      case "poolKey": return { currency0: dep.usdc, currency1: dep.weth, fee: 8388608, tickSpacing: 60, hooks: dep.hook };
+      case "allowance": return 0n;
+      default: throw new Error(`unexpected read ${functionName}`);
+    }
+  },
+} as unknown as PublicClient;
+
 const poincare = {
   deployment: dep,
   publicClient: { getBlockNumber: async () => 5_000n },
@@ -54,6 +69,10 @@ const poincare = {
     { blockNumber: 4_500n, price: 2310, trend: "down", evidenceUp: 0, evidenceDown: 0.006, kappa: 0.043, directionalEfficiency: 0.8, sigma: 0.01, fee: 0.003 },
   ],
   quote: async (side: "buy" | "sell", amount: string) => ({ side, amountIn: BigInt(Math.round(Number(amount))) * W, amountOut: 43n * 10n ** 15n, price: 2314.5, spread: 0, fee: 0.003 }),
+  swap: {
+    plan: (from: Address, side: "buy" | "sell", amount: string, opts?: Parameters<typeof planSwap>[5]) =>
+      planSwap(swapReads, dep, from, side, BigInt(Math.round(Number(amount))) * W, opts),
+  },
   dca: {
     order: async (id: bigint) => (id === 7n ? order : null),
     ordersOf: async () => [order],
@@ -127,6 +146,34 @@ describe("quote", () => {
     expect((await get("/quote?side=buy&amount=-3")).status).toBe(400);
     const ok = await (await get("/quote?side=buy&amount=100")).json();
     expect(ok.amountOut).toBe("43000000000000000");
+  });
+});
+
+describe("swap build", () => {
+  it("returns an exact approve and the router swap, unsigned", async () => {
+    const r = await get(`/swap/build?owner=${OWNER}&side=sell&amount=2`);
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    const [approve, swap] = body.transactions;
+    expect(decodeFunctionData({ abi: erc20Abi, data: approve.data as Hex }).args).toEqual([dep.router, 2n * W]);
+    const d = decodeFunctionData({ abi: routerAbi, data: swap.data as Hex });
+    expect(d.args[1]).toBe((4_000n * W * 9_950n) / 10_000n);
+    expect(d.args[5]).toBe(getAddress(OWNER));
+    expect(body.deadline).toBe(String(NOW + 1200));
+  });
+
+  it("validates owner, side, amount, slippage and recipient", async () => {
+    expect((await get(`/swap/build?side=sell&amount=2`)).status).toBe(400);
+    expect((await get(`/swap/build?owner=${OWNER}&side=hold&amount=2`)).status).toBe(400);
+    expect((await get(`/swap/build?owner=${OWNER}&side=sell&amount=0`)).status).toBe(400);
+    expect((await get(`/swap/build?owner=${OWNER}&side=sell&amount=2&slippageBps=5000`)).status).toBe(400);
+    expect((await get(`/swap/build?owner=${OWNER}&side=sell&amount=2&recipient=nope`)).status).toBe(400);
+    expect((await get(`/swap/build?owner=${OWNER}&side=sell&amount=2&recipient=0x0000000000000000000000000000000000000000`)).status).toBe(400);
+  });
+
+  it("flags a different recipient in the warnings", async () => {
+    const body = await (await get(`/swap/build?owner=${OWNER}&side=sell&amount=2&recipient=0x00000000000000000000000000000000000000b2`)).json();
+    expect(body.warnings.join(" ")).toMatch(/not to the sender/);
   });
 });
 
