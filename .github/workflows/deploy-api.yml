@@ -27,7 +27,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.4.0
 
       # --no-verify-jwt: the API is public and keyless; callers send the site's publishable key,
       # which is not a JWT (see frontend/SECURITY-BACKEND.md).
