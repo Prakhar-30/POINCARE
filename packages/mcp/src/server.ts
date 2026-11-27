@@ -22,6 +22,7 @@ import {
 import { getAddress, type Address, type TransactionReceipt } from "viem";
 import { z } from "zod";
 import { describeRegime, fail, ok } from "./format.js";
+import { registerPrompts } from "./prompts.js";
 
 /** The user's own key, if they configured one. Without it every write tool returns unsigned txs. */
 export type Signer = { address: Address; send: (tx: TxRequest) => Promise<TransactionReceipt> };
@@ -98,6 +99,7 @@ export function createServer(opts: ServerOptions): McpServer {
   const { poincare, signer } = opts;
   const now = opts.now ?? (() => Math.floor(Date.now() / 1000));
   const server = new McpServer({ name: "poincare", version: "0.1.2" });
+  registerPrompts(server);
 
   type RunResult =
     | { sent: false; transactions: TxRequest[]; note: string }
